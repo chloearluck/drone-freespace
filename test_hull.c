@@ -14,25 +14,28 @@ const double THETA = M_PI / 10;  //temporarily increase degrees for better visib
  * -> problem is when sorting vertices by z component in splitSimple, goes away when I use a random seed value. Ignore for now.
  */
 
+class SimpleTriangle {
+public: 
+  Point * verts[3];
 
-class TriangleOrTrapezoid {
-  public:
-  Point * verts[4];
-  bool isTriangle;
-
-  TriangleOrTrapezoid(Point * a, Point * b, Point * c) {
+  SimpleTriangle(Point * a, Point * b, Point * c) {
     verts[0] = a;
     verts[1] = b;
     verts[2] = c;
-    isTriangle = true;
   }
+};
 
-  TriangleOrTrapezoid(Point * a, Point * b, Point * c, Point * d) {
-  	verts[0] = a;
-    verts[1] = b;
-    verts[2] = c;
-    verts[3] = d;
-    isTriangle = false;
+class OuterApproxFace {
+  public:
+  Point * bottom1, * bottom2, * top1, * top2;
+  bool isTrapazoid;
+
+  OuterApproxFace(Point * bottom1, Point * bottom2, Point * top1, Point * top2) {
+    this->bottom1 = bottom1;
+    this->bottom2 = bottom2;
+    this->top1 = top1;
+    this->top2 = top2;
+    isTrapazoid = (top2 != NULL) && (bottom2 != NULL);
   }
 };
 
@@ -115,10 +118,8 @@ void printfFaces(Polyhedron * poly) {
   }
 }
 
-
 //generate 3 outer approximation points from rotate point p around the origin, add them to pList
 void pointOuterApprox(Points &pList, Point * p) {
-  printf("pointOuterApprox:\n"); // !!! precision exception somewhere in here
 	Point * p_theta = new RotationPoint(p, THETA);
 	Point * q  = new TangentIntersectionPoint(p, p_theta);
 
@@ -129,7 +130,6 @@ void pointOuterApprox(Points &pList, Point * p) {
 
 // generate the 5 out approximation points from rotating a segment around the origin (assuming the nearest point on the segment is an endpoint)
 void segmentOuterApprox(Points &pList, Point * p1, Point * p2) {
-  printf("segmentOuterApprox:\n"); // !!! precision exception somewhere in here
 	Point * outer;
 	Point * inner;
 
@@ -149,30 +149,25 @@ void segmentOuterApprox(Points &pList, Point * p1, Point * p2) {
 }
 
 // generate the 8 outer approximation points from rotating a triangle around the origin
-Polyhedron * triangleOuterApprox(TriangleOrTrapezoid t) { 
-	printf("traingleOuterApprox:\n"); // !!! precision exception somewhere in here
-  Points pList;
-  bool b;
-  printf("comp1\n");
-  b = ((t.verts[0]->getP().getZ() - t.verts[1]->getP().getZ()).sign() == 0);
-  printf("comp2\n");
-  b = ((t.verts[0]->getP().getZ() - t.verts[2]->getP().getZ()).sign() == 0);
-  printf("done comp\n");
-
-  if ((t.verts[0]->getP().getZ() - t.verts[1]->getP().getZ()).sign() == 0) {
-		segmentOuterApprox(pList, t.verts[0], t.verts[1]);
-		pointOuterApprox(pList, t.verts[2]);
-	} else if ((t.verts[0]->getP().getZ() - t.verts[2]->getP().getZ()).sign() == 0) {
-		segmentOuterApprox(pList, t.verts[0], t.verts[2]);
-		pointOuterApprox(pList, t.verts[1]);
-	} else {
-		segmentOuterApprox(pList, t.verts[1], t.verts[2]);
-		pointOuterApprox(pList, t.verts[0]);
-	}
-	return convexHull(pList);
+Polyhedron * triangleOuterApprox(OuterApproxFace t) { 
+	Points pList;
+  
+  if (t.isTrapazoid) {
+    segmentOuterApprox(pList, t.top1, t.top2);
+    segmentOuterApprox(pList, t.bottom1, t.bottom2);
+  } else if (t.top2 == NULL) {
+    pointOuterApprox(pList, t.top1);
+    segmentOuterApprox(pList, t.bottom1, t.bottom2);
+  } else if (t.bottom2 == NULL) {
+    segmentOuterApprox(pList, t.top1, t.top2);
+    pointOuterApprox(pList, t.bottom1);
+  } else {
+    printf("invalid face\n");
+  }
+  return convexHull(pList);
 }
 
-void splitSimple(std::vector<TriangleOrTrapezoid> & tList, TriangleOrTrapezoid t) {
+void splitSimple(std::vector<OuterApproxFace> & tList, SimpleTriangle t) {
   Point * verts[3];
 	for (int i=0; i<3; i++)
 		verts[i] = t.verts[i];
@@ -180,8 +175,13 @@ void splitSimple(std::vector<TriangleOrTrapezoid> & tList, TriangleOrTrapezoid t
 
   std::sort(verts, verts + 3, compz);
 
-	if (((verts[0]->getP().getZ() - verts[1]->getP().getZ()).sign() == 0) || ((verts[1]->getP().getZ() - verts[2]->getP().getZ()).sign() == 0)) {
-    tList.push_back(t); //no splitting is needed
+	if ((verts[0]->getP().getZ() - verts[1]->getP().getZ()).sign() == 0) { //no splitting needed
+    tList.push_back(OuterApproxFace(verts[0], verts[1], verts[2], NULL));
+    return;
+  }
+
+  if ((verts[1]->getP().getZ() - verts[2]->getP().getZ()).sign() == 0) { //no splitting needed
+    tList.push_back(OuterApproxFace(verts[0], NULL, verts[1], verts[2]));
     return;
   }
 
@@ -189,13 +189,12 @@ void splitSimple(std::vector<TriangleOrTrapezoid> & tList, TriangleOrTrapezoid t
   PTR<Plane> plane = new PointNormalPlane(verts[1], new InputPoint(0,0,1));
   Point * newVert = new IntersectionPoint(verts[0], verts[2], plane);
 
-  //TO DO: does this maintain the face direction of triangle t? what if the middle vert is on the other side? does it matter?
-  tList.push_back(TriangleOrTrapezoid(verts[0], verts[1], newVert));
-  tList.push_back(TriangleOrTrapezoid(verts[1], verts[2], newVert));
+  tList.push_back(OuterApproxFace(verts[0], NULL, verts[1], newVert));
+  tList.push_back(OuterApproxFace(verts[1], newVert, verts[2], NULL));
 }
 
 //splits t into sub-triangles that can be rotated, add sub-triangles to tList
-void split(std::vector<TriangleOrTrapezoid> & tList, TriangleOrTrapezoid t) {
+void split(std::vector<OuterApproxFace> & tList, SimpleTriangle t) {
   PTR<Plane> plane = new TrianglePlane(t.verts[0], t.verts[1], t.verts[2]);
   Point * n = new NormalToPlane(plane); 
 	Point * p = new IntersectionPoint(new InputPoint(0,0,0), n, plane);
@@ -204,13 +203,6 @@ void split(std::vector<TriangleOrTrapezoid> & tList, TriangleOrTrapezoid t) {
 	PTR<Plane> edgePlane1 = new TrianglePlane(t.verts[2], t.verts[1], new AddPoint(t.verts[2], n));
 	PTR<Plane> edgePlane2 = new TrianglePlane(t.verts[0], t.verts[2], new AddPoint(t.verts[0], n));
   
-  // bool b = (PlaneSide(edgePlane0, p) < 0);
-  // printf("PlaneSide1 %s\n", (b? "true" : "false"));
-  // b = (PlaneSide(edgePlane1, p) < 0);
-  // printf("PlaneSide2 %s\n", (b? "true" : "false"));
-  // b = (PlaneSide(edgePlane2, p) < 0);
-  // printf("PlaneSide3 %s\n", (b? "true" : "false"));
-
   if ((PlaneSide(edgePlane0, p) < 0) || (PlaneSide(edgePlane1, p) < 0) || (PlaneSide(edgePlane2, p) < 0)) {
   	splitSimple(tList, t);
   	return;
@@ -260,7 +252,7 @@ void split(std::vector<TriangleOrTrapezoid> & tList, TriangleOrTrapezoid t) {
 		otherVert2 = t.verts[1];
 	}
 
-	TriangleOrTrapezoid simple = TriangleOrTrapezoid(intersect1, intersect2, commonVert); //TODO: check direction of triangle faces
+	SimpleTriangle simple = SimpleTriangle(intersect1, intersect2, commonVert); 
 	splitSimple(tList, simple);
 
 	Point * verts[4];
@@ -300,13 +292,13 @@ void split(std::vector<TriangleOrTrapezoid> & tList, TriangleOrTrapezoid t) {
 			newVert2 = new IntersectionPoint(tVertSorted[1], tVertSorted[2], z2);
 	}
 
-  //if bottom 2 have same z value, this is no bottom triangle 
+  //if bottom 2 have same z value, there is no bottom triangle 
   if ((verts[0]->getP().getZ() - verts[1]->getP().getZ()).sign() != 0) //test me!!!
-	  tList.push_back(TriangleOrTrapezoid(verts[0], verts[1], newVert1));
- 	tList.push_back(TriangleOrTrapezoid(verts[1], newVert1, verts[2], newVert2));
+	  tList.push_back(OuterApproxFace(verts[0], NULL, verts[1], newVert1));
+ 	tList.push_back(OuterApproxFace(verts[1], newVert1, verts[2], newVert2));
   //if top 2 have same z value, there is no top triangle
  	if ((verts[1]->getP().getZ() - verts[2]->getP().getZ()).sign() != 0) //test me!!!
-	  tList.push_back(TriangleOrTrapezoid(verts[2], verts[3], newVert2));	
+	  tList.push_back(OuterApproxFace(verts[2], newVert2, verts[3], NULL));	
 }
 
 int main (int argc, char *argv[]) {
@@ -328,17 +320,17 @@ int main (int argc, char *argv[]) {
 
   poly = poly->triangulate(); 
 
-  std::vector<TriangleOrTrapezoid> tList;
+  std::vector<SimpleTriangle> tList;
   for (int i=0; i<poly->faces.size(); i++) {
   	HEdges es = poly->faces[i]->getBoundary();
   	Point * p = es[0]->tail()->getP();
   	Point * q = es[0]->getNext()->tail()->getP();
   	Point * r = es[0]->getNext()->getNext()->tail()->getP();
 
-  	tList.push_back(TriangleOrTrapezoid(p,q,r));
+  	tList.push_back(SimpleTriangle(p,q,r));
   }
 
-  std::vector<TriangleOrTrapezoid> splitTList;
+  std::vector<OuterApproxFace> splitTList;
   //call split on each triangle in tList
   for (int i=0; i< tList.size(); i++) 
   	split(splitTList, tList[i]);
@@ -356,9 +348,12 @@ int main (int argc, char *argv[]) {
   //   savePoly(polyList[i], s);
   // }
 
-  // // repeatedly take the union 
-  // for (int i=0; i< polyList.size(); i++) 
+  // repeatedly take the union 
+  // Polyhedron * outerApprox = polyList[0];
+  // for (int i=1; i< polyList.size(); i++) {
+  //   printf("%d of %d\n", i, polyList.size()-1);
   //   outerApprox = outerApprox->boolean(polyList[i], Union);
+  // }
 
   return 0;
 }
