@@ -60,9 +60,9 @@ Polyhedron * loadPoly(char * filename) {
 
 void savePoly(Polyhedron * p, char * filename) {
   int n = strlen(filename);
-  char * str = new char[n+8];
+  char * str = new char[n+9];
   strncpy(str, filename, n);
-  strncpy(str+n, "-out.vtk", 8);
+  strncpy(str+n, "-out.vtk", 9);
 
   ofstream out;
   out.open(str);
