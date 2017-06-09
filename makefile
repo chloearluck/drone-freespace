@@ -42,6 +42,12 @@ test_hull:  test_hull.o hull.o polyhedron.o triangulate.o io.o object.o acp.o ge
 test_hull.o: test_hull.c hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h
 	$(COMPILE) test_hull.c
 
+test_union:  test_union.o hull.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o
+	$(LINK) test_union.o hull.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o -lmpfr -o test_union
+
+test_union.o: test_union.c hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h
+	$(COMPILE) test_union.c
+
 # mink.o: mink.C mink.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h
 # 	$(COMPILE) mink.C
 

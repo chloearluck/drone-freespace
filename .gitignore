@@ -1,4 +1,5 @@
 *.o
 test_hull
+test_union
 output
 .DS_Store
