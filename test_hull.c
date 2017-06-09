@@ -84,6 +84,29 @@ void printPoint(Point * p) {
 	printf("  %f %f %f\n", p->getP().getX().mid(), p->getP().getY().mid(), p->getP().getZ().mid());
 }
 
+void printTriangle(OuterApproxFace t) {
+  Point * p = ((t.top2 != NULL)? t.top2 : t.bottom2);
+  printf("(%f %f %f)(%f %f %f)(%f %f %f)\n",
+          t.top1->getP().getX().mid(), t.top1->getP().getY().mid(), t.top1->getP().getZ().mid(), 
+          t.bottom1->getP().getX().mid(), t.bottom1->getP().getY().mid(), t.bottom1->getP().getZ().mid(), 
+          p->getP().getX().mid(), p->getP().getY().mid(), p->getP().getZ().mid()
+        );
+}
+
+void printTriangle(SimpleTriangle t) {
+  printf("(%f %f %f)(%f %f %f)(%f %f %f)\n",
+          t.verts[0]->getP().getX().mid(), t.verts[0]->getP().getY().mid(), t.verts[0]->getP().getY().mid(),
+          t.verts[1]->getP().getX().mid(), t.verts[1]->getP().getY().mid(), t.verts[1]->getP().getY().mid(),
+          t.verts[2]->getP().getX().mid(), t.verts[2]->getP().getY().mid(), t.verts[2]->getP().getY().mid()
+        );
+  if ((t.verts[0]->getP().getZ() - t.verts[1]->getP().getZ()).sign() == 0)
+    printf("01\n");
+  if ((t.verts[0]->getP().getZ() - t.verts[2]->getP().getZ()).sign() == 0)
+    printf("02\n");
+  if ((t.verts[1]->getP().getZ() - t.verts[2]->getP().getZ()).sign() == 0)
+    printf("12\n");
+}
+
 void printPolyVerts(Polyhedron * poly) {
   printf("{\n");
   Vertices vlist = poly->vertices;
