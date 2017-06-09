@@ -56,20 +56,34 @@ void savePoly(Polyhedron * p, char * str) {
 //   savePoly(out, "out.vtk");
 // }
 
-int main (int argc, char *argv[]) {
-  Polyhedron * outerApprox = loadPoly("output/0-out.vtk");
-  if (outerApprox == NULL) 
-    return 1;
 
-  for (int i=1; i<168; i++) {
-    printf("%d of 168\n", i);
+Polyhedron * union_all(std::vector<Polyhedron*> pList, int start, int end) {
+  printf("union_all %d %d\n", start, end);
+  if (start == end) 
+    return pList[start];
+  if ((start+1) == end) 
+    return pList[start]->boolean(pList[end], Union);
+  int mid = (start+end)/2;
+  Polyhedron * p1 = union_all(pList, start, mid);
+  Polyhedron * p2 = union_all(pList, mid+1, end);
+  printf("taking union of (%d,%d) and (%d,%d)\n", start, mid, mid+1, end);
+  return p1->boolean(p2, Union);
+}
+
+Polyhedron * union_all(std::vector<Polyhedron*> pList) {
+  return union_all(pList, 0, pList.size()-1);
+}
+
+int main (int argc, char *argv[]) {
+  std::vector<Polyhedron *> pList;
+  for (int i=0; i<168; i++) {
     char s[30];
     sprintf(s, "output/%d-out.vtk", i);
     Polyhedron * poly = loadPoly(s);
-    outerApprox = outerApprox->boolean(poly, Union);
-    sprintf(s, "output/union-%d.vtk", i);
-    savePoly(outerApprox, s);
+    pList.push_back(poly);
   }
 
-  savePoly(outerApprox, "out.vtk");
+  Polyhedron * p = union_all(pList);
+
+  savePoly(p, "out.vtk");
 }
