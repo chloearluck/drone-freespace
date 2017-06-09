@@ -1,2 +1,4 @@
 *.o
 test_hull
+output
+.DS_Store
