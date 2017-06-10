@@ -1,5 +1,6 @@
 #include "hull.h"
 #include "geometry3d.h"
+#include <cstring>
 
 // const double THETA = M_PI / 180; //approximately 1 degree  
 const double THETA = M_PI / 10;  //temporarily increase degrees for better visibility
