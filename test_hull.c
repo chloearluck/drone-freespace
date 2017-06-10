@@ -5,14 +5,23 @@
 const double THETA = M_PI / 10;  //temporarily increase degrees for better visibility
 
 /*
- * notes: 
  * first argument is the name of the file (no extension, should I change this?) that is the input polygon
  * second argument (optional) is the seed for random perturbation 
  * the program generates the convex hull polygons and saves them as '0-out.vtk', '1-out.vtk', ...
- * getting a precision exception from the when splitting triangles,
- *  likely the same issue I was getting and ignoring in the original version of the code. Debug.
- * -> problem is when sorting vertices by z component in splitSimple, goes away when I use a random seed value. Ignore for now.
+ 
+ * bugs:
+ * precision exception when sorting vertices by z component in splitSimple, 
+ *    goes away when I use any random seed value. Ignoring for now.
+ 
+ * union behaving strangely
+ * - union of two non-empty polyhedrons becomes an empty polyhedron
+ * - seg fault happening at specific unions
+ *
+ * to do:
+ * debug union seg fault in linux gdb
+ * debug extra bits in result of union. are there corresponding polyhedrons? where are they coming from?
  */
+
 
 class SimpleTriangle {
 public: 
@@ -324,6 +333,23 @@ void split(std::vector<OuterApproxFace> & tList, SimpleTriangle t) {
 	  tList.push_back(OuterApproxFace(verts[2], newVert2, verts[3], NULL));	
 }
 
+Polyhedron * union_all(std::vector<Polyhedron*> pList, int start, int end) {
+  printf("union_all %d %d\n", start, end);
+  if (start == end) 
+    return pList[start];
+  if ((start+1) == end) 
+    return pList[start]->boolean(pList[end], Union);
+  int mid = (start+end)/2;
+  Polyhedron * p1 = union_all(pList, start, mid);
+  Polyhedron * p2 = union_all(pList, mid+1, end);
+  printf("taking union of (%d,%d) and (%d,%d)\n", start, mid, mid+1, end);
+  return p1->boolean(p2, Union);
+}
+
+Polyhedron * union_all(std::vector<Polyhedron*> pList) {
+  return union_all(pList, 0, pList.size()-1);
+}
+
 int main (int argc, char *argv[]) {
 	if (argc < 2) {
     printf("not enough arguments\n");
@@ -365,18 +391,14 @@ int main (int argc, char *argv[]) {
   	polyList.push_back(triangleOuterApprox(splitTList[i]));
   }
 
-  // char s[3];
+  // char s[30];
   // for (int i=0; i<polyList.size(); i++) {
   //   sprintf(s, "%d", i);
   //   savePoly(polyList[i], s);
   // }
 
-  // repeatedly take the union 
-  // Polyhedron * outerApprox = polyList[0];
-  // for (int i=1; i< polyList.size(); i++) {
-  //   printf("%d of %d\n", i, polyList.size()-1);
-  //   outerApprox = outerApprox->boolean(polyList[i], Union);
-  // }
+  Polyhedron * outerApprox = union_all(polyList);
+  savePoly(outerApprox, filename);
 
   return 0;
 }
