@@ -74,16 +74,37 @@ Polyhedron * union_all(std::vector<Polyhedron*> pList) {
   return union_all(pList, 0, pList.size()-1);
 }
 
+double randomInRange(double low, double high) {
+  return (random() * (high-low)) + low;
+}
+
 int main (int argc, char *argv[]) {
-  std::vector<Polyhedron *> pList;
-  for (int i=0; i<168; i++) {
-    char s[30];
-    sprintf(s, "output/%d-out.vtk", i);
-    Polyhedron * poly = loadPoly(s);
-    pList.push_back(poly);
+  if (argc == 2) { 
+    unsigned seed = atoi(argv[1]);
+    srandom(seed);
   }
 
-  Polyhedron * p = union_all(pList);
+  bool generateSimple = true;
 
-  savePoly(p, "out.vtk");
+  if (generateSimple) {
+    Points pList;
+    for (int i=0; i<4; i++) {
+      pList.push_back(new InputPoint(randomInRange(-1,1), randomInRange(-1,1), randomInRange(-1,1)));
+    }
+
+    Polyhedron * simple = convexHull(pList);
+    savePoly(simple, "simple.vtk");
+  } else {
+    std::vector<Polyhedron *> pList;
+    for (int i=0; i<168; i++) {
+      char s[30];
+      sprintf(s, "output/%d-out.vtk", i);
+      Polyhedron * poly = loadPoly(s);
+      pList.push_back(poly);
+    }
+
+    Polyhedron * p = union_all(pList);
+
+    savePoly(p, "out.vtk");
+  }
 }
