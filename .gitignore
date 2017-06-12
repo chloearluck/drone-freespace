@@ -1,5 +1,5 @@
 *.o
-test_hull
+outer_approx
 test_union
 output
 .DS_Store

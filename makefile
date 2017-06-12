@@ -36,11 +36,11 @@ triangulate.o: triangulate.C triangulate.h polyhedron.h octree.h rbtree.h object
 hull.o: hull.C hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h
 	$(COMPILE) hull.C
 
-test_hull:  test_hull.o hull.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o
-	$(LINK) test_hull.o hull.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o -lmpfr -o test_hull
+outer_approx:  outer_approx.o hull.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o
+	$(LINK) outer_approx.o hull.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o -lmpfr -o outer_approx
 
-test_hull.o: test_hull.c hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h
-	$(COMPILE) test_hull.c
+outer_approx.o: outer_approx.c hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h
+	$(COMPILE) outer_approx.c
 
 test_union:  test_union.o hull.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o
 	$(LINK) test_union.o hull.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o -lmpfr -o test_union
