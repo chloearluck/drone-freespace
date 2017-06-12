@@ -72,4 +72,4 @@ acp.o:	acp.cc acp.h
 # 	-DIL_STD -Icplex124/include expander.C
 
 clean: 
-	rm -f *.o *~ hull 
+	rm -f *.o *~ hull test_union outer_approx
