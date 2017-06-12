@@ -6,18 +6,17 @@
 const double THETA = M_PI / 10;  //temporarily increase degrees for better visibility
 
 /*
- * first argument is the name of the file (no extension, should I change this?) that is the input polygon
+ * first argument is the name of the file (no extension) that is the input polygon
  * second argument (optional) is the seed for random perturbation 
- * the program generates the convex hull polygons and saves them as '0-out.vtk', '1-out.vtk', ...
- 
+
  * bugs:
  * precision exception when sorting vertices by z component in splitSimple, 
  *    goes away when I use any random seed value. Ignoring for now.
- 
+ *
  * union behaving strangely
  * - union of two non-empty polyhedrons becomes an empty polyhedron
- * - seg fault happening at specific unions
- *
+ * - seg fault happening at some unions
+ 
  * to do:
  * debug union seg fault in linux gdb
  * debug extra bits in result of union. are there corresponding polyhedrons? where are they coming from?
@@ -383,13 +382,14 @@ int main (int argc, char *argv[]) {
   	polyList.push_back(triangleOuterApprox(splitTList[i]));
   }
 
-  // char s[30];
-  // for (int i=0; i<polyList.size(); i++) {
-  //   sprintf(s, "%d", i);
-  //   savePoly(polyList[i], s);
-  // }
+  char s[30];
+  for (int i=0; i<polyList.size(); i++) {
+    sprintf(s, "%d", i);
+    savePoly(polyList[i], s);
+  }
 
   Polyhedron * outerApprox = union_all(polyList);
+  printf("saving outerApprox\n");
   savePoly(outerApprox, filename);
 
   return 0;
