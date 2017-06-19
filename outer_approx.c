@@ -148,12 +148,12 @@ void splitSimple(std::vector<OuterApproxFace> & tList, SimpleTriangle t) {
 
   std::sort(verts, verts + 3, compz);
 
-	if ((verts[0]->getP().getZ() - verts[1]->getP().getZ()).sign() == 0) { //no splitting needed
+	if (DiffZ(verts[0], verts[1]) == 0) { //no splitting needed
     tList.push_back(OuterApproxFace(verts[0], verts[1], verts[2], NULL));
     return;
   }
 
-  if ((verts[1]->getP().getZ() - verts[2]->getP().getZ()).sign() == 0) { //no splitting needed
+  if (DiffZ(verts[1], verts[2]) == 0) { //no splitting needed
     tList.push_back(OuterApproxFace(verts[0], NULL, verts[1], verts[2]));
     return;
   }
@@ -245,7 +245,7 @@ void split(std::vector<OuterApproxFace> & tList, SimpleTriangle t) {
 	if ((verts[1] == t.verts[0]) || (verts[1] == t.verts[1]) || (verts[1] == t.verts[2]))
 		newVert1 = new ZIntercectPoint(intersect1, intersect2, verts[1]);
 	else {
-		if (verts[1]->getP().getZ() < tVertSorted[1]->getP().getZ())
+		if (DiffZ(verts[1], tVertSorted[1]) < 0) {
 			newVert1 = new ZIntercectPoint(tVertSorted[0], tVertSorted[1], verts[1]);
 		else 
 			newVert1 = new ZIntercectPoint(tVertSorted[1], tVertSorted[2], verts[1]);
@@ -254,18 +254,18 @@ void split(std::vector<OuterApproxFace> & tList, SimpleTriangle t) {
 	if ((verts[2] == t.verts[0]) || (verts[2] == t.verts[1]) || (verts[2] == t.verts[2]))
 		newVert2 = new ZIntercectPoint(intersect1, intersect2, verts[2]);
 	else {
-		if (verts[2]->getP().getZ() < tVertSorted[1]->getP().getZ())
+    if (DiffZ(verts[2], tVertSorted[1]) < 0) {
 			newVert2 = new ZIntercectPoint(tVertSorted[0], tVertSorted[1], verts[2]);
 		else 
 			newVert2 = new ZIntercectPoint(tVertSorted[1], tVertSorted[2], verts[2]);
 	}
 
   //if bottom 2 have same z value, there is no bottom triangle 
-  if ((verts[0]->getP().getZ() - verts[1]->getP().getZ()).sign() != 0) //test me!!!
+  if (DiffZ(verts[0], verts[1]) != 0) {
 	  tList.push_back(OuterApproxFace(verts[0], NULL, verts[1], newVert1));
  	tList.push_back(OuterApproxFace(verts[1], newVert1, verts[2], newVert2));
   //if top 2 have same z value, there is no top triangle
- 	if ((verts[1]->getP().getZ() - verts[2]->getP().getZ()).sign() != 0) //test me!!!
+  if (DiffZ(verts[1], verts[2]) != 0) {
 	  tList.push_back(OuterApproxFace(verts[2], newVert2, verts[3], NULL));	
 }
 
