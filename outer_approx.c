@@ -2,25 +2,30 @@
 #include "geometry3d.h"
 #include <cstring>
 
-// const double THETA = M_PI / 180; //approximately 1 degree  
-const double THETA = M_PI / 10;  //temporarily increase degrees for better visibility
+const double TAN_THETA = tan(M_PI / 10);  //approximately 18 degrees (for better visibility) 
 
-/*
- * first argument is the name of the file (no extension) that is the input polygon
- * second argument (optional) is the seed for random perturbation 
+class InputParameter : public Object<Parameter> {
+public:
+  InputParameter (double x) { set(Parameter::input(x)); }
+};
 
- * bugs:
- * precision exception when sorting vertices by z component in splitSimple, 
- *    goes away when I use any random seed value. Ignoring for now.
- *
- * union behaving strangely
- * - union of two non-empty polyhedrons becomes an empty polyhedron
- * - seg fault happening at some unions
- 
- * to do:
- * debug union seg fault in linux gdb
- * debug extra bits in result of union. are there corresponding polyhedrons? where are they coming from?
- */
+class SinCosAlpha : public Point {
+  Object<Parameter> *tan_theta;
+  PV3 calculate () {
+    Parameter t = tan_theta->get();
+    Parameter sint = 2*t/(1+t*t);
+    Parameter cost = (1-t*t)/(1+t*t);
+    Parameter alpha = (1-cost)/sint;
+    return PV3(sint, cost, alpha);
+  }
+
+public:
+  SinCosAlpha (Object<Parameter> *t) : tan_theta(t) {}
+};
+
+InputParameter * t = new InputParameter(TAN_THETA);
+Point * sin_cos_alpha = new SinCosAlpha(t);
+
 
 
 class SimpleTriangle {
@@ -152,8 +157,8 @@ void printfFaces(Polyhedron * poly) {
 
 //generate 3 outer approximation points from rotate point p around the origin, add them to pList
 void pointOuterApprox(Points &pList, Point * p) {
-	Point * p_theta = new RotationPoint(p, THETA);
-	Point * q  = new TangentIntersectionPoint(p, p_theta);
+	Point * p_theta = new RotationPoint(p, sin_cos_alpha);
+	Point * q  = new TangentIntersectionPoint(p, sin_cos_alpha);
 
 	pList.push_back(p);
 	pList.push_back(p_theta);
@@ -174,7 +179,7 @@ void segmentOuterApprox(Points &pList, Point * p1, Point * p2) {
   }
 
   pointOuterApprox(pList, outer);
-  Point * inner_theta = new RotationPoint(inner, THETA);
+  Point * inner_theta = new RotationPoint(inner, sin_cos_alpha);
 
   pList.push_back(inner);
   pList.push_back(inner_theta);

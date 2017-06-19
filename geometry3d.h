@@ -62,22 +62,20 @@ Primitive5(InSphere, Point*, a, Point*, b, Point*, c, Point*, d, Point*, e);
 
 //Points defined by rotating point theta radians around the origin
 class RotationPoint : public Point {
-  PTR<Point> point;
-  double theta;
+  PTR<Point> point, sin_cos_alpha;
   PV3 calculate ();
 
 public:
-  RotationPoint(PTR<Point> point, double theta) : point(point), theta(theta) {}
+  RotationPoint(PTR<Point> point, PTR<Point> sin_cos_alpha) : point(point), sin_cos_alpha(sin_cos_alpha) {}
 };
 
 //point defined by the intersection of point1 and point2's tangent lines in the xy plane
 class TangentIntersectionPoint : public Point {
-  PTR<Point> point1;
-  PTR<Point> point2;
+  PTR<Point> point, sin_cos_alpha;
   PV3 calculate ();
 
 public:
-  TangentIntersectionPoint(PTR<Point> point1, PTR<Point> point2) : point1(point1), point2(point2) {}
+  TangentIntersectionPoint(PTR<Point> point, PTR<Point> sin_cos_alpha) : point(point), sin_cos_alpha(sin_cos_alpha) {}
 };
 
 //point defined by the normal vector to plane 

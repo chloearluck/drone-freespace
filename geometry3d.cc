@@ -65,10 +65,8 @@ PlaneData PointNormalPlane::calculate () {
 } 
 
 PV3 RotationPoint::calculate () {
-  Parameter s = Parameter::input(tan(theta)); //opposite side of triangle with angle ~= theta
-  Parameter h = (1 + s * s).sqrt();
-  Parameter sint = s / h;
-  Parameter cost = 1 / h;
+  Parameter sint = sin_cos_alpha->getP().getX();
+  Parameter cost = sin_cos_alpha->getP().getY();
   PV3 p = point->getP();
   return PV3(cost * p.getX() - sint * p.getY(),
              sint * p.getX() + cost * p.getY(), 
@@ -76,18 +74,11 @@ PV3 RotationPoint::calculate () {
 }
 
 PV3 TangentIntersectionPoint::calculate () {
-  PV3 p1 = point1->getP();
-  PV3 p2 = point2->getP();
-  PV3 n = PV3::input(0,0,1);
-  PV3 t1 = p1.cross(n);
-  PV3 t2 = p2.cross(n);
-
-  //t = -||(p1-p2)xt2|| / ||t1xt2||
-  PV3 numerator = (p1-p2).cross(t2);
-  PV3 denominator = t1.cross(t2);
-  Parameter t = - numerator.dot(numerator).sqrt() / denominator.dot(denominator).sqrt();
-  PV3 result = p1 + t * t1;
-  return result;
+  Parameter alpha = sin_cos_alpha->getP().getZ();
+  PV3 p = point->getP();
+  return PV3(p.getX()-alpha*p.getY(), 
+             p.getY()+alpha*p.getX(), 
+             p.getZ() );
 }
 
 PV3 AddPoint::calculate () {
