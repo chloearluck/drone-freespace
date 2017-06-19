@@ -335,9 +335,12 @@ void split(std::vector<OuterApproxFace> & tList, SimpleTriangle t) {
 
 Polyhedron * union_all(std::vector<Polyhedron*> pList) {
   Polyhedron * outerApprox = pList[0];
+  char s[30];
   for (int i=1; i< pList.size(); i++) {
     printf("union %d of %d\n", i, pList.size()-1);
+    sprintf(s, "union-%d", i);
     outerApprox = outerApprox->boolean(pList[i], Union);
+    savePoly(outerApprox, s);
   }
   return outerApprox;
 }
