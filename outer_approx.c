@@ -344,6 +344,7 @@ Polyhedron * union_all(std::vector<Polyhedron*> pList) {
     printf("union %d of %d\n", i, pList.size()-1);
     outerApprox = outerApprox->boolean(pList[i], Union);
   }
+  return outerApprox;
 }
 
 int main (int argc, char *argv[]) {
