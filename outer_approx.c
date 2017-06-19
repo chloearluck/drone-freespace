@@ -94,67 +94,6 @@ struct CompareZ {
   }
 };
 
-void printPoint(Point * p) {
-	printf("  %f %f %f\n", p->getP().getX().mid(), p->getP().getY().mid(), p->getP().getZ().mid());
-}
-
-void printTriangle(OuterApproxFace t) {
-  Point * p = ((t.top2 != NULL)? t.top2 : t.bottom2);
-  printf("(%f %f %f)(%f %f %f)(%f %f %f)\n",
-          t.top1->getP().getX().mid(), t.top1->getP().getY().mid(), t.top1->getP().getZ().mid(), 
-          t.bottom1->getP().getX().mid(), t.bottom1->getP().getY().mid(), t.bottom1->getP().getZ().mid(), 
-          p->getP().getX().mid(), p->getP().getY().mid(), p->getP().getZ().mid()
-        );
-}
-
-void printTriangle(SimpleTriangle t) {
-  printf("(%f %f %f)(%f %f %f)(%f %f %f)\n",
-          t.verts[0]->getP().getX().mid(), t.verts[0]->getP().getY().mid(), t.verts[0]->getP().getY().mid(),
-          t.verts[1]->getP().getX().mid(), t.verts[1]->getP().getY().mid(), t.verts[1]->getP().getY().mid(),
-          t.verts[2]->getP().getX().mid(), t.verts[2]->getP().getY().mid(), t.verts[2]->getP().getY().mid()
-        );
-  if ((t.verts[0]->getP().getZ() - t.verts[1]->getP().getZ()).sign() == 0)
-    printf("01\n");
-  if ((t.verts[0]->getP().getZ() - t.verts[2]->getP().getZ()).sign() == 0)
-    printf("02\n");
-  if ((t.verts[1]->getP().getZ() - t.verts[2]->getP().getZ()).sign() == 0)
-    printf("12\n");
-}
-
-void printPolyVerts(Polyhedron * poly) {
-  printf("{\n");
-  Vertices vlist = poly->vertices;
-  for (int i= 0; i<vlist.size(); i++) {
-    Point * p = vlist[i]->getP();
-    printf("  %f %f %f\n", p->getP().getX().mid(), p->getP().getY().mid(), p->getP().getZ().mid());
-  }
-  printf("}\n------\n");
-}
-
-void printEdge(HEdge * e) {
-  Point * t = e->tail()->getP();
-  Point * h = e->head()->getP();
-  printf("  %f %f %f -> %f %f %f\n", t->getP().getX().mid(), t->getP().getY().mid(), t->getP().getZ().mid(),
-                                     h->getP().getX().mid(), h->getP().getY().mid(), h->getP().getZ().mid());
-}
-
-void printfFaces(Polyhedron * poly) {
-  bool matlab = true;
-  for (int i=0; i<poly->faces.size(); i++) {
-    HEdges es = poly->faces[i]->getBoundary();
-    HEdge * e = es[0];
-    if (matlab) printf("T = [\n");
-    
-    do {
-      Point * p = e->tail()->getP();
-      printPoint(p);
-      e = e->getNext();
-    } while (e != es[0]);
-    if (matlab) printf("];  Ts = cat(3, Ts, T);\n");
-    printf("\n");
-  }
-}
-
 //generate 3 outer approximation points from rotate point p around the origin, add them to pList
 void pointOuterApprox(Points &pList, Point * p) {
 	pList.push_back(p);
