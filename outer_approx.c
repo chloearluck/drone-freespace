@@ -217,9 +217,7 @@ void splitSimple(std::vector<OuterApproxFace> & tList, SimpleTriangle t) {
     return;
   }
 
-  //get intersection between plane with v=(0,0,1) and d=vert[1]->getP().getZ()
-  PTR<Plane> plane = new PointNormalPlane(verts[1], new InputPoint(0,0,1));
-  Point * newVert = new IntersectionPoint(verts[0], verts[2], plane);
+  Point * newVert = new ZIntercectPoint(verts[0], verts[2], verts[1]);
 
   tList.push_back(OuterApproxFace(verts[0], NULL, verts[1], newVert));
   tList.push_back(OuterApproxFace(verts[1], newVert, verts[2], NULL));
@@ -295,10 +293,7 @@ void split(std::vector<OuterApproxFace> & tList, SimpleTriangle t) {
 	CompareZ compz;
 	std::sort(verts, verts + 4, compz);
 
-	PTR<Plane> z1 = new PointNormalPlane(verts[1], z);
-  PTR<Plane> z2 = new PointNormalPlane(verts[2], z);
- 
-  Point * newVert1;
+	Point * newVert1;
   Point * newVert2;
 
   Point * tVertSorted[3];
@@ -307,21 +302,21 @@ void split(std::vector<OuterApproxFace> & tList, SimpleTriangle t) {
   std::sort(tVertSorted, tVertSorted + 3, compz);
 
 	if ((verts[1] == t.verts[0]) || (verts[1] == t.verts[1]) || (verts[1] == t.verts[2]))
-		newVert1 = new IntersectionPoint(intersect1, intersect2, z1);
+		newVert1 = new ZIntercectPoint(intersect1, intersect2, verts[1]);
 	else {
 		if (verts[1]->getP().getZ() < tVertSorted[1]->getP().getZ())
-			newVert1 = new IntersectionPoint(tVertSorted[0], tVertSorted[1], z1);
+			newVert1 = new ZIntercectPoint(tVertSorted[0], tVertSorted[1], verts[1]);
 		else 
-			newVert1 = new IntersectionPoint(tVertSorted[1], tVertSorted[2], z1);
+			newVert1 = new ZIntercectPoint(tVertSorted[1], tVertSorted[2], verts[1]);
 	}
 
 	if ((verts[2] == t.verts[0]) || (verts[2] == t.verts[1]) || (verts[2] == t.verts[2]))
-		newVert2 = new IntersectionPoint(intersect1, intersect2, z2);
+		newVert2 = new ZIntercectPoint(intersect1, intersect2, verts[2]);
 	else {
 		if (verts[2]->getP().getZ() < tVertSorted[1]->getP().getZ())
-			newVert2 = new IntersectionPoint(tVertSorted[0], tVertSorted[1], z2);
+			newVert2 = new ZIntercectPoint(tVertSorted[0], tVertSorted[1], verts[2]);
 		else 
-			newVert2 = new IntersectionPoint(tVertSorted[1], tVertSorted[2], z2);
+			newVert2 = new ZIntercectPoint(tVertSorted[1], tVertSorted[2], verts[2]);
 	}
 
   //if bottom 2 have same z value, there is no bottom triangle 

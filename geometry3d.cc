@@ -85,6 +85,11 @@ PV3 AddPoint::calculate () {
   return point1->getP() + point2->getP();
 }
 
+PV3 ZIntercectPoint::calculate () {
+  Parameter t = (c->getP().getZ() - a->getP().getZ()) / (b->getP().getZ() - a->getP().getZ());
+  return a->getP() + t * (b->getP() - a->getP());
+}
+
 PV3 ACrossBPoint::calculate () {
   return point1->getP().cross(point2->getP());
 }

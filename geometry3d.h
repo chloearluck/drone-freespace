@@ -87,6 +87,17 @@ public:
   NormalToPlane(PTR<Plane> plane) : plane(plane) {}
 };
 
+//point along ab which has the same z component as c
+class ZIntercectPoint : public Point {
+  PTR<Point> a;
+  PTR<Point> b;
+  PTR<Point> c;
+  PV3 calculate ();
+
+public:
+  ZIntercectPoint(PTR<Point> a, PTR<Point> b, PTR<Point> c) : a(a), b(b), c(c) {}
+};
+
 //point defined by adding two points
 class AddPoint : public Point {
   PTR<Point> point1;
