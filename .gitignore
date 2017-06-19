@@ -3,3 +3,4 @@ outer_approx
 test_union
 output
 .DS_Store
+*out.vtk
