@@ -157,12 +157,9 @@ void printfFaces(Polyhedron * poly) {
 
 //generate 3 outer approximation points from rotate point p around the origin, add them to pList
 void pointOuterApprox(Points &pList, Point * p) {
-	Point * p_theta = new RotationPoint(p, sin_cos_alpha);
-	Point * q  = new TangentIntersectionPoint(p, sin_cos_alpha);
-
 	pList.push_back(p);
-	pList.push_back(p_theta);
-	pList.push_back(q);
+	pList.push_back(new RotationPoint(p, sin_cos_alpha));
+	pList.push_back(new TangentIntersectionPoint(p, sin_cos_alpha));
 }
 
 // generate the 5 out approximation points from rotating a segment around the origin (assuming the nearest point on the segment is an endpoint)
@@ -179,13 +176,11 @@ void segmentOuterApprox(Points &pList, Point * p1, Point * p2) {
   }
 
   pointOuterApprox(pList, outer);
-  Point * inner_theta = new RotationPoint(inner, sin_cos_alpha);
-
   pList.push_back(inner);
-  pList.push_back(inner_theta);
+  pList.push_back(new RotationPoint(inner, sin_cos_alpha));
 }
 
-// generate the 8 outer approximation points from rotating a triangle around the origin
+// generate the 8 o 10 convex hull points from rotating a triangle or trapezoid around the origin
 Polyhedron * triangleOuterApprox(OuterApproxFace t) { 
 	Points pList;
   
