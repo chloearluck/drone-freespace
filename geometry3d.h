@@ -50,6 +50,7 @@ using namespace acp;
 // Sorry this is a clunky macro, requiring commas between types and variables.
 // int PlaneSide::side() must be defined in geometry3d.cc.
 Primitive2(PlaneSide, Plane*, plane, Point*, point);
+Primitive2(DiffLength, Point*, i, Point*, j);
 
 // Orientation of tetrahedron.
 Primitive4(Orient3D, Point*, a, Point*, b, Point*, c, Point*, d);

@@ -8,6 +8,10 @@ int PlaneSide::sign () {
   return (v.dot(p) - d).sign();
 }
 
+int DiffLength::sign() {
+  return (i->getP().dot(i->getP()) - j->getP().dot(i->getP())).sign();
+}
+
 // Comment out to test how ACP handles inaccuracy.
 #define ACCURATE_ORIENT3D
 

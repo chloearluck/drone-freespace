@@ -108,7 +108,7 @@ void segmentOuterApprox(Points &pList, Point * p1, Point * p2) {
 	Point * outer;
 	Point * inner;
 
-	if (p1->get().dot(p1->get()) > p2->get().dot(p2->get())) { 
+  if (DiffLength(p1,p2) > 0) { 
     outer = p1;
     inner = p2;
   } else {
