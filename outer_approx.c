@@ -88,9 +88,11 @@ void savePoly(Polyhedron * p, char * filename) {
   }
 }
 
+Primitive2(DiffZ, Point*, i, Point*, j);
+int DiffZ::sign() { return (i->getP().getZ() - j->getP().getZ()).sign(); }
 struct CompareZ {
   bool operator()(Point * i, Point * j) {
-    return ((i->getP().getZ() - j->getP().getZ()).sign() < 0);
+    return (DiffZ(i, j) < 0); 
   }
 };
 
