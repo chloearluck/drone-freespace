@@ -55,9 +55,9 @@ class OuterApproxFace {
 
 Polyhedron * loadPoly(char * filename) {
   int n = strlen(filename);
-  char * str = new char[n+4];
+  char * str = new char[n+5];
   strncpy(str, filename, n);
-  strncpy(str+n, ".vtk", 4);
+  strncpy(str+n, ".vtk", 5);
 
   Polyhedron * poly;
   ifstream infile (str);
