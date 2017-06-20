@@ -51,7 +51,7 @@ using namespace acp;
 // int PlaneSide::side() must be defined in geometry3d.cc.
 Primitive2(PlaneSide, Plane*, plane, Point*, point);
 Primitive2(DiffLength, Point*, i, Point*, j);
-
+Primitive3(IsTangent, Point*, v0, Point*, v1, Point*, v2);
 // Orientation of tetrahedron.
 Primitive4(Orient3D, Point*, a, Point*, b, Point*, c, Point*, d);
 
@@ -129,6 +129,13 @@ public:
     : a(a), b(b), c(c) {}
 };
 
+class SplitPlane : public Plane {
+  PTR<Point> v0, v1, v2;
+  PlaneData calculate ();
+
+public:
+  SplitPlane(PTR<Point> v0, PTR<Point> v1, PTR<Point> v2) : v0(v0), v1(v1), v2(v2) {}
+};
 
 class PointNormalPlane : public Plane {
   ObjPTR<PV3> point, normal;
