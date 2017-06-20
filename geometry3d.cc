@@ -15,19 +15,11 @@ int IsTangent::sign () {
   PV3 n = (b - a).cross(c - a); 
   Parameter k = n.dot(a);
   PV3 p = k / (n.dot(n)) * n;
-  cout<<"p = ["<<p.getX().mid()<<" "<<p.getY().mid()<<" "<<p.getZ().mid()<<"];\n"; //n, k, and p are confirmed correct
 
   PV3 n0 = (a-b).cross(n); Parameter k0 = n0.dot(b);
   PV3 n1 = (b-c).cross(n); Parameter k1 = n1.dot(c);
   PV3 n2 = (c-a).cross(n); Parameter k2 = n2.dot(a);
 
-  if ((n0.dot(p) - k0).sign() < 0)
-    cout<<"wrong side of ab: ("<<a.getX().mid()<<" "<<a.getY().mid()<<" "<<a.getZ().mid()<<") ("<<b.getX().mid()<<" "<<b.getY().mid()<<" "<<b.getZ().mid()<<"\n";
-  if ((n1.dot(p) - k1).sign() < 0)
-    cout<<"wrong side of bc: ("<<b.getX().mid()<<" "<<b.getY().mid()<<" "<<b.getZ().mid()<<") ("<<c.getX().mid()<<" "<<c.getY().mid()<<" "<<c.getZ().mid()<<"\n";
-  if ((n2.dot(p) - k2).sign() < 0)
-    cout<<"wrong side of ac: ("<<a.getX().mid()<<" "<<a.getY().mid()<<" "<<a.getZ().mid()<<") ("<<c.getX().mid()<<" "<<c.getY().mid()<<" "<<c.getZ().mid()<<"\n";
-  // printf("------------\n");
   if ( ((n0.dot(p) - k0).sign() >= 0) && ((n1.dot(p) - k1).sign() >= 0) && ((n2.dot(p) - k2).sign() >= 0) )
     return 1;  
   return 0;
