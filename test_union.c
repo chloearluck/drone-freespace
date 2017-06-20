@@ -75,7 +75,7 @@ Polyhedron * union_all(std::vector<Polyhedron*> pList) {
 }
 
 double randomInRange(double low, double high) {
-  return (random() * (high-low)) + low;
+  return (random()/(RAND_MAX+1.0) * (high-low)) + low;
 }
 
 int main (int argc, char *argv[]) {
