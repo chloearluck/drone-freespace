@@ -166,36 +166,24 @@ void splitSimple(std::vector<OuterApproxFace> & tList, SimpleTriangle t) {
 
 //splits t into sub-triangles that can be rotated, add sub-triangles to tList
 void split(std::vector<OuterApproxFace> & tList, SimpleTriangle t) {
-  PTR<Plane> plane = new TrianglePlane(t.verts[0], t.verts[1], t.verts[2]);
-  Point * n = new NormalToPlane(plane); 
-	Point * p = new IntersectionPoint(new InputPoint(0,0,0), n, plane);
-
-	PTR<Plane> edgePlane0 = new TrianglePlane(t.verts[1], t.verts[0], new AddPoint(t.verts[1], n));
-	PTR<Plane> edgePlane1 = new TrianglePlane(t.verts[2], t.verts[1], new AddPoint(t.verts[2], n));
-	PTR<Plane> edgePlane2 = new TrianglePlane(t.verts[0], t.verts[2], new AddPoint(t.verts[0], n));
-  
-  if ((PlaneSide(edgePlane0, p) < 0) || (PlaneSide(edgePlane1, p) < 0) || (PlaneSide(edgePlane2, p) < 0)) {
+  if (IsTangent(t.verts[0], t.verts[1], t.verts[2]) == 0) { 
   	splitSimple(tList, t);
   	return;
   }
- 
-  printf("\ntriangle is tangent\n\n");
-  
-  Point * z = new InputPoint(0,0,1);
-  PTR<Plane> split = new PointNormalPlane(p, new ACrossBPoint(n, z)); 
-    //if || n cross z || = 0, then the triangle is in the xy, how should we handle this? 
+
+  PTR<Plane> split = new SplitPlane(t.verts[0], t.verts[1], t.verts[2]); 
 
   int validIntersects = 0;
   Point * p0 = new IntersectionPoint(t.verts[0], t.verts[1], split);
   Point * p1 = new IntersectionPoint(t.verts[1], t.verts[2], split);
   Point * p2 = new IntersectionPoint(t.verts[2], t.verts[0], split);
-  if ((PlaneSide(edgePlane1, p0) > 0) && (PlaneSide(edgePlane2, p0) > 0))
-		validIntersects += 1;
-	if ((PlaneSide(edgePlane0, p1) > 0) && (PlaneSide(edgePlane2, p1) > 0))
-		validIntersects += 2;
-	if ((PlaneSide(edgePlane0, p2) > 0) && (PlaneSide(edgePlane1, p2) > 0))
-		validIntersects += 4;
-	assert(validIntersects == 3 || validIntersects == 5 || validIntersects == 6);
+  if (PlaneSide(split, t.verts[0]) != PlaneSide(split, t.verts[1]))
+    validIntersects += 1;
+  if (PlaneSide(split, t.verts[1]) != PlaneSide(split, t.verts[2]))
+    validIntersects += 2;
+  if (PlaneSide(split, t.verts[0]) != PlaneSide(split, t.verts[2]))
+    validIntersects += 4;
+  assert(validIntersects == 3 || validIntersects == 5 || validIntersects == 6);
 
 	Point * intersect1;
 	Point * intersect2;
@@ -221,7 +209,7 @@ void split(std::vector<OuterApproxFace> & tList, SimpleTriangle t) {
 		commonVert = t.verts[2];
 		otherVert1 = t.verts[0];
 		otherVert2 = t.verts[1];
-	}
+	} 
 
 	SimpleTriangle simple = SimpleTriangle(intersect1, intersect2, commonVert); 
 	splitSimple(tList, simple);
