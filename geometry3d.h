@@ -79,15 +79,6 @@ public:
   TangentIntersectionPoint(PTR<Point> point, PTR<Point> sin_cos_alpha) : point(point), sin_cos_alpha(sin_cos_alpha) {}
 };
 
-//point defined by the normal vector to plane 
-class NormalToPlane : public Point {
-  PTR<Plane> plane;
-  PV3 calculate ();
-
-public: 
-  NormalToPlane(PTR<Plane> plane) : plane(plane) {}
-};
-
 //point along ab which has the same z component as c
 class ZIntercectPoint : public Point {
   PTR<Point> a;
@@ -97,26 +88,6 @@ class ZIntercectPoint : public Point {
 
 public:
   ZIntercectPoint(PTR<Point> a, PTR<Point> b, PTR<Point> c) : a(a), b(b), c(c) {}
-};
-
-//point defined by adding two points
-class AddPoint : public Point {
-  PTR<Point> point1;
-  PTR<Point> point2;
-  PV3 calculate ();
-
-public:
-  AddPoint(PTR<Point> point1, PTR<Point> point2) : point1(point1), point2(point2) {}
-};
-
-//cross product of two vectors
-class ACrossBPoint : public Point {
-  PTR<Point> point1;
-  PTR<Point> point2;
-  PV3 calculate ();
-
-public:
-  ACrossBPoint(PTR<Point> point1, PTR<Point> point2) : point1(point1), point2(point2) {}
 };
 
 // Plane defined by triangle of points.
