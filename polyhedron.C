@@ -47,6 +47,7 @@ int projectionCoordinate (Plane *p)
   return ProjectionCoordinate(p).getPC();
 }
 
+/*
 void Point::decref ()
 {
   if (ref > 0u)
@@ -55,6 +56,7 @@ void Point::decref ()
     return;
   delete this;
 }
+*/
 
 void Point::getBBox (double *bbox)
 {
@@ -76,8 +78,6 @@ int Point::order (Point *a)
 {
   if (this == a)
     return 0;
-  if (inputPerturbed) 
-    return PointOrderR(this, a);
   SumPoint *s1 = dynamic_cast<SumPoint *>(this);
   if (s1) {
     SumPoint *s2 = dynamic_cast<SumPoint *>(a);
@@ -159,13 +159,8 @@ int TripleProductR::sign ()
 
 int Orientation::sign ()
 {
-  
-  PV3 pb = b->getP();
-  PV3 pc = c->getP();
-  PV3 pd = d->getP();
   PV3 u = d->getP() - a->getP(), v = b->getP() - a->getP(), 
     w = c->getP() - a->getP();
-
   return u.tripleProduct(v, w).sign();
 }
 
@@ -200,13 +195,19 @@ bool bboxOverlap (Point *a, const double *bbox)
 
 Vertex::Vertex (Point *p) : p(p), node(0)
 {
-  p->incref();
+  /* p->incref(); */
   p->getBBox(bbox);
   if (!inputPerturbed) {
     Parameter k = Rdir.getP().dot(p->getP());
     rint[0] = k.lb();
     rint[1] = k.ub();
   }
+}
+
+HEdge * Vertex::getOutgoing (int i) const
+{
+  HEdges &he = edges[i]->hedges;
+  return he[0]->tail() == this ? he[0] : he[1];
 }
 
 void Vertex::outgoingHEdges (HEdges &ed) const
@@ -462,23 +463,8 @@ HFace * HFace::neighbor (HEdge *e) const
   return flag ? g->hfaces + 1 : g->hfaces;
 }
 
-void HFace::triangulate (VVMap &vvmap, Polyhedron *a) const
-{
-  Triangles tr;
-  f->triangulate(tr);
-  int pc = f->getPC();
-  if (pos())
-    for (Triangles::iterator t = tr.begin(); t != tr.end(); ++t)
-      a->addTriangle(a->getVertex(t->a, vvmap), a->getVertex(t->b, vvmap),
-		     a->getVertex(t->c, vvmap), pc);
-  else
-    for (Triangles::iterator t = tr.begin(); t != tr.end(); ++t)
-      a->addTriangle(a->getVertex(t->c, vvmap), a->getVertex(t->b, vvmap),
-		     a->getVertex(t->a, vvmap), pc);
-}
-
 Face::Face (const Vertices &b, Vertex *u, Vertex *v, Vertex *w, int pc, bool flag)
-  : p(u->p, v->p, w->p), pc(pc), flag(flag)
+  : p(u->p, v->p, w->p), pc(pc)
 {
   hfaces[0].f = hfaces[1].f = this;
   copyBBox(b[0]->bbox, bbox);
@@ -613,7 +599,7 @@ bool Face::coplanar (Face *f)
 {
   if (p.id == f->p.id)
     return true;
-  return !inputPerturbed && SamePlane(&p, &f->p) == 1;
+  return SamePlane(&p, &f->p) == 1;
 };
 
 bool Face::intersectRay (Point *a, Point *r)
@@ -624,12 +610,12 @@ bool Face::intersectRay (Point *a, Point *r)
   return contains(&q) && PointOrderR(a, &q) == 1;
 }
 
-bool Face::contains (Point *a)
+bool Face::contains (Point *a, bool strict)
 {
   if (!bboxOverlap(a, bbox))
     return false;
   if (triangle())
-    return containsConvex(a);
+    return containsConvex(a, strict);
   if (!boundaryContains(a, 0))
     return false;
   for (int i = 1; i < boundary.size(); ++i)
@@ -837,7 +823,8 @@ int Shell::contains (Point *a) const
   octreef->find(rb, fa);
   bool res = false;
   for (Faces::iterator f = fa.begin(); f != fa.end(); ++f)
-    if ((*f)->boundaryVertex(a))
+    if ((*f)->boundaryVertex(a) ||
+	a->side((*f)->getP()) == 0 && (*f)->contains(a, false))
       return 0;
   else if ((*f)->intersectRay(a, &r))
     res = !res;
@@ -1161,11 +1148,32 @@ Polyhedron * Polyhedron::triangulate () const
   for (Faces::const_iterator f = faces.begin(); f != faces.end(); ++f) {
     Triangles tr;
     (*f)->triangulate(tr);
+    int pc = (*f)->getPC();
     for (Triangles::iterator t = tr.begin(); t != tr.end(); ++t)
-      a->addTriangleUnique(a->getVertex(t->a, vvmap), a->getVertex(t->b, vvmap),
-			   a->getVertex(t->c, vvmap), (*f)->getPC(), (*f)->flag);
+      a->getTriangle(t->a, t->b, t->c, vvmap, pc);
   }
   return a;
+}
+
+void Polyhedron::getTriangle (Vertex *ta, Vertex *tb, Vertex *tc,
+			      VVMap &vvmap, int pc)
+{
+  Vertex *a = getVertex(ta, vvmap), *b = getVertex(tb, vvmap),
+    *c = getVertex(tc, vvmap);
+  HEdges ae;
+  a->outgoingHEdges(ae);
+  for (HEdges::iterator h = ae.begin(); h != ae.end(); ++h)
+    if ((*h)->head() == c && (*h)->next->head() == b)
+      return;
+  addTriangle(a, b, c, pc)->hfaces;
+}
+
+void Polyhedron::getTriangle (Face *f, VVMap &vvmap)
+{
+  Vertices vf;
+  f->boundaryVertices(vf);
+  int pc = f->getPC();
+  getTriangle(vf[0], vf[1], vf[2], vvmap, pc);
 }
 
 Polyhedron * Polyhedron::subdivide ()
@@ -1380,7 +1388,7 @@ void Polyhedron::intersectEF (Edge *e, Face *f, EFVMap &efvmap, Vertices &vfg)
       vfg.push_back(i->second);
     return;
   }
-  Point *p = new EPPoint(e->t->p, e->h->p, &f->p);
+  PTR<Point> p = new EPPoint(e->t->p, e->h->p, &f->p);
   if (bboxOverlap(p, f->bbox)) {
     HEdges ed;
     f->boundaryHEdges(ed);
@@ -1408,7 +1416,7 @@ void Polyhedron::intersectEF (Edge *e, Face *f, EFVMap &efvmap, Vertices &vfg)
       return;
     }
   }
-  p->decref();
+  /* p->decref(); */
   efvmap.insert(pair<EFPair, Vertex *>(ef, 0));
 }
 
@@ -1443,7 +1451,9 @@ Polyhedron * Polyhedron::subdivideAux ()
   VVMap vvmap;
   for (Faces::iterator f = faces.begin(); f != faces.end(); ++f)
     subfaces(*f, a, vvmap);
-  return a;
+  Polyhedron *b = a->triangulate();
+  delete a;
+  return b;
 }
 
 void Polyhedron::intersectFFF (Face *f, FFFVMap &fffvmap)
@@ -1497,7 +1507,7 @@ void Polyhedron::subfaces (Face *f, Polyhedron *a, VVMap &vvmap)
     sort(inner.begin(), inner.end(), HEdgeOrder());
   Faces nfaces;
   for (HEdges::iterator e = outer.begin(); e != outer.end(); ++e)
-    nfaces.push_back(a->addFace(*e, f->getPC(), f->flag));
+    nfaces.push_back(a->addFace(*e, f->getPC()));
   for (HEdges::iterator e = inner.begin(); e != inner.end(); ++e) {
     Face *g = enclosingFace(nfaces, (*e)->tail()->p);
     if (g)
@@ -1634,13 +1644,8 @@ Polyhedron * Polyhedron::translate (Point *t) const
   VVMap vvmap;
   for (Vertices::const_iterator v = vertices.begin(); v != vertices.end(); ++v)
     vvmap.insert(VVPair(*v, a->getVertex(new SumPoint(t, (*v)->p))));
-  for (Faces::const_iterator f = faces.begin(); f != faces.end(); ++f) {
-    HEdge *e = (*f)->boundary[0];
-    Vertex *u = vvmap.find(e->tail())->second,
-      *v = vvmap.find(e->head())->second,
-      *w = vvmap.find(e->next->head())->second;
-    a->addTriangle(u, v, w);
-  }
+  for (Faces::const_iterator f = faces.begin(); f != faces.end(); ++f)
+    a->getTriangle(*f, vvmap);
   return a;
 }
 
@@ -1707,75 +1712,77 @@ bool Polyhedron::intersectsEF (Edge *e, Face *f) const
   return true;
 }
 
-Polyhedron * Polyhedron::overlay (Polyhedron *a) const
-{
-  Polyhedron *c = new Polyhedron;
-  VVMap vvmap;
-  for (Faces::const_iterator f = faces.begin(); f != faces.end(); ++f)
-    c->copyFace(*f, vvmap);
-  for (Faces::iterator f = c->faces.begin(); f != c->faces.end(); ++f)
-    (*f)->flag = true;
-  for (Faces::iterator f = a->faces.begin(); f != a->faces.end(); ++f)
-    c->copyFace(*f, vvmap);
-  Polyhedron *d = c->subdivide(), *e = d->triangulate();
-  delete c;
-  delete d;
-  return e;
-}
-
-Face * Polyhedron::copyFace (Face *f, VVMap &vvmap)
-{
-  VVertices reg;
-  for (HEdges::const_iterator e = f->boundary.begin(); e != f->boundary.end(); ++e) {
-    Vertices ve, *nve = new Vertices;
-    (*e)->loop(ve);
-    for (Vertices::iterator v = ve.begin(); v != ve.end(); ++v)
-      nve->push_back(getVertex(*v, vvmap));
-    reg.push_back(nve);
-  }
-  Face *g = addFace(reg);
-  deleteRegion(reg);
-  return g;
-}
-
-Polyhedron * Polyhedron::boolean (Polyhedron *a, SetOp op) const
+Polyhedron * Polyhedron::boolean (Polyhedron *a, SetOp op)
 {
   Polyhedron *c = overlay(a), *d = new Polyhedron;
   VVMap vvmap;
+  formCells();
+  a->formCells();
   c->formCells();
-  CellSet cin = c->boolean(op);
+  CellSet cin;
+  for (int i = 1; i < c->cells.size(); ++i) {
+    Cell *ci = c->cells[i];
+    bool ina = contains(ci), inb = a->contains(ci);
+    if (inSet(ina, inb, op))
+      cin.insert(ci);
+  }
   for (Faces::iterator f = c->faces.begin(); f != c->faces.end(); ++f) {
     bool in1 = cin.find((*f)->hfaces[0].s->c) != cin.end(),
       in2 = cin.find((*f)->hfaces[1].s->c) != cin.end();
-    if (!in1 && in2)
-      (*f)->hfaces[0].triangulate(vvmap, d);
-    else if (in1 && !in2)
-      (*f)->hfaces[1].triangulate(vvmap, d);
+    if (in1 != in2) {
+      Vertices vf;
+      (*f)->boundaryVertices(vf);
+      int pc = (*f)->getPC();
+      if (in2)
+	d->getTriangle(vf[0], vf[1], vf[2], vvmap, pc);
+      else
+	d->getTriangle(vf[2], vf[1], vf[0], vvmap, - pc);
+    }
   }
   delete c;
   return d;
 }
 
-CellSet Polyhedron::boolean (SetOp op) const
+Polyhedron * Polyhedron::overlay (Polyhedron *a) const
 {
-  CellSet done, res;
-  boolean(op, cells[0], false, false, done, res);
-  return res;
+  bool oip = inputPerturbed;
+  inputPerturbed = false;
+  Polyhedron *c = new Polyhedron;
+  VVMap vvmap;
+  for (Faces::const_iterator f = faces.begin(); f != faces.end(); ++f)
+    c->getTriangle(*f, vvmap);
+  for (Faces::iterator f = a->faces.begin(); f != a->faces.end(); ++f)
+    c->getTriangle(*f, vvmap);
+  Polyhedron *d = c->subdivide();
+  delete c;
+  inputPerturbed = oip;
+  return d;
 }
 
-void Polyhedron::boolean (SetOp op, Cell *c, bool ina, bool inb, CellSet &done,
-			  CellSet &res) const
+bool Polyhedron::contains (Cell *c) const
 {
-  if (!done.insert(c).second)
-    return;
-  if (inSet(ina, inb, op))
-    res.insert(c);
-  for (Shells::iterator s = c->boundary.begin(); s != c->boundary.end(); ++s)
-    for (HFaces::iterator f = (*s)->hfaces.begin(); f != (*s)->hfaces.end(); ++f) {
-      Cell *d = (*f)->twin()->s->c;
-      bool inad = (*f)->f->flag ? !ina : ina, inbd = (*f)->f->flag ? inb : !inb;
-      boolean(op, d, inad, inbd, done, res);
-    }
+  set<Shell *> ss;
+  for (int i = 1; i < cells.size(); ++i)
+    ss.insert(cells[i]->boundary[0]);
+  VertexSet vs;
+  Shell *s = c->boundary[0];
+  for (HFaces::iterator f = s->hfaces.begin(); f != s->hfaces.end(); ++f) {
+    Vertices ve;
+    (*f)->f->boundaryVertices(ve);
+    for (Vertices::iterator v = ve.begin(); v != ve.end(); ++v)
+      if (vs.insert(*v).second)
+	for (set<Shell *>::iterator i = ss.begin(); i != ss.end(); ++i) {
+	  int ic = (*i)->contains((*v)->p);
+	  if (ic == 1)
+	    return true;
+	  if (ic == -1) {
+	    ss.erase(*i);
+	    if (ss.empty())
+	      return false;
+	  }
+	}
+  }
+  return true;
 }
 
 // used in simplify from here on
@@ -1825,8 +1832,8 @@ void Polyhedron::removeHEdge (HEdge *h)
 
 void Polyhedron::moveVertex (Vertex *v, Point *p)
 {
-  v->p->decref();
-  p->incref();
+  /* v->p->decref(); */
+  /* p->incref(); */
   v->p = p;
   if (!inputPerturbed) {
     vtree.remove(v->node);
@@ -1878,20 +1885,9 @@ void Polyhedron::removeNullFaces ()
       ++i;
 }
 
-void Polyhedron::addTriangleUnique (Vertex *a, Vertex *b, Vertex *c, int pc, bool flag)
+Octree<Face *> * Polyhedron::faceOctree (double s) const
 {
-  for (Edges::iterator e = a->edges.begin(); e != a->edges.end(); ++e)
-    for (HEdges::iterator h = (*e)->hedges.begin(); h != (*e)->hedges.end(); ++h)
-      if ((*h)->tail() == a &&
-	  ((*h)->head() == b && (*h)->next->head() == c ||
-	   (*h)->head() == c && (*h)->next->head() == b))
-	return;
-  addTriangle(a, b, c, pc, flag);
-}
-
-Octree<Face *> * Polyhedron::faceOctree () const
-{
-  return Octree<Face *>::octree(faces, bbox);
+  return Octree<Face *>::octree(faces, bbox, s);
 }
 
 Octree<Cell *> * Polyhedron::cellOctree () const
@@ -2471,4 +2467,12 @@ void edgesNM (Polyhedron *a)
 {
   Edges ed;
   edgesNM(a, ed);
+}
+
+void check (Polyhedron *a)
+{
+  for (int i = 0; i + 1 < a->vertices.size(); ++i)
+    for (int j = i + 1; j < a->vertices.size(); ++j)
+      if (a->vertices[i]->getP()->identical(a->vertices[j]->getP()))
+	cerr << "duplicate vertices " << i << " " << j << endl;
 }

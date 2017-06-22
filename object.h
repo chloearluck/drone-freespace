@@ -34,7 +34,10 @@ class RefCnt {
   template<class T> friend class PTR;
   int refCnt;
   void incRef () { refCnt++; }
-  void decRef () { if (--refCnt == 0) delete this; }
+  void decRef () {
+    if (--refCnt == 0)
+      delete this;
+  }
 public:
   RefCnt () : refCnt(0) {}
   virtual ~RefCnt () { assert(refCnt == 0); }

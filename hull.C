@@ -225,9 +225,23 @@ Polyhedron * convexHull (Polyhedron *a)
 
 Polyhedron * convexHull (const Points &pts)
 {
-
-  int n = pts.size(), *p = new int [n];
+  int n = pts.size(), *p = new int [n], i = 2;
   randomPermutation(n, p);
+  while (pts[p[0]]->onLine(pts[p[1]], pts[p[i]]))
+    ++i;
+  if (i > 2) {
+    int t = p[2];
+    p[2] = p[i];
+    p[i] = t;
+  }
+  i = 3;
+  while (Orientation(pts[p[0]], pts[p[1]], pts[p[2]], pts[p[i]]) == 0)
+    ++i;
+  if (i > 3) {
+    int t = p[3];
+    p[3] = p[i];
+    p[i] = t;
+  }
   Hull hull;
   for (int i = 0; i < n; ++i) {
     hull.addVertex(pts[p[i]]);

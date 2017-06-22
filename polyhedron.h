@@ -87,12 +87,9 @@ class Point : public Object<PV3> {
   friend class Polyhedron;
   friend class Convolution;
  protected:
-  ID ref;
   IDSet ps;
  public:
-  Point () : ref(0u) {}
-  void incref () { ++ref; }
-  void decref ();
+  Point () {}
   PV3 getP () { return get(); }
   IDSet getps () const { return ps; }
   void getBBox (double *bbox);
@@ -103,7 +100,9 @@ class Point : public Object<PV3> {
   int side (Plane *a);
 };
 
-typedef vector<Point *> Points;
+typedef PTR<Point> PPtr;
+
+typedef vector<PPtr> Points;
 
 Primitive3(TripleProduct, Point *, a, Point *, b, Point *, c);
 
@@ -178,29 +177,29 @@ extern InputPoint Rdir;
 
 class NegPoint : public Point {
   friend class Point;
-  Point *a;
+  PTR<Point> a;
   PV3 calculate () { return - a->getP(); }
  public:
-  NegPoint (Point *a) : a(a) { a->incref(); }
-  ~NegPoint () { a->decref(); }
+  NegPoint (Point *a) : a(a) { /* a->incref(); */ }
+  ~NegPoint () { /* a->decref(); */ }
 };
 
 class SumPoint : public Point {
   friend class Point;
-  Point *a, *b;
+  PTR<Point> a, b;
   PV3 calculate () { return a->getP() + b->getP(); }
  public:
-  SumPoint (Point *a, Point *b) : a(a), b(b) { a->incref(); b->incref(); }
-  ~SumPoint () { a->decref(); b->decref(); }
+  SumPoint (Point *a, Point *b) : a(a), b(b) { /* a->incref(); b->incref(); */ }
+  ~SumPoint () { /* a->decref(); b->decref(); */ }
 };
 
 class DiffPoint : public Point {
   friend class Point;
-  Point *a, *b;
+  PTR<Point> a, b;
   PV3 calculate () { return a->getP() - b->getP(); }
  public:
-  DiffPoint (Point *a, Point *b) : a(a), b(b) { a->incref(); b->incref(); }
-  ~DiffPoint () { a->decref(); b->decref(); }
+  DiffPoint (Point *a, Point *b) : a(a), b(b) { /* a->incref(); b->incref(); */ }
+  ~DiffPoint () { /* a->decref(); b->decref(); */ }
 };
 
 class CentroidPoint : public Point {
@@ -218,24 +217,28 @@ class CentroidPoint : public Point {
       psp = intersection(psp, pts[i]->ps);
     for (IDSet::iterator i = psp.begin(); i != psp.end(); ++i)
       ps.insert(*i);
+    /*
     for (Points::iterator p = pts.begin(); p != pts.end(); ++p)
       (*p)->incref();
+    */
   }
   CentroidPoint (Point *p, Point *q) {
     pts.push_back(p); pts.push_back(q);
     IDSet psp = intersection(p->ps, q->ps);
     for (IDSet::iterator i = psp.begin(); i != psp.end(); ++i)
       ps.insert(*i);
-    p->incref(); q->incref();
+    /* p->incref(); q->incref(); */
   }
   ~CentroidPoint () {
+    /*
     for (Points::iterator p = pts.begin(); p != pts.end(); ++p)
       (*p)->decref();
+    */
   }
 };
 
 class EPPoint : public Point {
-  Point *t, *h, *a, *b, *c;
+  PTR<Point> t, h, a, b, c;
   PV3 calculate () {
     PV3 ap = a->getP(), n = (b->getP() - ap).cross(c->getP() - ap),
       tp = t->getP(), u = h->getP() - tp;
@@ -249,11 +252,11 @@ class EPPoint : public Point {
     for (IDSet::iterator i = psth.begin(); i != psth.end(); ++i)
       ps.insert(*i);
     ps.insert(q->id);
-    t->incref(); h->incref(); a->incref(); b->incref(); c->incref();
+    /* t->incref(); h->incref(); a->incref(); b->incref(); c->incref(); */
   }
   
   ~EPPoint () {
-    t->decref(); h->decref(); a->decref(); b->decref(); c->decref();
+    /* t->decref(); h->decref(); a->decref(); b->decref(); c->decref(); */
   }
 };
 
@@ -284,17 +287,18 @@ class Vertex {
   friend class Polyhedron;
   friend class Convolution;
  protected:
-  Point *p;
+  PTR<Point> p;
   vector<Edge *> edges;
   double rint[2], bbox[6];
   RBTree<Vertex*>::Node *node;
  public:
   Vertex (Point *p);
-  ~Vertex () { p->decref(); }
+  ~Vertex () { /* p->decref(); */ }
   Point * getP () { return p; }
   int EdgesN () const { return edges.size(); }
   Edge * getEdge (int i) const { return edges[i]; }
   double * getBBox () { return bbox; }
+  HEdge * getOutgoing (int i) const;
   void outgoingHEdges (vector<HEdge *> &ed) const;
   void incidentFaces (set<Face *> &fs) const;
   HEdge * connected (Vertex *a) const;
@@ -421,7 +425,7 @@ class EdgeVertexOrder {
 };
 
 class EEPoint : public Point {
-  Point *et, *eh, *ft, *fh;
+  PTR<Point> et, eh, ft, fh;
   int pc;
   PV3 calculate () {
     PV3 a = et->getP(), u = eh->getP() - a, b = ft->getP(), v = fh->getP() - b;
@@ -436,10 +440,10 @@ class EEPoint : public Point {
 	      inserter(pef, pef.begin()));
     for (IDSet::iterator i = pef.begin(); i != pef.end(); ++i)
       ps.insert(*i);
-    et->incref(); eh->incref(); ft->incref(); fh->incref();
+    /* et->incref(); eh->incref(); ft->incref(); fh->incref(); */
   }
   
-  ~EEPoint () { et->decref(); eh->decref(); ft->decref(); fh->decref(); }
+  ~EEPoint () { /* et->decref(); eh->decref(); ft->decref(); fh->decref(); */ }
 };
 
 class Shell;
@@ -468,12 +472,9 @@ class HFace {
   PV3 getN () const;
   void neighbors (vector<HFace *> &hfaces) const;
   HFace * neighbor (HEdge *e) const;
-  void triangulate (VVMap &vvmap, Polyhedron *a) const;
 };
 
 typedef vector<HFace *> HFaces;
-
-typedef set<HFace *> HFaceSet;
 
 class HFaceNormal : public Point {
   HFace *f;
@@ -498,7 +499,6 @@ class Face {
   HFace hfaces[2];
   double bbox[6];
   Edges edges;
-  bool flag;
  public:
   Face (const Vertices &b, Vertex *u, Vertex *v, Vertex *w, int pc, bool flag);
   void update ();
@@ -523,7 +523,7 @@ class Face {
   void edgeVertices (VertexSet &vs) const;
   bool coplanar (Face *f);
   bool intersectRay (Point *a, Point *r);
-  bool contains (Point *a);
+  bool contains (Point *a, bool strict = true);
   bool triangle () const;
   bool containsConvex (Point *a, bool strict = true);
   bool boundaryContains (Point *a, int i);
@@ -786,6 +786,8 @@ class Polyhedron {
   Shell * formShell (HFace *f) const;
   Cell * enclosingCell (Shell *s, Octree<Cell *> *octreec) const;
   Polyhedron * triangulate () const;
+  void getTriangle (Vertex *ta, Vertex *tb, Vertex *tc, VVMap &vvmap, int pc);
+  void getTriangle (Face *f, VVMap &vvmap);
   Polyhedron * subdivide ();
   void intersectFF ();
   void intersectFF (Face *f, Face *g, EFVMap &efvmap);
@@ -814,19 +816,15 @@ class Polyhedron {
   bool contains (Point *p) const;
   bool intersectsEdges (const Polyhedron *a) const;
   bool intersectsEF (Edge *e, Face *f) const;
-  Face * copyFace (Face *f, VVMap &vvmap);
+  Polyhedron * boolean (Polyhedron *a, SetOp op);
   Polyhedron * overlay (Polyhedron *a) const;
-  Polyhedron * boolean (Polyhedron *a, SetOp op) const;
-  CellSet boolean (SetOp op) const;
-  void boolean (SetOp op, Cell *c, bool ina, bool inb, CellSet &done,
-		CellSet &res) const;
+  bool contains (Cell *c) const;
   void replaceVertex (Face *f, Vertex *v, Vertex *w);
   void removeLoop (HEdge *e);
   void removeHEdge (HEdge *e);
   void moveVertex (Vertex *v, Point *p);
   void removeNullFaces ();
-  void addTriangleUnique (Vertex *a, Vertex *b, Vertex *c, int pc = 0, bool flag = false);
-  Octree<Face *> * faceOctree () const;
+  Octree<Face *> * faceOctree (double s = 0.0) const;
   Octree<Cell *> * cellOctree () const;
   void describe (int i0 = 1);
 };

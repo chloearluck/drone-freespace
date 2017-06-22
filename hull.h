@@ -10,7 +10,7 @@ class HullFace;
 class HullVertex {
  public:
   HullVertex (Point *p) : p(p), edge(0) {}
-  Point *p;
+  PTR<Point> p;
   HullEdge *edge;
   vector<HullFace *> conflicts;
 };
