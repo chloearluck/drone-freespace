@@ -225,28 +225,13 @@ void split(std::vector<OuterApproxFace> & tList, SimpleTriangle t) {
 	Point * newVert1;
   Point * newVert2;
 
-  Point * tVertSorted[3];
-  for (int i=0; i<3; i++)
-  	tVertSorted[i] = t.verts[i];
-  std::sort(tVertSorted, tVertSorted + 3, compz);
-
-	if ((verts[1] == t.verts[0]) || (verts[1] == t.verts[1]) || (verts[1] == t.verts[2]))
-		newVert1 = new ZIntercectPoint(intersect1, intersect2, verts[1]);
-	else {
-		if (DiffZ(verts[1], tVertSorted[1]) < 0) 
-			newVert1 = new ZIntercectPoint(tVertSorted[0], tVertSorted[1], verts[1]);
-		else 
-			newVert1 = new ZIntercectPoint(tVertSorted[1], tVertSorted[2], verts[1]);
-	}
-
-	if ((verts[2] == t.verts[0]) || (verts[2] == t.verts[1]) || (verts[2] == t.verts[2]))
-		newVert2 = new ZIntercectPoint(intersect1, intersect2, verts[2]);
-	else {
-    if (DiffZ(verts[2], tVertSorted[1]) < 0) 
-			newVert2 = new ZIntercectPoint(tVertSorted[0], tVertSorted[1], verts[2]);
-		else 
-			newVert2 = new ZIntercectPoint(tVertSorted[1], tVertSorted[2], verts[2]);
-	}
+  if ((verts[0] == intersect1) || (verts[0] == intersect2) || (verts[3] == intersect1) || (verts[3] == intersect2)) {
+    newVert1 = new ZIntercectPoint(verts[0], verts[2], verts[1]);
+    newVert2 = new ZIntercectPoint(verts[1], verts[3], verts[2]);
+  } else {
+    newVert1 = new ZIntercectPoint(verts[0], verts[3], verts[1]);
+    newVert2 = new ZIntercectPoint(verts[0], verts[3], verts[2]);
+  }
 
   //if bottom 2 have same z value, there is no bottom triangle 
   if (DiffZ(verts[0], verts[1]) != 0) 
