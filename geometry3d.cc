@@ -20,7 +20,9 @@ int IsTangent::sign () {
   PV3 n1 = (b-c).cross(n); Parameter k1 = n1.dot(c);
   PV3 n2 = (c-a).cross(n); Parameter k2 = n2.dot(a);
 
-  if ( ((n0.dot(p) - k0).sign() >= 0) && ((n1.dot(p) - k1).sign() >= 0) && ((n2.dot(p) - k2).sign() >= 0) )
+  if ( ((n0.dot(p) - k0).sign() == (n0.dot(c) - k0).sign()) && 
+       ((n1.dot(p) - k1).sign() == (n1.dot(a) - k0).sign()) && 
+       ((n2.dot(p) - k2).sign() == (n2.dot(b) - k0).sign()) )
     return 1;  
   return 0;
 }
