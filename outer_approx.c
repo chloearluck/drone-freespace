@@ -3,6 +3,9 @@
 #include <cstring>
 
 const double TAN_THETA = tan(M_PI / 36);  //approximately 5 degrees
+bool SAVE_CONVEX_HULLS = false;
+bool SAVE_INTERMEDIATE_UNIONS = false;
+
 
 class InputParameter : public Object<Parameter> {
 public:
@@ -248,11 +251,13 @@ Polyhedron * union_all(std::vector<Polyhedron*> pList) {
   char s[30];
   for (int i=1; i< pList.size(); i++) {
     printf("union %d of %d\n", i, pList.size()-1);
-    sprintf(s, "union-%d", i);
     Polyhedron * new_outer_approx = outerApprox->boolean(pList[i], Union);
     delete outerApprox;
     outerApprox = new_outer_approx;
-    savePoly(outerApprox, s);
+    if (SAVE_INTERMEDIATE_UNIONS) {
+      sprintf(s, "union-%d", i);
+      savePoly(outerApprox, s);
+    }
   }
   return outerApprox;
 }
@@ -298,10 +303,12 @@ int main (int argc, char *argv[]) {
   	polyList.push_back(triangleOuterApprox(splitTList[i]));
   }
 
-  char s[30];
-  for (int i=0; i<polyList.size(); i++) {
-    sprintf(s, "%d", i);
-    savePoly(polyList[i], s);
+  if (SAVE_CONVEX_HULLS) {
+    char s[30];
+    for (int i=0; i<polyList.size(); i++) {
+      sprintf(s, "%d", i);
+      savePoly(polyList[i], s);
+    }
   }
 
   Polyhedron * outerApprox = union_all(polyList);
