@@ -2,7 +2,7 @@
 #include "geometry3d.h"
 #include <cstring>
 
-const double TAN_THETA = tan(M_PI / 10);  //approximately 18 degrees (for better visibility) 
+const double TAN_THETA = tan(M_PI / 36);  //approximately 5 degrees
 
 class InputParameter : public Object<Parameter> {
 public:
