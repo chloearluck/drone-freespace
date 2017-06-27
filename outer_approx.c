@@ -55,7 +55,7 @@ class OuterApproxFace {
 
 Polyhedron * loadPoly(char * filename) {
   int n = strlen(filename);
-  char * str = new char[n+5];
+  char str[n+5];
   strncpy(str, filename, n);
   strncpy(str+n, ".vtk", 5);
 
@@ -74,7 +74,7 @@ Polyhedron * loadPoly(char * filename) {
 
 void savePoly(Polyhedron * p, char * filename) {
   int n = strlen(filename);
-  char * str = new char[n+9];
+  char str[n+9];
   strncpy(str, filename, n);
   strncpy(str+n, "-out.vtk", 9);
 
@@ -183,6 +183,7 @@ void split(std::vector<OuterApproxFace> & tList, SimpleTriangle t) {
     validIntersects += 2;
   if (PlaneSide(split, t.verts[0]) != PlaneSide(split, t.verts[2]))
     validIntersects += 4;
+  delete split;
   assert(validIntersects == 3 || validIntersects == 5 || validIntersects == 6);
 
 	Point * intersect1;
@@ -248,7 +249,9 @@ Polyhedron * union_all(std::vector<Polyhedron*> pList) {
   for (int i=1; i< pList.size(); i++) {
     printf("union %d of %d\n", i, pList.size()-1);
     sprintf(s, "union-%d", i);
-    outerApprox = outerApprox->boolean(pList[i], Union);
+    Polyhedron * new_outer_approx = outerApprox->boolean(pList[i], Union);
+    delete outerApprox;
+    outerApprox = new_outer_approx;
     savePoly(outerApprox, s);
   }
   return outerApprox;
