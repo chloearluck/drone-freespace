@@ -1,5 +1,6 @@
 #include "hull.h"
 #include "geometry3d.h"
+#include "mink.h"
 #include <cstring>
 
 const double TAN_THETA = tan(M_PI / 36);  //approximately 5 degrees

@@ -36,8 +36,8 @@ triangulate.o: triangulate.C triangulate.h polyhedron.h octree.h rbtree.h object
 hull.o: hull.C hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h
 	$(COMPILE) hull.C
 
-outer_approx:  outer_approx.o hull.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o
-	$(LINK) outer_approx.o hull.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o -lmpfr -o outer_approx
+outer_approx:  outer_approx.o hull.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o mink.o
+	$(LINK) outer_approx.o hull.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o mink.o -lmpfr -o outer_approx
 
 outer_approx.o: outer_approx.c hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h
 	$(COMPILE) outer_approx.c
@@ -48,8 +48,8 @@ test_union:  test_union.o hull.o polyhedron.o triangulate.o io.o object.o acp.o 
 test_union.o: test_union.c hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h
 	$(COMPILE) test_union.c
 
-# mink.o: mink.C mink.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h
-# 	$(COMPILE) mink.C
+mink.o: mink.C mink.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h
+	$(COMPILE) mink.C
 
 # simplify.o: simplify.C simplify.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h \
 # 	expander.h
