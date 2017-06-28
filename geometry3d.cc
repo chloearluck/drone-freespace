@@ -57,6 +57,25 @@ int Orient3D::sign () {
 #endif
 }
 
+int SegmentIntersect::sign() {
+  PV3 a = pa->getP();
+  PV3 b = pb->getP();
+  PV3 c = pc->getP();
+  PV3 d = pd->getP();
+
+  PV3 n  = (b-a).cross(d-c);
+  if ((n.dot(a) - n.dot(c)).sign() != 0) //don't lie in the same plane
+    return 0; //don't intersect
+
+  PV3 nab = (b-a).cross(n);
+  PV3 ncd = (d-c).cross(n);
+
+  if ( (nab.dot(d-a).sign() != nab.dot(c-a).sign()) && 
+       (ncd.dot(a-c).sign() != ncd.dot(b-c).sign()) ) 
+    return 1;
+  return 0;
+}
+
 int InSphere::sign () {
   PV3 e = this->e->getP();
   PV3 ea = a->getP() - e;

@@ -54,7 +54,7 @@ Primitive2(DiffLength, Point*, i, Point*, j);
 Primitive3(IsTangent, Point*, v0, Point*, v1, Point*, v2);
 // Orientation of tetrahedron.
 Primitive4(Orient3D, Point*, a, Point*, b, Point*, c, Point*, d);
-
+Primitive4(SegmentIntersect, Point*, pa, Point*, pb, Point*, pc, Point*, pd);
 // Insphere test.
 Primitive5(InSphere, Point*, a, Point*, b, Point*, c, Point*, d, Point*, e);
 

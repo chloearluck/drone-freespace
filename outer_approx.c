@@ -6,6 +6,7 @@
 const double TAN_THETA = tan(M_PI / 36);  //approximately 5 degrees
 bool SAVE_CONVEX_HULLS = false;
 bool SAVE_INTERMEDIATE_UNIONS = false;
+bool SAVE_TRIANGULATION = true;
 
 
 class InputParameter : public Object<Parameter> {
@@ -91,6 +92,63 @@ void savePoly(Polyhedron * p, char * filename) {
     printf("could not write to file\n");
   }
 }
+
+void save_triangulation(std::vector<OuterApproxFace> tList, char * filename) {
+  std::vector<Point *> vertList;
+  int size = 0;
+  for (int i=0; i<tList.size(); i++) {
+    if(std::find(vertList.begin(), vertList.end(), tList[i].top1) == vertList.end())
+      vertList.push_back(tList[i].top1);
+    if(tList[i].top2 != NULL && std::find(vertList.begin(), vertList.end(), tList[i].top2) == vertList.end())
+      vertList.push_back(tList[i].top2);
+    if(std::find(vertList.begin(), vertList.end(), tList[i].bottom1) == vertList.end())
+      vertList.push_back(tList[i].bottom1);
+    if(tList[i].bottom2 != NULL && std::find(vertList.begin(), vertList.end(), tList[i].bottom2) == vertList.end())
+      vertList.push_back(tList[i].bottom2);
+    size = size + 3;
+    if (tList[i].top2 != NULL && tList[i].bottom2 != NULL)
+      size++;
+  }
+
+  int n = strlen(filename);
+  char str[n+18];
+  strncpy(str, filename, n);
+  strncpy(str+n, "-triangulated.vtk", 18);
+  ofstream ostr;
+  ostr.open(str);
+  if (ostr.is_open()) { 
+    ostr << setprecision(20) << "# vtk DataFile Version 3.0" << endl
+         << "vtk output" << endl << "ASCII" << endl
+         << "DATASET POLYDATA" << endl 
+         << "POINTS " << vertList.size() << " double" << endl;
+    for (int i=0; i<vertList.size(); i++)
+      ostr << vertList[i]->getP().getX().mid() << " " << vertList[i]->getP().getY().mid() << " " << vertList[i]->getP().getZ().mid() << endl;
+
+    ostr << endl << "POLYGONS " << tList.size() << " " << size+tList.size() << endl;
+    for (int i=0; i<tList.size(); i++) {
+      int t1,t2,b1,b2;
+      t1 = std::find(vertList.begin(), vertList.end(), tList[i].top1) - vertList.begin();
+      if (tList[i].top2 != NULL) t2 = std::find(vertList.begin(), vertList.end(), tList[i].top2) - vertList.begin();
+      b1 = std::find(vertList.begin(), vertList.end(), tList[i].bottom1) - vertList.begin();
+      if (tList[i].bottom2 != NULL) b2 = std::find(vertList.begin(), vertList.end(), tList[i].bottom2) - vertList.begin();
+
+      if (tList[i].top2 == NULL)
+        ostr << "3 " << t1 << " " << b1 << " " << b2 << endl;
+      else if (tList[i].bottom2 == NULL)
+        ostr << "3 " << t1 << " " << t2 << " " << b1 << endl;
+      else {
+        if (SegmentIntersect(tList[i].top1, tList[i].bottom1, tList[i].top2, tList[i].bottom2))
+          ostr << "4 " << t1 << " " << t2 << " " << b1 << " " << b2 << endl;
+        else
+          ostr << "4 " << t1 << " " << t2 << " " << b2 << " " << b1 << endl;
+      }
+    }
+    ostr.close();
+  } else {
+    printf("could not write to file\n");
+  }
+}
+
 
 Primitive2(DiffZ, Point*, i, Point*, j);
 int DiffZ::sign() { return (i->getP().getZ() - j->getP().getZ()).sign(); }
@@ -295,6 +353,9 @@ int main (int argc, char *argv[]) {
   //call split on each triangle in tList
   for (int i=0; i< tList.size(); i++) 
   	split(splitTList, tList[i]);
+
+  if (SAVE_TRIANGULATION)
+    save_triangulation(splitTList, filename);
 
   //find the rotated convex hull of each triangle in splitTList
   std::vector<Polyhedron *> polyList;
