@@ -337,7 +337,10 @@ int main (int argc, char *argv[]) {
   if (poly == NULL)
     return 1;
 
-  poly = poly->triangulate(); 
+  
+  Polyhedron * poly2 = poly->triangulate(); 
+  delete poly;
+  poly = poly2;
 
   std::vector<SimpleTriangle> tList;
   for (int i=0; i<poly->faces.size(); i++) {
