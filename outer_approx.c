@@ -187,7 +187,6 @@ void split(std::vector<OuterApproxFace> & tList, SimpleTriangle t) {
     validIntersects += 2;
   if (PlaneSide(split, t.verts[0]) != PlaneSide(split, t.verts[2]))
     validIntersects += 4;
-  delete split;
   assert(validIntersects == 3 || validIntersects == 5 || validIntersects == 6);
 
 	Point * intersect1;
