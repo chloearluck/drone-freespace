@@ -5,7 +5,7 @@
 
 const double TAN_THETA = tan(M_PI / 36);  //approximately 5 degrees
 bool SAVE_CONVEX_HULLS = false;
-bool SAVE_TRIANGULATION = true;
+bool SAVE_TRIANGULATION = false;
 
 
 class InputParameter : public Object<Parameter> {
@@ -331,7 +331,6 @@ void split(std::vector<OuterApproxFace> & tList, SimpleTriangle t) {
 }
 
 Polyhedron * union_all(std::vector<Polyhedron*> pList, int start, int end) {
-  printf("union_all %d %d\n", start, end);
   if (start == end) 
     return pList[start];
   if ((start+1) == end) 
