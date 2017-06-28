@@ -330,15 +330,24 @@ void split(std::vector<OuterApproxFace> & tList, SimpleTriangle t) {
 	  tList.push_back(OuterApproxFace(verts[2], newVert2, verts[3], NULL));	
 }
 
+Polyhedron * union_all(std::vector<Polyhedron*> pList, int start, int end) {
+  printf("union_all %d %d\n", start, end);
+  if (start == end) 
+    return pList[start];
+  if ((start+1) == end) 
+    return pList[start]->boolean(pList[end], Union);
+  int mid = (start+end)/2;
+  Polyhedron * p1 = union_all(pList, start, mid);
+  Polyhedron * p2 = union_all(pList, mid+1, end);
+  printf("taking union of (%d,%d) and (%d,%d)\n", start, mid, mid+1, end);
+  Polyhedron * p3 = p1->boolean(p2, Union);
+  delete p1;
+  delete p2;
+  return p3;
+}
+
 Polyhedron * union_all(std::vector<Polyhedron*> pList) {
-  Polyhedron * outerApprox = pList[0];
-  for (int i=1; i< pList.size(); i++) {
-    printf("union %d of %d\n", i, pList.size()-1);
-    Polyhedron * new_outer_approx = outerApprox->boolean(pList[i], Union);
-    delete outerApprox;
-    outerApprox = new_outer_approx;
-  }
-  return outerApprox;
+  return union_all(pList, 0, pList.size()-1);
 }
 
 int main (int argc, char *argv[]) {
