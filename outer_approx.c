@@ -394,14 +394,13 @@ int main (int argc, char *argv[]) {
   }
 
   std::vector<OuterApproxFace> splitTList;
-  //call split on each triangle in tList
   for (int i=0; i< tList.size(); i++) 
   	split(splitTList, tList[i]);
+  tList.clear();
 
   if (SAVE_TRIANGULATION)
     save_triangulation(splitTList, filename);
 
-  //find the rotated convex hull of each triangle in splitTList
   std::vector<Polyhedron *> polyList;
 
   for (int i=0; i<splitTList.size(); i++) {
@@ -418,6 +417,9 @@ int main (int argc, char *argv[]) {
 
   Polyhedron * outerApprox = union_all(polyList);
   delete poly;
+  for (int i=0; i<polyList.size(); i++)
+    delete polyList[i];
+  polyList.clear();
 
   printf("saving outerApprox\n");
   savePoly(outerApprox, filename);
