@@ -39,8 +39,9 @@ if (argc < 3) {
 
   Polyhedron * poly1 = loadPoly(filename1);
   Polyhedron * poly2 = loadPoly(filename2);
-
   Polyhedron * poly3 = minkowskiSum (poly1, poly2);
+
+  delete poly1, poly2, poly3;
 
   return 0;
 }
