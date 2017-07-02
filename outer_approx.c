@@ -340,8 +340,10 @@ Polyhedron * union_all(std::vector<Polyhedron*> pList, int start, int end) {
   Polyhedron * p2 = union_all(pList, mid+1, end);
   printf("taking union of (%d,%d) and (%d,%d)\n", start, mid, mid+1, end);
   Polyhedron * p3 = p1->boolean(p2, Union);
-  delete p1;
-  delete p2;
+  if (start != mid)
+    delete p1;
+  if ((mid+1) != end)
+    delete p2;
   return p3;
 }
 
