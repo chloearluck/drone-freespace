@@ -3,7 +3,8 @@
 #include "mink.h"
 #include <cstring>
 
-const double TAN_THETA = tan(M_PI / 36);  //approximately 5 degrees
+const double THETA = M_PI / 10; //approximately 18 degrees
+const double TAN_THETA = tan(THETA/2);  
 bool SAVE_CONVEX_HULLS = false;
 bool SAVE_TRIANGULATION = false;
 
@@ -351,6 +352,15 @@ Polyhedron * union_all(std::vector<Polyhedron*> pList) {
   return union_all(pList, 0, pList.size()-1);
 }
 
+Polyhedron * rotate(Polyhedron * p) {
+  Polyhedron * poly = p->triangulate(); 
+  for (int i = 0; i< poly->vertices.size(); i++) {
+    Vertex * v = poly->vertices[i];
+    poly->moveVertex(v, new RotationPoint(v->getP(), sin_cos_alpha));
+  }
+  return poly;
+}
+
 int main (int argc, char *argv[]) {
 	if (argc < 2) {
     printf("not enough arguments\n");
@@ -407,8 +417,30 @@ int main (int argc, char *argv[]) {
   }
 
   Polyhedron * outerApprox = union_all(polyList);
+  delete poly;
+
   printf("saving outerApprox\n");
   savePoly(outerApprox, filename);
+
+  Polyhedron * reflectedOuterApprox = outerApprox->negative();
+  savePoly(reflectedOuterApprox, "reflection");
+
+  double bounds[6] = { 5, 7, 5, 7, 5, 7};
+  Polyhedron * obstacle = box(bounds);
+
+  char s[30];
+  int numRotations = floor(2*M_PI/THETA);
+  vector<Polyhedron *> allRotations;
+  allRotations.push_back(reflectedOuterApprox);
+  for (int i=0; i< numRotations; i++) {
+    allRotations.push_back(rotate(allRotations[i]));
+    sprintf(s, "%d", i+1);
+    savePoly(allRotations[i+1], s);
+  }
+
+  //for each polyhedron in allRotations
+  //  find the minkowski sum of the (already negated) polyhedron and the obstacle 
+  //  output the complement of it
 
   return 0;
 }
