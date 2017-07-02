@@ -29,15 +29,15 @@ public:
 };
 
 InputParameter * t = new InputParameter(TAN_THETA);
-Point * sin_cos_alpha = new SinCosAlpha(t);
+PTR<Point> sin_cos_alpha = new SinCosAlpha(t);
 
 
 
 class SimpleTriangle {
 public: 
-  Point * verts[3];
+  PTR<Point> verts[3];
 
-  SimpleTriangle(Point * a, Point * b, Point * c) {
+  SimpleTriangle(PTR<Point> a, PTR<Point> b, PTR<Point> c) {
     verts[0] = a;
     verts[1] = b;
     verts[2] = c;
@@ -46,10 +46,10 @@ public:
 
 class OuterApproxFace {
   public:
-  Point * bottom1, * bottom2, * top1, * top2;
+  PTR<Point> bottom1, bottom2, top1, top2;
   bool isTrapazoid;
 
-  OuterApproxFace(Point * bottom1, Point * bottom2, Point * top1, Point * top2) {
+  OuterApproxFace(PTR<Point> bottom1, PTR<Point> bottom2, PTR<Point> top1, PTR<Point> top2) {
     this->bottom1 = bottom1;
     this->bottom2 = bottom2;
     this->top1 = top1;
@@ -94,8 +94,8 @@ void savePoly(Polyhedron * p, char * filename) {
 }
 
 void save_triangulation(std::vector<OuterApproxFace> tList, char * filename) {
-  std::vector<Point *> vertList;
-  std::vector<Point *> rotatedVertList;
+  std::vector< PTR<Point> > vertList;
+  std::vector< PTR<Point> > rotatedVertList;
 
   int size = 0;
   for (int i=0; i<tList.size(); i++) {
@@ -177,25 +177,25 @@ void save_triangulation(std::vector<OuterApproxFace> tList, char * filename) {
   }
 }
 
-Primitive2(DiffZ, Point*, i, Point*, j);
+Primitive2(DiffZ, PTR<Point>, i, PTR<Point>, j);
 int DiffZ::sign() { return (i->getP().getZ() - j->getP().getZ()).sign(); }
 struct CompareZ {
-  bool operator()(Point * i, Point * j) {
+  bool operator()(PTR<Point> i, PTR<Point> j) {
     return (DiffZ(i, j) < 0); 
   }
 };
 
 //generate 3 outer approximation points from rotate point p around the origin, add them to pList
-void pointOuterApprox(Points &pList, Point * p) {
+void pointOuterApprox(Points &pList, PTR<Point> p) {
 	pList.push_back(p);
 	pList.push_back(new RotationPoint(p, sin_cos_alpha));
 	pList.push_back(new TangentIntersectionPoint(p, sin_cos_alpha));
 }
 
 // generate the 5 out approximation points from rotating a segment around the origin (assuming the nearest point on the segment is an endpoint)
-void segmentOuterApprox(Points &pList, Point * p1, Point * p2) {
-	Point * outer;
-	Point * inner;
+void segmentOuterApprox(Points &pList, PTR<Point> p1, PTR<Point> p2) {
+	PTR<Point> outer;
+	PTR<Point> inner;
 
   if (DiffLength(p1,p2) > 0) { 
     outer = p1;
@@ -230,7 +230,7 @@ Polyhedron * triangleOuterApprox(OuterApproxFace t) {
 }
 
 void splitSimple(std::vector<OuterApproxFace> & tList, SimpleTriangle t) {
-  Point * verts[3];
+  PTR<Point> verts[3];
 	for (int i=0; i<3; i++)
 		verts[i] = t.verts[i];
 	CompareZ compz;
@@ -247,7 +247,7 @@ void splitSimple(std::vector<OuterApproxFace> & tList, SimpleTriangle t) {
     return;
   }
 
-  Point * newVert = new ZIntercectPoint(verts[0], verts[2], verts[1]);
+  PTR<Point> newVert = new ZIntercectPoint(verts[0], verts[2], verts[1]);
 
   tList.push_back(OuterApproxFace(verts[0], NULL, verts[1], newVert));
   tList.push_back(OuterApproxFace(verts[1], newVert, verts[2], NULL));
@@ -263,9 +263,9 @@ void split(std::vector<OuterApproxFace> & tList, SimpleTriangle t) {
   PTR<Plane> split = new SplitPlane(t.verts[0], t.verts[1], t.verts[2]); 
 
   int validIntersects = 0;
-  Point * p0 = new IntersectionPoint(t.verts[0], t.verts[1], split);
-  Point * p1 = new IntersectionPoint(t.verts[1], t.verts[2], split);
-  Point * p2 = new IntersectionPoint(t.verts[2], t.verts[0], split);
+  PTR<Point> p0 = new IntersectionPoint(t.verts[0], t.verts[1], split);
+  PTR<Point> p1 = new IntersectionPoint(t.verts[1], t.verts[2], split);
+  PTR<Point> p2 = new IntersectionPoint(t.verts[2], t.verts[0], split);
   if (PlaneSide(split, t.verts[0]) != PlaneSide(split, t.verts[1]))
     validIntersects += 1;
   if (PlaneSide(split, t.verts[1]) != PlaneSide(split, t.verts[2]))
@@ -274,11 +274,11 @@ void split(std::vector<OuterApproxFace> & tList, SimpleTriangle t) {
     validIntersects += 4;
   assert(validIntersects == 3 || validIntersects == 5 || validIntersects == 6);
 
-	Point * intersect1;
-	Point * intersect2;
-	Point * commonVert;
-	Point * otherVert1;
-	Point * otherVert2;
+	PTR<Point> intersect1;
+	PTR<Point> intersect2;
+	PTR<Point> commonVert;
+	PTR<Point> otherVert1;
+	PTR<Point> otherVert2;
 
 	if (validIntersects == 3) {
 		intersect1 = p0;
@@ -303,7 +303,7 @@ void split(std::vector<OuterApproxFace> & tList, SimpleTriangle t) {
 	SimpleTriangle simple = SimpleTriangle(intersect1, intersect2, commonVert); 
 	splitSimple(tList, simple);
 
-	Point * verts[4];
+	PTR<Point> verts[4];
 	verts[0] = intersect1;
 	verts[1] = intersect2;
 	verts[2] = otherVert1;
@@ -311,8 +311,8 @@ void split(std::vector<OuterApproxFace> & tList, SimpleTriangle t) {
 	CompareZ compz;
 	std::sort(verts, verts + 4, compz);
 
-	Point * newVert1;
-  Point * newVert2;
+	PTR<Point> newVert1;
+  PTR<Point> newVert2;
 
   if ((verts[0] == intersect1) || (verts[0] == intersect2) || (verts[3] == intersect1) || (verts[3] == intersect2)) {
     newVert1 = new ZIntercectPoint(verts[0], verts[2], verts[1]);
@@ -386,9 +386,9 @@ int main (int argc, char *argv[]) {
   std::vector<SimpleTriangle> tList;
   for (int i=0; i<poly->faces.size(); i++) {
   	HEdges es = poly->faces[i]->getBoundary();
-  	Point * p = es[0]->tail()->getP();
-  	Point * q = es[0]->getNext()->tail()->getP();
-  	Point * r = es[0]->getNext()->getNext()->tail()->getP();
+  	PTR<Point> p = es[0]->tail()->getP();
+  	PTR<Point> q = es[0]->getNext()->tail()->getP();
+  	PTR<Point> r = es[0]->getNext()->getNext()->tail()->getP();
 
   	tList.push_back(SimpleTriangle(p,q,r));
   }
