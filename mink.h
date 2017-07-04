@@ -122,33 +122,33 @@ void BSPPartition (BSPElts &elts, Point *r, ID c, BSPElts &elts1, BSPElts &elts2
 void BSPLeaf (const BSPElts &aelts, const BSPElts &belts, BSPElts &ea, 
 	      BSPElts &eb);
 
-class HullFace {
+class MinkHullFace {
  public:
-  HullFace (HEdge *e, HullFace *prev, HullFace *next) : e(e), prev(prev), next(next) {}
+  MinkHullFace (HEdge *e, MinkHullFace *prev, MinkHullFace *next) : e(e), prev(prev), next(next) {}
   bool inCset (HEdge *f) const
   { return find(cset.begin(), cset.end(), f) != cset.end(); }
-  void updateCset (HullFace *h, HEdge *f);
+  void updateCset (MinkHullFace *h, HEdge *f);
   bool conflict (HEdge *f) const;
   void cone (HEdges &hedges) const;
 
   HEdges cset;
   HEdge *e;
-  HullFace *prev, *next;
+  MinkHullFace *prev, *next;
 };
 
 Primitive4(DegenerateConflict, Point *, a, Point *, b, Point *, c, Point *, d);
 
 bool convexCone (Vertex *v, HEdges &hedges);
 
-HullFace * initHull (HEdges &hedges);
+MinkHullFace * initHull (HEdges &hedges);
 
 int circulationEEE (HEdge *e, HEdge *f, HEdge *g);
 
-HullFace * updateHull (HullFace *hull, HEdge *e, bool &flag);
+MinkHullFace * updateHull (MinkHullFace *hull, HEdge *e, bool &flag);
 
-HullFace * updateHullAux (HullFace *fs, HullFace *fe, HEdge *e);
+MinkHullFace * updateHullAux (MinkHullFace *fs, MinkHullFace *fe, HEdge *e);
 
-void deleteHull (HullFace *hull);
+void deleteHull (MinkHullFace *hull);
 
 bool convexOrder (const HEdges &hedges);
 

@@ -327,7 +327,7 @@ void BSPLeaf (const BSPElts &aelts, const BSPElts &belts, BSPElts &ea,
       }
 }
 
-bool HullFace::conflict (HEdge *f) const
+bool MinkHullFace::conflict (HEdge *f) const
 {
   int s = circulationEEE(f, e, next->e);
   if (s != 0) return s == 1;
@@ -337,16 +337,16 @@ bool HullFace::conflict (HEdge *f) const
     DegenerateConflict(a, b, c, d) == 1;
 }
 
-void HullFace::updateCset (HullFace *h, HEdge *f)
+void MinkHullFace::updateCset (MinkHullFace *h, HEdge *f)
 {
   for (HEdges::iterator g = h->cset.begin(); g != h->cset.end(); ++g)
     if (*g != f && conflict(*g))
       cset.push_back(*g);
 }
 
-void HullFace::cone (HEdges &hedges) const
+void MinkHullFace::cone (HEdges &hedges) const
 {
-  const HullFace *h = this;
+  const MinkHullFace *h = this;
   do {
     hedges.push_back(h->e);
     h = h->next;
@@ -370,7 +370,7 @@ bool convexCone (Vertex *v, HEdges &hedges)
     HEdge *e = v->getEdge(i)->getHEdge(0);
     he.push_back(e->tail() == v ? e : e->ccw());
   }
-  HullFace *hull = initHull(he);
+  MinkHullFace *hull = initHull(he);
   if (!hull)
     return false;
   for (int i = 3; i < he.size(); ++i) {
@@ -386,7 +386,7 @@ bool convexCone (Vertex *v, HEdges &hedges)
   return convexOrder(hedges);
 }
 
-HullFace * initHull (HEdges &hedges)
+MinkHullFace * initHull (HEdges &hedges)
 {
   HEdge *e = hedges[0], *f = 0, *g = 0;
   for (int i = 2; i < hedges.size(); ++i) {
@@ -409,12 +409,12 @@ HullFace * initHull (HEdges &hedges)
   }
   if (!f)
     return 0;
-  HullFace *he = new HullFace(e, 0, 0), *hf = new HullFace(f, he, 0), 
-    *hg = new HullFace(g, hf, he);
+  MinkHullFace *he = new MinkHullFace(e, 0, 0), *hf = new MinkHullFace(f, he, 0), 
+    *hg = new MinkHullFace(g, hf, he);
   he->next = hf;
   he->prev = hg;
   hf->next = hg;
-  HullFace *faces[3] = {he, hf, hg};
+  MinkHullFace *faces[3] = {he, hf, hg};
   for (int i = 0; i < 3; ++i)
     for (int j = 3; j < hedges.size(); ++j)
       if (faces[i]->conflict(hedges[j]))
@@ -428,10 +428,10 @@ int circulationEEE (HEdge *e, HEdge *f, HEdge *g)
 		     f->head()->getP(), g->head()->getP());
 }
 
-HullFace * updateHull (HullFace *hull, HEdge *e, bool &flag)
+MinkHullFace * updateHull (MinkHullFace *hull, HEdge *e, bool &flag)
 {
   flag = true;
-  HullFace *fs = hull;
+  MinkHullFace *fs = hull;
   if (fs->inCset(e)) {
     while (fs->prev != hull && fs->prev->inCset(e))
       fs = fs->prev;
@@ -447,15 +447,15 @@ HullFace * updateHull (HullFace *hull, HEdge *e, bool &flag)
     if (fs == hull)
       return hull;
   }
-  HullFace *fe = fs;
+  MinkHullFace *fe = fs;
   while (fe->next->inCset(e))
     fe = fe->next;
   return updateHullAux(fs, fe, e);
 }
 
-HullFace * updateHullAux (HullFace *fs, HullFace *fe, HEdge *e)
+MinkHullFace * updateHullAux (MinkHullFace *fs, MinkHullFace *fe, HEdge *e)
 {
-  HullFace *f1 = new HullFace(fs->e, fs->prev, 0), *f2 = new HullFace(e, f1, fe->next);
+  MinkHullFace *f1 = new MinkHullFace(fs->e, fs->prev, 0), *f2 = new MinkHullFace(e, f1, fe->next);
   f1->next = f2;
   f1->updateCset(fs->prev, e);
   f1->updateCset(fs, e);
@@ -465,18 +465,18 @@ HullFace * updateHullAux (HullFace *fs, HullFace *fe, HEdge *e)
   f2->next->prev = f2;
   fe->next = 0;
   while (fs) {
-    HullFace *ptr = fs->next;
+    MinkHullFace *ptr = fs->next;
     delete fs;
     fs = ptr;
   }
   return f1;
 }
 
-void deleteHull (HullFace *hull)
+void deleteHull (MinkHullFace *hull)
 {
   hull->prev->next = 0;
   while (hull) {
-    HullFace *nhull = hull->next;
+    MinkHullFace *nhull = hull->next;
     delete hull;
     hull = nhull;
   }
