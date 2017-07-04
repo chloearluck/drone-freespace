@@ -429,6 +429,7 @@ int main (int argc, char *argv[]) {
 
   double bounds[6] = { 5, 7, 5, 7, 5, 7};
   Polyhedron * obstacle = box(bounds);
+  savePoly(obstacle, "obstacle");
 
   char s[30];
   int numRotations = floor(2*M_PI/THETA);
@@ -440,9 +441,14 @@ int main (int argc, char *argv[]) {
     savePoly(allRotations[i+1], s);
   }
 
-  //for each polyhedron in allRotations
-  //  find the minkowski sum of the (already negated) polyhedron and the obstacle 
-  //  output the complement of it
+  vector<Polyhedron *> cspaces;
+  for (int i=0; i<allRotations.size(); i++) {
+    Polyhedron * mSum = minkowskiSum(allRotations[i], obstacle); 
+    sprintf(s, "freespace-%d", i+1);
+    savePoly(mSum, s);
+    //to do: take complement
+    cspaces.push_back(mSum); 
+  }
 
   return 0;
 }
