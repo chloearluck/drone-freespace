@@ -339,7 +339,6 @@ Polyhedron * union_all(std::vector<Polyhedron*> pList, int start, int end) {
   int mid = (start+end)/2;
   Polyhedron * p1 = union_all(pList, start, mid);
   Polyhedron * p2 = union_all(pList, mid+1, end);
-  printf("taking union of (%d,%d) and (%d,%d)\n", start, mid, mid+1, end);
   Polyhedron * p3 = p1->boolean(p2, Union);
   if (start != mid)
     delete p1;
@@ -383,6 +382,7 @@ int main (int argc, char *argv[]) {
   delete poly;
   poly = poly2;
 
+  cout<<"find outerApprox...";
   std::vector<SimpleTriangle> tList;
   for (int i=0; i<poly->faces.size(); i++) {
   	HEdges es = poly->faces[i]->getBoundary();
@@ -421,26 +421,28 @@ int main (int argc, char *argv[]) {
     delete polyList[i];
   polyList.clear();
 
-  printf("saving outerApprox\n");
+  cout<<" done"<<endl;
   savePoly(outerApprox, filename);
-
-  Polyhedron * reflectedOuterApprox = outerApprox->negative();
-  savePoly(reflectedOuterApprox, "reflection");
 
   double bounds[6] = { 5, 7, 5, 7, 5, 7};
   Polyhedron * obstacle = box(bounds);
   savePoly(obstacle, "obstacle");
 
+  cout<<"find all rotations...";
+  Polyhedron * reflectedOuterApprox = outerApprox->negative();
   char s[30];
   int numRotations = floor(2*M_PI/THETA);
   vector<Polyhedron *> allRotations;
   allRotations.push_back(reflectedOuterApprox);
+  savePoly(reflectedOuterApprox, "0-");
   for (int i=0; i< numRotations; i++) {
     allRotations.push_back(rotate(allRotations[i]));
     sprintf(s, "%d", i+1);
     savePoly(allRotations[i+1], s);
   }
+  cout<<" done"<<endl;
 
+  cout<<"find minkowski sums...";
   vector<Polyhedron *> cspaces;
   for (int i=0; i<allRotations.size(); i++) {
     Polyhedron * mSum = minkowskiSum(allRotations[i], obstacle); 
@@ -449,6 +451,7 @@ int main (int argc, char *argv[]) {
     //to do: take complement
     cspaces.push_back(mSum); 
   }
+  cout<<" done"<<endl;
 
   return 0;
 }
