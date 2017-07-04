@@ -10,7 +10,6 @@ bool SAVE_TRIANGULATION = false;
 bool SAVE_OUTER_APPROX = true;
 bool SAVE_ALL_ROTATIONS = true;
 
-
 class InputParameter : public Object<Parameter> {
 public:
   InputParameter (double x) { set(Parameter::input(x)); }
@@ -32,8 +31,6 @@ public:
 
 InputParameter * t = new InputParameter(TAN_THETA);
 PTR<Point> sin_cos_alpha = new SinCosAlpha(t);
-
-
 
 class SimpleTriangle {
 public: 
@@ -376,7 +373,6 @@ int main (int argc, char *argv[]) {
   Polyhedron * poly = loadPoly(filename);
   if (poly == NULL)
     return 1;
-
   
   Polyhedron * poly2 = poly->triangulate(); 
   delete poly;
