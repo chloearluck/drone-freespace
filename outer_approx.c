@@ -7,6 +7,8 @@ const double THETA = M_PI / 10; //approximately 18 degrees
 const double TAN_THETA = tan(THETA/2);  
 bool SAVE_CONVEX_HULLS = false;
 bool SAVE_TRIANGULATION = false;
+bool SAVE_OUTER_APPROX = true;
+bool SAVE_ALL_ROTATIONS = true;
 
 
 class InputParameter : public Object<Parameter> {
@@ -420,7 +422,7 @@ int main (int argc, char *argv[]) {
   polyList.clear();
 
   cout<<" done"<<endl;
-  savePoly(outerApprox, filename);
+  if (SAVE_OUTER_APPROX) savePoly(outerApprox, filename);
 
   double bounds[6] = { 5, 7, 5, 7, 5, 7};
   Polyhedron * obstacle = box(bounds);
@@ -432,11 +434,13 @@ int main (int argc, char *argv[]) {
   int numRotations = floor(2*M_PI/THETA);
   vector<Polyhedron *> allRotations;
   allRotations.push_back(reflectedOuterApprox);
-  savePoly(reflectedOuterApprox, "0-");
+  if (SAVE_ALL_ROTATIONS) savePoly(reflectedOuterApprox, "0-");
   for (int i=0; i< numRotations; i++) {
     allRotations.push_back(rotate(allRotations[i]));
-    sprintf(s, "%d", i+1);
-    savePoly(allRotations[i+1], s);
+    if (SAVE_ALL_ROTATIONS) {
+      sprintf(s, "%d", i+1);
+      savePoly(allRotations[i+1], s);
+    }
   }
   cout<<" done"<<endl;
 
