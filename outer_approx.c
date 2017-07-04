@@ -70,7 +70,7 @@ Polyhedron * loadPoly(char * filename) {
     poly = readPolyhedronVTK (infile);
     infile.close();
   } else {
-    printf("could not read from file\n");
+    cout<<"could not read from file"<<endl;
     return NULL;
   }
 
@@ -89,7 +89,7 @@ void savePoly(Polyhedron * p, char * filename) {
     writePolyhedronVTK (p->faces, out);
     out.close();
   } else {
-    printf("could not write to file\n");
+    cout<<"could not write to file"<<endl;
   }
 }
 
@@ -173,7 +173,7 @@ void save_triangulation(std::vector<OuterApproxFace> tList, char * filename) {
     ostr.close();
     ostr2.close();
   } else {
-    printf("could not write to file\n");
+    cout<<"could not write to file"<<endl;
   }
 }
 
@@ -223,9 +223,7 @@ Polyhedron * triangleOuterApprox(OuterApproxFace t) {
   } else if (t.bottom2 == NULL) {
     segmentOuterApprox(pList, t.top1, t.top2);
     pointOuterApprox(pList, t.bottom1);
-  } else {
-    printf("invalid face\n");
-  }
+  } 
   return convexHull(pList);
 }
 
@@ -362,7 +360,7 @@ Polyhedron * rotate(Polyhedron * p) {
 
 int main (int argc, char *argv[]) {
 	if (argc < 2) {
-    printf("not enough arguments\n");
+    cout<<"not enough arguments"<<endl;
     return 1;
   }
 
