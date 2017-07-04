@@ -23,24 +23,6 @@ Polyhedron * minkowskiSum (Polyhedron *a, Polyhedron *b)
   return d;
 }
 
-class HullFace {
- public:
-  HullFace (HEdge *e, HullFace *prev, HullFace *next) : e(e), prev(prev), next(next) {}
-  bool inCset (HEdge *f) const
-  { return find(cset.begin(), cset.end(), f) != cset.end(); }
-  void updateCset (HullFace *h, HEdge *f);
-  bool conflict (HEdge *f) const;
-  void cone (HEdges &hedges) const;
-
-  HEdges cset;
-  HEdge *e;
-  HullFace *prev, *next;
-};
-HullFace * initHull (HEdges &hedges);
-HullFace * updateHull (HullFace *hull, HEdge *e, bool &flag);
-HullFace * updateHullAux (HullFace *fs, HullFace *fe, HEdge *e);
-void deleteHull (HullFace *hull);
-
 Face * Convolution::minkowskiInit (FaceSet &fdone, Octree<Face *> *octree,
 				   Polyhedron *a, VVMap &vvmap)
 {
