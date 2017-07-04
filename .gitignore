@@ -1,7 +1,6 @@
 *.o
 outer_approx
 test_union
-test_mink
 output
 .DS_Store
 *out.vtk

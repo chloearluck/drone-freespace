@@ -48,12 +48,6 @@ test_union:  test_union.o hull.o polyhedron.o triangulate.o io.o object.o acp.o 
 test_union.o: test_union.c hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h
 	$(COMPILE) test_union.c
 
-test_mink: test_mink.o hull.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o mink.o
-	$(LINK) test_mink.o hull.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o mink.o -lmpfr -o test_mink
-
-test_mink.o: test_mink.c hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h mink.h
-	$(COMPILE) test_mink.c
-
 mink.o: mink.C mink.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h
 	$(COMPILE) mink.C
 
@@ -78,4 +72,4 @@ acp.o:	acp.cc acp.h
 # 	-DIL_STD -Icplex124/include expander.C
 
 clean: 
-	rm -f *.o *~ hull test_union outer_approx test_mink
+	rm -f *.o *~ hull test_union outer_approx
