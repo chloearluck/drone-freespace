@@ -378,7 +378,7 @@ int main (int argc, char *argv[]) {
   delete poly;
   poly = poly2;
 
-  cout<<"find outerApprox...";
+  cout<<"find outerApprox..."<<flush;
   std::vector<SimpleTriangle> tList;
   for (int i=0; i<poly->faces.size(); i++) {
   	HEdges es = poly->faces[i]->getBoundary();
@@ -424,7 +424,7 @@ int main (int argc, char *argv[]) {
   Polyhedron * obstacle = box(bounds);
   savePoly(obstacle, "obstacle");
 
-  cout<<"find all rotations...";
+  cout<<"find all rotations..."<<flush;
   Polyhedron * reflectedOuterApprox = outerApprox->negative();
   char s[30];
   int numRotations = floor(2*M_PI/THETA);
@@ -440,7 +440,7 @@ int main (int argc, char *argv[]) {
   }
   cout<<" done"<<endl;
 
-  cout<<"find minkowski sums...";
+  cout<<"find minkowski sums..."<<flush;
   vector<Polyhedron *> cspaces;
   for (int i=0; i<allRotations.size(); i++) {
     Polyhedron * mSum = minkowskiSum(allRotations[i], obstacle); 
