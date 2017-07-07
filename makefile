@@ -36,12 +36,6 @@ triangulate.o: triangulate.C triangulate.h polyhedron.h octree.h rbtree.h object
 hull.o: hull.C hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h
 	$(COMPILE) hull.C
 
-outer_approx:  outer_approx.o hull.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o mink.o
-	$(LINK) outer_approx.o hull.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o mink.o -lmpfr -o outer_approx
-
-outer_approx.o: outer_approx.c hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h
-	$(COMPILE) outer_approx.c
-
 freespace.o: freespace.c freespace.h hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h
 	$(COMPILE) freespace.c
 
@@ -81,4 +75,4 @@ acp.o:	acp.cc acp.h
 # 	-DIL_STD -Icplex124/include expander.C
 
 clean: 
-	rm -f *.o *~ hull test_union outer_approx freespace_test
+	rm -f *.o *~ hull test_union freespace_test
