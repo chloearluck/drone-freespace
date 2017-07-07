@@ -1,6 +1,7 @@
 *.o
 outer_approx
 test_union
+freespace_test
 output
 .DS_Store
 *out.vtk
