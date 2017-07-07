@@ -142,6 +142,27 @@ PV3 ZIntercectPoint::calculate () {
   return a->getP() + t * (b->getP() - a->getP());
 }
 
+PV3 FacePoint::calculate () {
+  HFace * hface = cell->getBoundary(0)->getHFaces()[0];
+  HEdge * hedge = hface->getF()->getBoundary(0);
+  
+  PV3 h = hedge->head()->getP()->getP();
+  PV3 t = hedge->tail()->getP()->getP();
+  PV3 n = hface->getN();
+
+  PV3 mid = t + (h-t)/2;
+  PV3 inward_normal = n.cross(h-t);
+
+  return mid + unit * (inward_normal); 
+}
+
+PV3 CellInternalPoint::calculate () {
+  HFace * hface = cell->getBoundary(0)->getHFaces()[0];
+  PV3 fp = facePoint->getP();
+  PV3 n = hface->getN();
+  return fp - unit * n;
+}
+
 PV3 PlanePoint::calculate ()  {
   PV3 v = plane->getN();
   Parameter d = plane->getK();

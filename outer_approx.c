@@ -184,6 +184,28 @@ struct CompareZ {
   }
 };
 
+//returns a point in the ith cell of polyhedron poly
+PTR<Point> pointInCell(Polyhedron * poly, int i) {
+  poly->formCells();
+  Cell * cell =  poly->cells[i];
+  Face * face = cell->getBoundary(0)->getHFaces()[0]->getF();
+
+  PTR<Point> fp;
+  double unit = 1;
+  do {
+    fp = new FacePoint(cell, unit);
+    unit = unit/2;
+  } while (!face->contains(fp));
+
+  PTR<Point> p;
+  unit = 1;
+  do {
+    p = new CellInternalPoint(cell, fp, unit);
+    unit = unit/2;
+  } while (!cell->contains(p));
+  return p;
+}
+
 //generate 3 outer approximation points from rotate point p around the origin, add them to pList
 void pointOuterApprox(Points &pList, PTR<Point> p) {
 	pList.push_back(p);

@@ -90,6 +90,25 @@ public:
   ZIntercectPoint(PTR<Point> a, PTR<Point> b, PTR<Point> c) : a(a), b(b), c(c) {}
 };
 
+class FacePoint : public Point {
+  Cell * cell;
+  double unit;
+  PV3 calculate ();
+
+public:
+  FacePoint(Cell * cell, double unit) : cell(cell), unit(unit) {}
+};
+
+class CellInternalPoint : public Point {
+  Cell * cell;
+  PTR<Point> facePoint;
+  double unit;
+  PV3 calculate ();
+
+public:
+  CellInternalPoint(Cell * cell, PTR<Point> facePoint, double unit) : cell(cell), facePoint(facePoint), unit(unit) {}
+};
+
 // Plane defined by triangle of points.
 class TrianglePlane2 : public Plane {
   ObjPTR<PV3> a, b, c;
