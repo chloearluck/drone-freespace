@@ -412,7 +412,10 @@ int main (int argc, char *argv[]) {
   }
 
   Polyhedron * outerApprox = union_all(polyList);
-  delete poly;
+  poly2 = outerApprox->boolean(poly, Union);
+  delete poly; delete outerApprox;
+  outerApprox = poly2;
+
   for (int i=0; i<polyList.size(); i++)
     delete polyList[i];
   polyList.clear();
@@ -430,7 +433,7 @@ int main (int argc, char *argv[]) {
   int numRotations = floor(2*M_PI/THETA);
   vector<Polyhedron *> allRotations;
   allRotations.push_back(reflectedOuterApprox);
-  if (SAVE_ALL_ROTATIONS) savePoly(reflectedOuterApprox, "0-");
+  if (SAVE_ALL_ROTATIONS) savePoly(reflectedOuterApprox, "0");
   for (int i=0; i< numRotations; i++) {
     allRotations.push_back(rotate(allRotations[i]));
     if (SAVE_ALL_ROTATIONS) {
