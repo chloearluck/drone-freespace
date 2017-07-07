@@ -427,6 +427,9 @@ int main (int argc, char *argv[]) {
   Polyhedron * obstacle = box(bounds);
   savePoly(obstacle, "obstacle");
 
+  double bb_bounds[6] = {-20, 20, -20, 20, -20, 20};
+  Polyhedron * bounding_box = box(bb_bounds);
+
   cout<<"find all rotations..."<<flush;
   Polyhedron * reflectedOuterApprox = outerApprox->negative();
   char s[30];
@@ -447,10 +450,11 @@ int main (int argc, char *argv[]) {
   vector<Polyhedron *> cspaces;
   for (int i=0; i<allRotations.size(); i++) {
     Polyhedron * mSum = minkowskiSum(allRotations[i], obstacle); 
+    Polyhedron * mSum_complement = complement(bounding_box, mSum);
+    delete mSum;
+    cspaces.push_back(mSum_complement); 
     sprintf(s, "freespace-%d", i+1);
-    savePoly(mSum, s);
-    //to do: take complement
-    cspaces.push_back(mSum); 
+    savePoly(mSum_complement, s);
   }
   cout<<" done"<<endl;
 
