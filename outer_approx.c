@@ -57,6 +57,22 @@ class OuterApproxFace {
   }
 };
 
+class FreeSpace {
+public:
+  class Node {
+    Polyhedron * poly;
+    int cell_index;
+    Node(Polyhedron * poly, int cell_index) : poly(poly), cell_index(cell_index) {}
+  };
+  class Edge {
+    Node *a, *b;
+    PTR<Point> p;
+    Edge(Node *a, Node *b, PTR<Point> p) : a(a), b(b), p(p) {}
+  };
+  vector<Node*> nodes;
+  vector<Edge*> edges;
+};
+
 Polyhedron * loadPoly(char * filename) {
   int n = strlen(filename);
   char str[n+5];
