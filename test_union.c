@@ -1,7 +1,7 @@
 #include "hull.h"
 #include "geometry3d.h"
-
-
+#include "mink.h"
+#include <cstring>
 
 Polyhedron * loadPoly(char * str) {
   Polyhedron * poly;
@@ -17,65 +17,135 @@ Polyhedron * loadPoly(char * str) {
   return poly;
 }
 
-void savePoly(Polyhedron * p, char * str) {
+//now try point in cell...
+
+void savePoly(Polyhedron * p, char * filename) {
+  int n = strlen(filename);
+  char str[n+9];
+  strncpy(str, filename, n);
+  strncpy(str+n, "-out.vtk", 9);
+
   ofstream out;
   out.open(str);
   if (out.is_open()) {
     writePolyhedronVTK (p->faces, out);
     out.close();
   } else {
-    printf("could not write to file\n");
+    cout<<"could not write to file"<<endl;
   }
 }
 
-// //take the union of 2 polyhedrons given at vtk files
-// //first 2 args are name of vtk files, 3rd is random seed
-// int main (int argc, char *argv[]) {
-//   if (argc < 3) {
-//     printf("not enough arguments\n");
-//     return 1;
-//   }
+void saveShell(HFaces hf,  char * filename) {
+  int n = strlen(filename);
+  char str[n+9];
+  strncpy(str, filename, n);
+  strncpy(str+n, "-out.vtk", 9);
 
-//   char * filename1 =  argv[1];
-//   char * filename2 =  argv[2];
+  ofstream out;
+  out.open(str);
+  if (out.is_open()) {
+    writePolyhedronVTK (hf, out);
+    out.close();
+  } else {
+    cout<<"could not write to file"<<endl;
+  }
+}
 
-//   if (argc == 3) { 
-//     unsigned seed = atoi(argv[3]);
-//     srandom(seed);
-//   }
 
-//   Polyhedron * poly1 = loadPoly(filename1);
-//   if (poly1 == NULL)
-//     return 1;
-//   Polyhedron * poly2 = loadPoly(filename2);
-//   if (poly2 == NULL)
-//     return 1;
+void saveWithShells(Polyhedron * poly, char * filename) {
+  savePoly(poly, filename);
+  poly->formCells();
+  for (int i=1; i<poly->cells.size(); i++) {
+    Cell * c = poly->cells[i];
+    for (int j=0; j<c->nBoundary(); j++) {
+      Shell * s = c->getBoundary(j);
+      char str[50];
+      sprintf(str, "%s-%d-%d", filename, i, j);
+      saveShell(s->getHFaces(), str);
+    }
+  }
+}
 
-//   Polyhedron * out = poly1->boolean(poly2, Union);
+PTR<Point> pointInCell(Polyhedron * poly, int i) {
+  // poly->formCells();
+  Cell * cell =  poly->cells[i];
+  Face * face = cell->getBoundary(0)->getHFaces()[0]->getF();
 
-//   savePoly(out, "out.vtk");
+  PTR<Point> fp;
+  double unit = 1;
+  // do {
+  //   fp = new FacePoint(cell, unit);
+  //   unit = unit/2;
+  // } while (!face->contains(fp));
+
+  while (true) {
+    fp = new FacePoint(cell, unit);
+    if (face->contains(fp))
+      break;
+    fp = new FacePoint(cell, -unit);
+    if (face->contains(fp)){
+      cout<<"negative face unit"<<endl;
+      break;
+    }
+    unit= unit/2;
+  }
+
+  PTR<Point> p;
+  unit = 1;
+  
+  while (true) {
+    p = new CellInternalPoint(cell, fp, unit);
+    if (cell->contains(p))
+      break;
+    p = new CellInternalPoint(cell, fp, -unit);
+    if (cell->contains(p)) {
+      cout<<"negative internal unit"<<endl;
+      break;
+    }
+    unit = unit/2;
+  }
+
+    
+  return p;
+}
+
+//returns a point in the ith cell of polyhedron poly
+// PTR<Point> pointInCell(Polyhedron * poly, int i) {
+//   poly->formCells();
+//   Cell * cell =  poly->cells[i];
+//   Face * face = cell->getBoundary(0)->getHFaces()[0]->getF();
+
+//   PTR<Point> fp;
+//   double unit = 1;
+//   do {
+//     fp = new FacePoint(cell, unit);
+//     unit = unit/2;
+//   } while (!face->contains(fp));
+
+//   PTR<Point> p;
+//   unit = 1;
+//   do {
+//     p = new CellInternalPoint(cell, fp, unit);
+//     unit = unit/2;
+//   } while (!cell->contains(p));
+//   return p;
 // }
 
-
-Polyhedron * union_all(std::vector<Polyhedron*> pList, int start, int end) {
-  printf("union_all %d %d\n", start, end);
-  if (start == end) 
-    return pList[start];
-  if ((start+1) == end) 
-    return pList[start]->boolean(pList[end], Union);
-  int mid = (start+end)/2;
-  Polyhedron * p1 = union_all(pList, start, mid);
-  Polyhedron * p2 = union_all(pList, mid+1, end);
-  printf("taking union of (%d,%d) and (%d,%d)\n", start, mid, mid+1, end);
-  return p1->boolean(p2, Union);
-}
-
-Polyhedron * union_all(std::vector<Polyhedron*> pList) {
-  return union_all(pList, 0, pList.size()-1);
-}
-
-double randomInRange(double low, double high) {
-  return (random()/(RAND_MAX+1.0) * (high-low)) + low;
+void test_cells(Polyhedron * p, char * s) {
+  p->formCells();
+  cout<<s<<" has "<<p->cells.size()<<" cells"<<endl;
+  for (int i=1; i<p->cells.size(); i++) {
+    cout<<"cell "<<i<<endl;
+    Cell * c = p->cells[i];
+    bool valid = !c->getBoundary(0)->getHFaces()[0]->pos();
+    if (valid) {
+      for (int j=0; j<c->nBoundary(); j++) 
+        cout<<j<<": "<<( c->getBoundary(j)->outer() ? "outer" : "inner")<<endl;
+      PTR<Point> q = pointInCell(p, i);
+      cout<<"p: "<<q->getP().getX().mid()<<" "<<q->getP().getY().mid()<<" "<<q->getP().getZ().mid()<<endl;
+    }
+  }
+  saveWithShells(p, s);
 }
 
 int main (int argc, char *argv[]) {
@@ -84,27 +154,21 @@ int main (int argc, char *argv[]) {
     srandom(seed);
   }
 
-  bool generateSimple = true;
+  double b1[6] = { 1, 2, 1, 2, 1, 2};
+  Polyhedron * box1 = box(b1);
 
-  if (generateSimple) {
-    Points pList;
-    for (int i=0; i<4; i++) {
-      pList.push_back(new InputPoint(randomInRange(-1,1), randomInRange(-1,1), randomInRange(-1,1)));
-    }
+  double b2[6] = { -1, -2, -1, -2, -1, -2};
+  Polyhedron * box2 = box(b2);
 
-    Polyhedron * simple = convexHull(pList);
-    savePoly(simple, "simple.vtk");
-  } else {
-    std::vector<Polyhedron *> pList;
-    for (int i=0; i<168; i++) {
-      char s[30];
-      sprintf(s, "output/%d-out.vtk", i);
-      Polyhedron * poly = loadPoly(s);
-      pList.push_back(poly);
-    }
+  double b3[6] = { -3, 3, -3, 3, -3, 3};
+  Polyhedron * box3 = box(b3);
 
-    Polyhedron * p = union_all(pList);
+  Polyhedron * disjoint = box1->boolean(box2, Union);
+  Polyhedron * nested = complement(box3, box1);
 
-    savePoly(p, "out.vtk");
-  }
+  test_cells(box3, "box3");
+  test_cells(nested, "nested");
+  test_cells(disjoint, "disjoint");
+  
+  return 0;
 }
