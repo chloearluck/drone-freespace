@@ -315,6 +315,16 @@ Polyhedron * rotate(Polyhedron * p) {
   return poly;
 }
 
+FreeSpace::Node * FreeSpace::findOrAddNode(int cspace_index, int cell_index) {
+  for (int i=0; i<nodes[cspace_index].size(); i++) {
+    if (nodes[cspace_index][i]->cell_index == cell_index)
+      return nodes[cspace_index][i];
+  }
+  FreeSpace::Node * n = new Node(cspaces[cspace_index], cell_index);
+  nodes[cspace_index].push_back(n);
+  return n;
+}
+
 FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta, double * bounding_box) {
   this->robot = robot->triangulate();
   this->obstacle = obstacle;
@@ -360,14 +370,56 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta, do
   for (int i=0; i< numRotations; i++)
     allRotations.push_back(rotate(allRotations[i]));
 
+  std::vector<Polyhedron*> blockspaces;
   for (int i=0; i<allRotations.size(); i++) {
     Polyhedron * mSum = minkowskiSum(allRotations[i], obstacle); 
     Polyhedron * mSum_complement = complement(bb, mSum);
-    delete mSum;
     cspaces.push_back(mSum_complement); 
+    blockspaces.push_back(mSum);
   }
+
+  cout<<"cspaces populated"<<endl;
 
   for (int i=0; i< numRotations; i++)
     delete allRotations[i];
   allRotations.clear();
+
+  for (int i=0; i<numRotations; i++) {
+    cspaces[i]->formCells();
+    nodes.push_back(std::vector<Node *>());
+  }
+
+  cout<<"creating nodes and edges"<<endl;
+
+  // create all edges
+  for (int i=0; i<numRotations; i++) {
+    int j = (i+1)%numRotations;
+    cout<<"i,j = "<<i<<","<<j<<endl;
+    Polyhedron * block_union = blockspaces[i]->boolean(blockspaces[j], Union);
+    Polyhedron * intersection = complement(bb, block_union);
+    intersection->formCells();
+    // char s[50];
+    // sprintf(s, "%d-%d", i, j);
+    // saveWithShells(intersection, s);
+    for (int k=1; k<intersection->cells.size(); k++) {
+      PTR<Point> p = pointInCell(intersection, k);
+      // bool valid = intersection->contains(p); 
+      bool valid = !intersection->cells[k]->getBoundary(0)->getHFaces()[0]->pos();
+      if (valid) {
+        cout<<"  "<<k<<": "<<p->getP().getX().mid()<<" "<<p->getP().getY().mid()<<" "<<p->getP().getZ().mid()<<endl;
+        int ci = containingCell(cspaces[i], p);
+        int cj = containingCell(cspaces[j], p);
+        FreeSpace::Node * ni = findOrAddNode(i, ci);
+        FreeSpace::Node * nj = findOrAddNode(j, cj);
+        edges.push_back(new Edge(ni, nj, p));
+      }
+    }
+    delete block_union;
+    delete intersection;
+    cout<<endl;
+  }
+
+  for (int i=0; i<numRotations; i++)
+    delete blockspaces[i];
+  blockspaces.clear();
 }
