@@ -103,29 +103,40 @@ struct CompareZ {
 
 //returns a point in the ith cell of polyhedron poly
 PTR<Point> pointInCell(Polyhedron * poly, int i) {
-  poly->formCells();
   Cell * cell =  poly->cells[i];
   Face * face = cell->getBoundary(0)->getHFaces()[0]->getF();
 
   PTR<Point> fp;
   double unit = 1;
-  do {
+
+  while (true) {
     fp = new FacePoint(cell, unit);
-    unit = unit/2;
-  } while (!face->contains(fp));
+    if (face->contains(fp))
+      break;
+    fp = new FacePoint(cell, -unit);
+    if (face->contains(fp))
+      break;
+    unit= unit/2;
+  }
 
   PTR<Point> p;
   unit = 1;
-  do {
+  
+  while (true) {
     p = new CellInternalPoint(cell, fp, unit);
+    if (cell->contains(p))
+      break;
+    p = new CellInternalPoint(cell, fp, -unit);
+    if (cell->contains(p))
+      break;
     unit = unit/2;
-  } while (!cell->contains(p));
+  }
   return p;
 }
 
 int containingCell(Polyhedron * poly, PTR<Point> p) {
   poly->formCells(); 
-  for (int i=0; i< poly->cells.size(); i++)
+  for (int i=1; i< poly->cells.size(); i++)
     if (poly->cells[i]->contains(p))
       return i;
   return -1;
