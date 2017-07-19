@@ -388,6 +388,22 @@ string outi (int i)
     + ".vtk";
 }
 
+void plines (const vector<PV3s> &lines, int i)
+{
+  PV3s pts;
+  IVector data;
+  int k = 0;
+  for (vector<PV3s>::const_iterator l = lines.begin(); l != lines.end(); ++l) {
+    data.push_back(l->size());
+    for (PV3s::const_iterator p = l->begin(); p != l->end(); ++p, ++k) {
+      pts.push_back(*p);
+      data.push_back(k);
+    }
+  }
+  ofstream ostr(outi(i).c_str());
+  outputVTK(pts, data, false, ostr);
+}
+
 // debug
 
 void ptriangles (const Triangles &tr, int i)
@@ -440,7 +456,7 @@ void pcells (Polyhedron *a)
   if (a->cells.empty())
     a->formCells();
   for (int i = 1; i < a->cells.size(); ++i)
-    pfaces(a->cells[i]->getBoundary(0)->getHFaces(), i);
+    pfaces(a->cells[i]->getShell(0)->getHFaces(), i);
 }
 
 void pfaces (const Faces &faces)

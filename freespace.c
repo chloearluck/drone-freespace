@@ -37,8 +37,8 @@ void saveWithShells(Polyhedron * poly, char * filename) {
   poly->formCells();
   for (int i=0; i<poly->cells.size(); i++) {
     Cell * c = poly->cells[i];
-    for (int j=0; j<c->nBoundary(); j++) {
-      Shell * s = c->getBoundary(j);
+    for (int j=0; j<c->nShells(); j++) {
+      Shell * s = c->getShell(j);
       char str[50];
       sprintf(str, "%s-%d-%d", filename, i, j);
       saveShell(s->getHFaces(), str);
@@ -104,7 +104,7 @@ struct CompareZ {
 //returns a point in the ith cell of polyhedron poly
 PTR<Point> pointInCell(Polyhedron * poly, int i) {
   Cell * cell =  poly->cells[i];
-  Face * face = cell->getBoundary(0)->getHFaces()[0]->getF();
+  Face * face = cell->getShell(0)->getHFaces()[0]->getF();
 
   PTR<Point> fp;
   double unit = 1;
@@ -336,13 +336,17 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta, do
   sin_cos_alpha = new SinCosAlpha(t);
 
   std::vector<SimpleTriangle> tList;
+  this->robot->computeWindingNumbers();
   for (int i=0; i<this->robot->faces.size(); i++) {
     HEdges es = this->robot->faces[i]->getBoundary();
     PTR<Point> p = es[0]->tail()->getP();
     PTR<Point> q = es[0]->getNext()->tail()->getP();
     PTR<Point> r = es[0]->getNext()->getNext()->tail()->getP();
 
-    tList.push_back(SimpleTriangle(p,q,r));
+    if (this->robot->faces[i]->getHFace(0)->getS()->getC()->getWN() == 0)
+      tList.push_back(SimpleTriangle(p,q,r));
+    else
+      tList.push_back(SimpleTriangle(r,q,p));
   }
 
   std::vector<OuterApproxFace> splitTList;
@@ -373,7 +377,7 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta, do
   std::vector<Polyhedron*> blockspaces;
   for (int i=0; i<allRotations.size(); i++) {
     Polyhedron * mSum = minkowskiSum(allRotations[i], obstacle); 
-    Polyhedron * mSum_complement = complement(bb, mSum);
+    Polyhedron * mSum_complement = bb->boolean(mSum, Complement);
     cspaces.push_back(mSum_complement); 
     blockspaces.push_back(mSum);
   }
@@ -396,15 +400,17 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta, do
     int j = (i+1)%numRotations;
     cout<<"i,j = "<<i<<","<<j<<endl;
     Polyhedron * block_union = blockspaces[i]->boolean(blockspaces[j], Union);
-    Polyhedron * intersection = complement(bb, block_union);
+    Polyhedron * intersection = bb->boolean(block_union, Complement);
     intersection->formCells();
+    intersection->computeWindingNumbers();
     // char s[50];
     // sprintf(s, "%d-%d", i, j);
     // saveWithShells(intersection, s);
     for (int k=1; k<intersection->cells.size(); k++) {
       PTR<Point> p = pointInCell(intersection, k);
       // bool valid = intersection->contains(p); 
-      bool valid = !intersection->cells[k]->getBoundary(0)->getHFaces()[0]->pos();
+      // bool valid = !intersection->cells[k]->getShell(0)->getHFaces()[0]->pos();
+      bool valid = intersection->cells[k]->getWN() == 0;
       if (valid) {
         cout<<"  "<<k<<": "<<p->getP().getX().mid()<<" "<<p->getP().getY().mid()<<" "<<p->getP().getZ().mid()<<endl;
         int ci = containingCell(cspaces[i], p);
