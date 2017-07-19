@@ -312,9 +312,17 @@ FreeSpace::Node * FreeSpace::findOrAddNode(int cspace_index, int cell_index) {
     if (nodes[cspace_index][i]->cell_index == cell_index)
       return nodes[cspace_index][i];
   }
-  FreeSpace::Node * n = new Node(cspaces[cspace_index], cell_index);
+  FreeSpace::Node * n = new Node(cspace_index, cell_index);
   nodes[cspace_index].push_back(n);
   return n;
+}
+
+FreeSpace::Node * FreeSpace::findNode(int cspace_index, int cell_index) {
+  for (int i=0; i<nodes[cspace_index].size(); i++) {
+    if (nodes[cspace_index][i]->cell_index == cell_index)
+      return nodes[cspace_index][i];
+  }
+  return NULL;
 }
 
 FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta, double * bounding_box) {

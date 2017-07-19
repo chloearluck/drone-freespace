@@ -13,10 +13,12 @@ public:
   class Edge;
   class Node {
   public:
-    Polyhedron * poly;
+    int cspace_index;
     int cell_index;
     std::vector<Edge *> edges;
-    Node(Polyhedron * poly, int cell_index) : poly(poly), cell_index(cell_index) {}
+    bool discovered;
+    Node * parent;
+    Node(int cspace_index, int cell_index) : cspace_index(cspace_index), cell_index(cell_index), discovered(false), parent(NULL) {}
   };
 
   class Edge {
@@ -36,6 +38,7 @@ public:
   int numRotations;
 
   FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta, double * bounding_box);
+  Node * findNode(int cspace_index, int cell_index); 
 
 private:
   Node * findOrAddNode(int cspace_index, int cell_index);
