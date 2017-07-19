@@ -943,19 +943,28 @@ bool Cell::contains (Point *p) const
   return true;
 }
 
+int Polyhedron::containingCell(Point * p) 
+{
+  for (int i=1; i< cells.size(); i++)
+    if (cells[i]->contains(p))
+      return i;
+  return -1;
+}
+
 PTR<Point> Cell::interiorPoint () const
 {
   HFace *hf = getShell(0)->hfaces[0];
   Face *f = hf->f;
   PTR<Point> p = f->centroid();
-  HFaceNormal n(hf);
+  // HFaceNormal n(hf);
+  HFaceNormal * n = new HFaceNormal(hf);
   PTR<Point> qmin = 0;
   for (int i = 0; i < nShells(); ++i) {
     Shell *s = getShell(i);
     for (HFaces::iterator h = s->hfaces.begin(); h != s->hfaces.end(); ++h) {
       Face *g = (*h)->f;
       if (g != f) {
-	PTR<Point> q = g->rayIntersection(p, &n);
+	PTR<Point> q = g->rayIntersection(p, n);
 	if (q && (!qmin || CloserPair(p, q, p, qmin) == 1))
 	  qmin = q;
       }

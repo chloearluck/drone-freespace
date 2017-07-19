@@ -134,14 +134,6 @@ PTR<Point> pointInCell(Polyhedron * poly, int i) {
   return p;
 }
 
-int containingCell(Polyhedron * poly, PTR<Point> p) {
-  poly->formCells(); 
-  for (int i=1; i< poly->cells.size(); i++)
-    if (poly->cells[i]->contains(p))
-      return i;
-  return -1;
-}
-
 //generate 3 outer approximation points from rotate point p around the origin, add them to pList
 void pointOuterApprox(Points &pList, PTR<Point> p) {
   pList.push_back(p);
@@ -413,8 +405,8 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta, do
       bool valid = intersection->cells[k]->getWN() == 0;
       if (valid) {
         cout<<"  "<<k<<": "<<p->getP().getX().mid()<<" "<<p->getP().getY().mid()<<" "<<p->getP().getZ().mid()<<endl;
-        int ci = containingCell(cspaces[i], p);
-        int cj = containingCell(cspaces[j], p);
+        int ci = cspaces[i]->containingCell(p);
+        int cj = cspaces[j]->containingCell(p);
         FreeSpace::Node * ni = findOrAddNode(i, ci);
         FreeSpace::Node * nj = findOrAddNode(j, cj);
         edges.push_back(new Edge(ni, nj, p));

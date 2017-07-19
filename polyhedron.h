@@ -811,6 +811,7 @@ class Polyhedron {
   Polyhedron * negativeTranslate (Point *t) const;
   bool intersects (Polyhedron *a) const;
   bool contains (Point *p) const;
+  int containingCell(Point * p);
   bool intersectsEdges (const Polyhedron *a) const;
   Polyhedron * boolean (Polyhedron *a, SetOp op);
   void replaceVertex (Face *f, Vertex *v, Vertex *w);
