@@ -341,17 +341,24 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta, do
       tList.push_back(SimpleTriangle(r,q,p));
   }
 
+  cout<<"loaded triangles"<<endl;
+
   std::vector<OuterApproxFace> splitTList;
   for (int i=0; i< tList.size(); i++) 
     split(splitTList, tList[i]);
   tList.clear();
+
+  cout<<"split triangles"<<endl;
 
   std::vector<Polyhedron *> polyList;
   for (int i=0; i<splitTList.size(); i++) {
     polyList.push_back(triangleOuterApprox(splitTList[i]));
   }
 
+  cout<<"found triangle polyhedrons"<<endl;
+
   Polyhedron * outerApprox = union_all(polyList);
+  cout<<"found outerApprox"<<endl;
   Polyhedron * tmp = outerApprox->boolean(robot, Union);
   delete outerApprox;
   outerApprox = tmp;
@@ -365,6 +372,7 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta, do
   allRotations.push_back(reflectedOuterApprox);
   for (int i=0; i< numRotations; i++)
     allRotations.push_back(rotate(allRotations[i]));
+  cout<<"found all rotations"<<endl;
 
   std::vector<Polyhedron*> blockspaces;
   for (int i=0; i<allRotations.size(); i++) {
