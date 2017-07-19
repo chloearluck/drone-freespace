@@ -1,4 +1,5 @@
 #include "freespace.h"
+#include <queue>
 
 Polyhedron * loadPoly(char * filename) {
   int n = strlen(filename);
@@ -35,6 +36,29 @@ void savePoly(Polyhedron * p, char * filename) {
   }
 }
 
+void bfs(FreeSpace * fs, FreeSpace::Node * start, FreeSpace::Node * end) {
+  queue<FreeSpace::Node *> q;
+  start->discovered = true;
+  q.push(start);
+  while(!q.empty()) {
+    FreeSpace::Node * current = q.front();   q.pop();
+    if (current == end) {
+      cout<<"found path"<<endl;
+      return;
+    }
+    for (int i=0; i<current->edges.size(); i++) {
+      FreeSpace::Edge * e = current->edges[i];
+      FreeSpace::Node * n = ((e->a == current)? e->b : e->a);
+      if (!n->discovered) {
+        n->discovered = true;
+        n->parent = current;
+        q.push(n);
+      }
+    }
+  }
+  cout<<"no path found"<<endl;
+}
+
 int main (int argc, char *argv[]) {
   if (argc < 2) {
     cout<<"not enough arguments"<<endl;
@@ -64,4 +88,29 @@ int main (int argc, char *argv[]) {
   double bb_bounds[6] = {-20, 20, -20, 20, -20, 20};
 
   FreeSpace * fs  = new FreeSpace(poly, obstacle, theta, bb_bounds);
+
+  cout<<"Finding path"<<endl;
+  PTR<Point> startp = new InputPoint(5, 5, 2);
+  PTR<Point> endp = new InputPoint(15, 15, 2);
+  int starti = fs->cspaces[0]->containingCell(startp);
+  int endi = fs->cspaces[0]->containingCell(endp);
+  cout<<"need to get from cell "<<starti<<" to cell "<<endi<<" of cspace[0]"<<endl;
+  FreeSpace::Node * start =  fs->findNode(0, starti);
+  if (start == NULL)
+    cout<<"start is null"<<endl;
+  FreeSpace::Node * end =  fs->findNode(0, endi);
+  if (end == NULL)
+    cout<<"end is null"<<endl;
+
+  cout<<"bfs:"<<endl;
+  bfs(fs, start, end);
+
+  FreeSpace::Node * current = end;
+  while (current->parent != NULL) {
+    cout<<"cspaces["<<current->cspace_index<<"] cell "<<current->cell_index<<endl;
+    current = current->parent;
+  }
+
+
+
 }
