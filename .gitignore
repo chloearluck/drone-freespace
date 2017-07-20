@@ -1,5 +1,5 @@
 *.o
-test_union
+test_mink
 freespace_test
 output
 .DS_Store
