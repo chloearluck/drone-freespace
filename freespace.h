@@ -6,7 +6,7 @@
 
 class FreeSpace {
 public:
-  bool COMPUTE_USING_BLOCK_SPACE = true;
+  bool COMPUTE_USING_BLOCK_SPACE = false;
   Polyhedron * robot, * obstacle, * bb;
   std::vector<Polyhedron*> cspaces;
   std::vector<Polyhedron*> blockspaces;

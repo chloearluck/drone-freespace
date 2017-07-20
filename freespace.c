@@ -93,6 +93,90 @@ class OuterApproxFace {
   }
 };
 
+void save_triangulation(std::vector<OuterApproxFace> tList, char * filename, PTR<Point> sin_cos_alpha) {
+  std::vector< PTR<Point> > vertList;
+  std::vector< PTR<Point> > rotatedVertList;
+
+  int size = 0;
+  for (int i=0; i<tList.size(); i++) {
+    if(std::find(vertList.begin(), vertList.end(), tList[i].top1) == vertList.end()) {
+      vertList.push_back(tList[i].top1);
+      rotatedVertList.push_back(new RotationPoint(tList[i].top1, sin_cos_alpha));
+    }
+    if(tList[i].top2 != NULL && std::find(vertList.begin(), vertList.end(), tList[i].top2) == vertList.end()) {
+      vertList.push_back(tList[i].top2);
+      rotatedVertList.push_back(new RotationPoint(tList[i].top2, sin_cos_alpha));
+    }
+    if(std::find(vertList.begin(), vertList.end(), tList[i].bottom1) == vertList.end()) {
+      vertList.push_back(tList[i].bottom1);
+      rotatedVertList.push_back(new RotationPoint(tList[i].bottom1, sin_cos_alpha));
+    }
+    if(tList[i].bottom2 != NULL && std::find(vertList.begin(), vertList.end(), tList[i].bottom2) == vertList.end()) {
+      vertList.push_back(tList[i].bottom2);
+      rotatedVertList.push_back(new RotationPoint(tList[i].bottom2, sin_cos_alpha));
+    }
+    size = size + 3;
+    if (tList[i].top2 != NULL && tList[i].bottom2 != NULL)
+      size++;
+  }
+
+  int n = strlen(filename);
+  char str[n+18];
+  char str2[n+13];
+  strncpy(str, filename, n);
+  strncpy(str2, filename, n);
+  strncpy(str+n, "-triangulated.vtk", 18);
+  strncpy(str2+n, "-rotated.vtk", 13);
+  ofstream ostr;
+  ofstream ostr2;
+  ostr.open(str);
+  ostr2.open(str2);
+  if (ostr.is_open()) { 
+    ostr << setprecision(20) << "# vtk DataFile Version 3.0" << endl
+         << "vtk output" << endl << "ASCII" << endl
+         << "DATASET POLYDATA" << endl 
+         << "POINTS " << vertList.size() << " double" << endl;
+    ostr2 << setprecision(20) << "# vtk DataFile Version 3.0" << endl
+         << "vtk output" << endl << "ASCII" << endl
+         << "DATASET POLYDATA" << endl 
+         << "POINTS " << vertList.size() << " double" << endl;
+    for (int i=0; i<vertList.size(); i++)
+      ostr << vertList[i]->getP().getX().mid() << " " << vertList[i]->getP().getY().mid() << " " << vertList[i]->getP().getZ().mid() << endl;
+    for (int i=0; i<vertList.size(); i++)
+      ostr2 << rotatedVertList[i]->getP().getX().mid() << " " << rotatedVertList[i]->getP().getY().mid() << " " << rotatedVertList[i]->getP().getZ().mid() << endl;
+ 
+    ostr << endl << "POLYGONS " << tList.size() << " " << size+tList.size() << endl;
+    ostr2 << endl << "POLYGONS " << tList.size() << " " << size+tList.size() << endl;
+    for (int i=0; i<tList.size(); i++) {
+      int t1,t2,b1,b2;
+      t1 = std::find(vertList.begin(), vertList.end(), tList[i].top1) - vertList.begin();
+      if (tList[i].top2 != NULL) t2 = std::find(vertList.begin(), vertList.end(), tList[i].top2) - vertList.begin();
+      b1 = std::find(vertList.begin(), vertList.end(), tList[i].bottom1) - vertList.begin();
+      if (tList[i].bottom2 != NULL) b2 = std::find(vertList.begin(), vertList.end(), tList[i].bottom2) - vertList.begin();
+
+      if (tList[i].top2 == NULL) {
+        ostr << "3 " << t1 << " " << b1 << " " << b2 << endl;
+        ostr2 << "3 " << t1 << " " << b1 << " " << b2 << endl;
+      } else if (tList[i].bottom2 == NULL) {
+        ostr << "3 " << t1 << " " << t2 << " " << b1 << endl;
+        ostr2 << "3 " << t1 << " " << t2 << " " << b1 << endl;
+      } else {
+        if (SegmentIntersect(tList[i].top1, tList[i].bottom1, tList[i].top2, tList[i].bottom2)) {
+          ostr << "4 " << t1 << " " << t2 << " " << b1 << " " << b2 << endl;
+          ostr2 << "4 " << t1 << " " << t2 << " " << b1 << " " << b2 << endl;
+        } else {
+          ostr << "4 " << t1 << " " << t2 << " " << b2 << " " << b1 << endl;
+          ostr2 << "4 " << t1 << " " << t2 << " " << b2 << " " << b1 << endl;
+        }
+      }
+    }
+    ostr.close();
+    ostr2.close();
+  } else {
+    cout<<"could not write to file"<<endl;
+  }
+}
+
 Primitive2(DiffZ, PTR<Point>, i, PTR<Point>, j);
 int DiffZ::sign() { return (i->getP().getZ() - j->getP().getZ()).sign(); }
 struct CompareZ {
@@ -358,11 +442,13 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta, do
 
   cout<<"split triangles"<<endl;
 
+  // char str[30];
   std::vector<Polyhedron *> polyList;
   for (int i=0; i<splitTList.size(); i++) {
     polyList.push_back(triangleOuterApprox(splitTList[i]));
+    // sprintf(str, "poly-%d", i);
+    // savePolyTmp(polyList[i], str);
   }
-
   cout<<"found triangle polyhedrons"<<endl;
 
   Polyhedron * outerApprox = union_all(polyList);
@@ -370,6 +456,8 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta, do
   Polyhedron * tmp = outerApprox->boolean(robot, Union);
   delete outerApprox;
   outerApprox = tmp;
+  // savePolyTmp(outerApprox, "outerApprox");
+  // save_triangulation(splitTList, "outerApprox", sin_cos_alpha);
 
   for (int i=0; i<polyList.size(); i++)
     delete polyList[i];
@@ -389,8 +477,8 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta, do
     char s[50];
     // sprintf(s,"cspaces-%d",i);
     // savePolyTmp(mSum_complement, s);
-    sprintf(s,"blockspaces-%d",i);
-    savePolyTmp(mSum, s);
+    // sprintf(s,"blockspaces-%d",i);
+    // savePolyTmp(mSum, s);
     // sprintf(s,"allRotations-%d",i);
     // savePolyTmp(allRotations[i], s);
 
