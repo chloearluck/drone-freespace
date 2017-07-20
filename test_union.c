@@ -1,3 +1,5 @@
+//minkowski sum of rect-drone and room is incorrect
+
 #include "hull.h"
 #include "geometry3d.h"
 #include "mink.h"
@@ -17,7 +19,6 @@ Polyhedron * loadPoly(char * str) {
   return poly;
 }
 
-//now try point in cell...
 
 void savePoly(Polyhedron * p, char * filename) {
   int n = strlen(filename);
@@ -57,8 +58,8 @@ void saveWithShells(Polyhedron * poly, char * filename) {
   poly->formCells();
   for (int i=1; i<poly->cells.size(); i++) {
     Cell * c = poly->cells[i];
-    for (int j=0; j<c->nBoundary(); j++) {
-      Shell * s = c->getBoundary(j);
+    for (int j=0; j<c->nShells(); j++) {
+      Shell * s = c->getShell(j);
       char str[50];
       sprintf(str, "%s-%d-%d", filename, i, j);
       saveShell(s->getHFaces(), str);
@@ -69,7 +70,7 @@ void saveWithShells(Polyhedron * poly, char * filename) {
 PTR<Point> pointInCell(Polyhedron * poly, int i) {
   // poly->formCells();
   Cell * cell =  poly->cells[i];
-  Face * face = cell->getBoundary(0)->getHFaces()[0]->getF();
+  Face * face = cell->getShell(0)->getHFaces()[0]->getF();
 
   PTR<Point> fp;
   double unit = 1;
@@ -113,7 +114,7 @@ PTR<Point> pointInCell(Polyhedron * poly, int i) {
 // PTR<Point> pointInCell(Polyhedron * poly, int i) {
 //   poly->formCells();
 //   Cell * cell =  poly->cells[i];
-//   Face * face = cell->getBoundary(0)->getHFaces()[0]->getF();
+//   Face * face = cell->getShell(0)->getHFaces()[0]->getF();
 
 //   PTR<Point> fp;
 //   double unit = 1;
@@ -137,10 +138,10 @@ void test_cells(Polyhedron * p, char * s) {
   for (int i=1; i<p->cells.size(); i++) {
     cout<<"cell "<<i<<endl;
     Cell * c = p->cells[i];
-    bool valid = !c->getBoundary(0)->getHFaces()[0]->pos();
+    bool valid = !c->getShell(0)->getHFaces()[0]->pos();
     if (valid) {
-      for (int j=0; j<c->nBoundary(); j++) 
-        cout<<j<<": "<<( c->getBoundary(j)->outer() ? "outer" : "inner")<<endl;
+      for (int j=0; j<c->nShells(); j++) 
+        cout<<j<<": "<<( c->getShell(j)->outer() ? "outer" : "inner")<<endl;
       PTR<Point> q = pointInCell(p, i);
       cout<<"p: "<<q->getP().getX().mid()<<" "<<q->getP().getY().mid()<<" "<<q->getP().getZ().mid()<<endl;
     }
@@ -154,21 +155,26 @@ int main (int argc, char *argv[]) {
     srandom(seed);
   }
 
-  double b1[6] = { 1, 2, 1, 2, 1, 2};
-  Polyhedron * box1 = box(b1);
+  // double b1[6] = { 1, 2, 1, 2, 1, 2};
+  // Polyhedron * box1 = box(b1);
 
-  double b2[6] = { -1, -2, -1, -2, -1, -2};
-  Polyhedron * box2 = box(b2);
+  // double b2[6] = { -1, -2, -1, -2, -1, -2};
+  // Polyhedron * box2 = box(b2);
 
-  double b3[6] = { -3, 3, -3, 3, -3, 3};
-  Polyhedron * box3 = box(b3);
+  // double b3[6] = { -3, 3, -3, 3, -3, 3};
+  // Polyhedron * box3 = box(b3);
 
-  Polyhedron * disjoint = box1->boolean(box2, Union);
-  Polyhedron * nested = complement(box3, box1);
+  // Polyhedron * disjoint = box1->boolean(box2, Union);
+  // Polyhedron * nested = complement(box3, box1);
 
-  test_cells(box3, "box3");
-  test_cells(nested, "nested");
-  test_cells(disjoint, "disjoint");
+  // test_cells(box3, "box3");
+  // test_cells(nested, "nested");
+  // test_cells(disjoint, "disjoint");
+
+  Polyhedron * robot = loadPoly("rect-drone.vtk");
+  Polyhedron * room = loadPoly("room.vtk");
+  Polyhedron * mSum = minkowskiSum(robot, room);
+  savePoly(mSum, "mSum");
   
   return 0;
 }
