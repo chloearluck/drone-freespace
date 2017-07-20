@@ -945,7 +945,7 @@ bool Cell::contains (Point *p) const
 
 int Polyhedron::containingCell(Point * p) 
 {
-  for (int i=1; i< cells.size(); i++)
+  for (int i=0; i< cells.size(); i++)
     if (cells[i]->contains(p))
       return i;
   return -1;
