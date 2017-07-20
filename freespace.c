@@ -426,10 +426,10 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta, do
       saveWithShells(block_union, s);
 
       for (int k=0; k<block_union->cells.size(); k++) {
-        PTR<Point> p = pointInCell(block_union, k);
         bool valid = (block_union->cells[k]->getWN() == 0);
         if (valid) {
           cout<<"  "<<k<<": "<<p->getP().getX().mid()<<" "<<p->getP().getY().mid()<<" "<<p->getP().getZ().mid()<<endl;
+          PTR<Point> p = pointInCell(block_union, k);
           int ci = cspaces[i]->containingCell(p);
           int cj = cspaces[j]->containingCell(p);
           FreeSpace::Node * ni = findOrAddNode(i, ci);
@@ -446,10 +446,10 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta, do
       saveWithShells(intersection, s);
 
       for (int k=0; k<intersection->cells.size(); k++) {
-        PTR<Point> p = pointInCell(intersection, k);
         bool valid = (intersection->cells[k]->getWN() == 1);
         if (valid) {
           cout<<"  "<<k<<": "<<p->getP().getX().mid()<<" "<<p->getP().getY().mid()<<" "<<p->getP().getZ().mid()<<endl;
+          PTR<Point> p = pointInCell(intersection, k);
           int ci = cspaces[i]->containingCell(p);
           int cj = cspaces[j]->containingCell(p);
           FreeSpace::Node * ni = findOrAddNode(i, ci);
