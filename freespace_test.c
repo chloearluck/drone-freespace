@@ -95,13 +95,24 @@ int main (int argc, char *argv[]) {
   cout<<"Finding path"<<endl;
   PTR<Point> startp = new InputPoint(5, 5, 2);
   PTR<Point> endp = new InputPoint(15, 15, 2);
-  int starti = fs->cspaces[0]->containingCell(startp);
-  int endi = fs->cspaces[0]->containingCell(endp);
-  cout<<"need to get from cell "<<starti<<" to cell "<<endi<<" of cspace[0]"<<endl;
-  FreeSpace::Node * start =  fs->findNode(0, starti);
+  int startRotationIndex = 0; 
+  int endRotationIndex = 0; 
+  int starti, endi;
+  if (fs->COMPUTE_USING_BLOCK_SPACE) {
+    starti = fs->blockspaces[startRotationIndex]->containingCell(startp);
+    endi = fs->blockspaces[endRotationIndex]->containingCell(endp);
+    cout<<"finding path from cell "<<starti<<" in blockspaces["<<startRotationIndex
+        <<"] to cell "<<endi<<" in blockspaces["<<endRotationIndex<<"]"<<endl;
+  } else {
+    starti = fs->cspaces[0]->containingCell(startp);
+    endi = fs->cspaces[0]->containingCell(endp);
+    cout<<"finding path from cell "<<starti<<" in cspaces["<<startRotationIndex
+        <<"] to cell "<<endi<<" in cspaces["<<endRotationIndex<<"]"<<endl;
+  }
+  FreeSpace::Node * start =  fs->findNode(startRotationIndex, starti);
   if (start == NULL)
     cout<<"start is null"<<endl;
-  FreeSpace::Node * end =  fs->findNode(0, endi);
+  FreeSpace::Node * end =  fs->findNode(endRotationIndex, endi);
   if (end == NULL)
     cout<<"end is null"<<endl;
 
@@ -110,7 +121,10 @@ int main (int argc, char *argv[]) {
 
   FreeSpace::Node * current = end;
   while (current != NULL && current->parent != NULL) {
-    cout<<"cspaces["<<current->cspace_index<<"] cell "<<current->cell_index<<endl;
+    if (fs->COMPUTE_USING_BLOCK_SPACE)
+      cout<<"blockspaces["<<current->space_index<<"] cell "<<current->cell_index<<endl;
+    else 
+      cout<<"cspaces["<<current->space_index<<"] cell "<<current->cell_index<<endl;
     current = current->parent;
   }
 }

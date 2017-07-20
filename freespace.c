@@ -1,7 +1,5 @@
 #include "freespace.h"
 
-bool COMPUTE_USING_BLOCK_SPACE = true;
-
 void savePolyTmp(Polyhedron * p, char * filename) {
   int n = strlen(filename);
   char str[n+9];
@@ -309,20 +307,20 @@ Polyhedron * rotate(Polyhedron * p) {
   return poly;
 }
 
-FreeSpace::Node * FreeSpace::findOrAddNode(int cspace_index, int cell_index) {
-  for (int i=0; i<nodes[cspace_index].size(); i++) {
-    if (nodes[cspace_index][i]->cell_index == cell_index)
-      return nodes[cspace_index][i];
+FreeSpace::Node * FreeSpace::findOrAddNode(int space_index, int cell_index) {
+  for (int i=0; i<nodes[space_index].size(); i++) {
+    if (nodes[space_index][i]->cell_index == cell_index)
+      return nodes[space_index][i];
   }
-  FreeSpace::Node * n = new Node(cspace_index, cell_index);
-  nodes[cspace_index].push_back(n);
+  FreeSpace::Node * n = new Node(space_index, cell_index);
+  nodes[space_index].push_back(n);
   return n;
 }
 
-FreeSpace::Node * FreeSpace::findNode(int cspace_index, int cell_index) {
-  for (int i=0; i<nodes[cspace_index].size(); i++) {
-    if (nodes[cspace_index][i]->cell_index == cell_index)
-      return nodes[cspace_index][i];
+FreeSpace::Node * FreeSpace::findNode(int space_index, int cell_index) {
+  for (int i=0; i<nodes[space_index].size(); i++) {
+    if (nodes[space_index][i]->cell_index == cell_index)
+      return nodes[space_index][i];
   }
   return NULL;
 }
@@ -385,15 +383,14 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta, do
   cout<<"found all rotations"<<endl;
 
 
-  std::vector<Polyhedron*> blockspaces;
   for (int i=0; i<allRotations.size(); i++) {
     Polyhedron * mSum = minkowskiSum(allRotations[i], obstacle); 
     Polyhedron * mSum_complement = bb->boolean(mSum, Complement);
-    // char s[50];
+    char s[50];
     // sprintf(s,"cspaces-%d",i);
     // savePolyTmp(mSum_complement, s);
-    // sprintf(s,"blockspaces-%d",i);
-    // savePolyTmp(mSum, s);
+    sprintf(s,"blockspaces-%d",i);
+    savePolyTmp(mSum, s);
     // sprintf(s,"allRotations-%d",i);
     // savePolyTmp(allRotations[i], s);
 
@@ -428,10 +425,10 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta, do
       for (int k=0; k<block_union->cells.size(); k++) {
         bool valid = (block_union->cells[k]->getWN() == 0);
         if (valid) {
-          cout<<"  "<<k<<": "<<p->getP().getX().mid()<<" "<<p->getP().getY().mid()<<" "<<p->getP().getZ().mid()<<endl;
           PTR<Point> p = pointInCell(block_union, k);
-          int ci = cspaces[i]->containingCell(p);
-          int cj = cspaces[j]->containingCell(p);
+          cout<<"  "<<k<<": "<<p->getP().getX().mid()<<" "<<p->getP().getY().mid()<<" "<<p->getP().getZ().mid()<<endl;
+          int ci = blockspaces[i]->containingCell(p);
+          int cj = blockspaces[j]->containingCell(p);
           FreeSpace::Node * ni = findOrAddNode(i, ci);
           FreeSpace::Node * nj = findOrAddNode(j, cj);
           edges.push_back(new Edge(ni, nj, p));
@@ -448,8 +445,8 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta, do
       for (int k=0; k<intersection->cells.size(); k++) {
         bool valid = (intersection->cells[k]->getWN() == 1);
         if (valid) {
-          cout<<"  "<<k<<": "<<p->getP().getX().mid()<<" "<<p->getP().getY().mid()<<" "<<p->getP().getZ().mid()<<endl;
           PTR<Point> p = pointInCell(intersection, k);
+          cout<<"  "<<k<<": "<<p->getP().getX().mid()<<" "<<p->getP().getY().mid()<<" "<<p->getP().getZ().mid()<<endl;
           int ci = cspaces[i]->containingCell(p);
           int cj = cspaces[j]->containingCell(p);
           FreeSpace::Node * ni = findOrAddNode(i, ci);

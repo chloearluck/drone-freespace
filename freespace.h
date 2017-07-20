@@ -4,21 +4,22 @@
 #include <cstring>
 
 
-
 class FreeSpace {
 public:
+  bool COMPUTE_USING_BLOCK_SPACE = true;
   Polyhedron * robot, * obstacle, * bb;
   std::vector<Polyhedron*> cspaces;
+  std::vector<Polyhedron*> blockspaces;
   
   class Edge;
   class Node {
   public:
-    int cspace_index;
+    int space_index;
     int cell_index;
     std::vector<Edge *> edges;
     bool discovered;
     Node * parent;
-    Node(int cspace_index, int cell_index) : cspace_index(cspace_index), cell_index(cell_index), discovered(false), parent(NULL) {}
+    Node(int space_index, int cell_index) : space_index(space_index), cell_index(cell_index), discovered(false), parent(NULL) {}
   };
 
   class Edge {
@@ -38,9 +39,9 @@ public:
   int numRotations;
 
   FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta, double * bounding_box);
-  Node * findNode(int cspace_index, int cell_index); 
+  Node * findNode(int space_index, int cell_index); 
 
 private:
-  Node * findOrAddNode(int cspace_index, int cell_index);
+  Node * findOrAddNode(int space_index, int cell_index);
 };
 
