@@ -384,7 +384,7 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta, do
 
 
   for (int i=0; i<allRotations.size(); i++) {
-    Polyhedron * mSum = minkowskiSum(allRotations[i], obstacle); 
+    Polyhedron * mSum = minkowskiSumFull(allRotations[i], obstacle); 
     Polyhedron * mSum_complement = bb->boolean(mSum, Complement);
     char s[50];
     // sprintf(s,"cspaces-%d",i);

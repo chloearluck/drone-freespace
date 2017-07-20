@@ -75,7 +75,7 @@ int main (int argc, char *argv[]) {
 
   Polyhedron * robot = loadPoly("rect-drone.vtk");
   Polyhedron * room = loadPoly("room.vtk");
-  Polyhedron * mSum = minkowskiSum(robot, room);
+  Polyhedron * mSum = minkowskiSumFull(robot, room);
   savePoly(mSum, "mSum");
   
   return 0;
