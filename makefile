@@ -45,11 +45,11 @@ freespace_test: freespace_test.o freespace.o hull.o polyhedron.o triangulate.o i
 freespace_test.o: freespace_test.c freespace.h hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h
 	$(COMPILE) freespace_test.c
 
-test_union:  test_union.o hull.o mink.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o
-	$(LINK) test_union.o hull.o mink.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o -lmpfr -o test_union
+test_mink:  test_mink.o hull.o mink.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o
+	$(LINK) test_mink.o hull.o mink.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o -lmpfr -o test_mink
 
-test_union.o: test_union.c mink.h hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h
-	$(COMPILE) test_union.c
+test_mink.o: test_mink.c mink.h hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h
+	$(COMPILE) test_mink.c
 
 mink.o: mink.C mink.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h
 	$(COMPILE) mink.C
@@ -75,4 +75,4 @@ acp.o:	acp.cc acp.h
 # 	-DIL_STD -Icplex124/include expander.C
 
 clean: 
-	rm -f *.o *~ hull test_union freespace_test
+	rm -f *.o *~ hull test_mink freespace_test
