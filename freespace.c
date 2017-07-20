@@ -1,5 +1,7 @@
 #include "freespace.h"
 
+bool COMPUTE_USING_BLOCK_SPACE = true;
+
 void savePolyTmp(Polyhedron * p, char * filename) {
   int n = strlen(filename);
   char str[n+9];
@@ -382,10 +384,19 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta, do
     allRotations.push_back(rotate(allRotations[i]));
   cout<<"found all rotations"<<endl;
 
+
   std::vector<Polyhedron*> blockspaces;
   for (int i=0; i<allRotations.size(); i++) {
     Polyhedron * mSum = minkowskiSum(allRotations[i], obstacle); 
     Polyhedron * mSum_complement = bb->boolean(mSum, Complement);
+    // char s[50];
+    // sprintf(s,"cspaces-%d",i);
+    // savePolyTmp(mSum_complement, s);
+    // sprintf(s,"blockspaces-%d",i);
+    // savePolyTmp(mSum, s);
+    // sprintf(s,"allRotations-%d",i);
+    // savePolyTmp(allRotations[i], s);
+
     cspaces.push_back(mSum_complement); 
     blockspaces.push_back(mSum);
   }
@@ -408,29 +419,47 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta, do
     int j = (i+1)%numRotations;
     cout<<"i,j = "<<i<<","<<j<<endl;
     Polyhedron * block_union = blockspaces[i]->boolean(blockspaces[j], Union);
-    Polyhedron * intersection = bb->boolean(block_union, Complement);
-    intersection->formCells();
-    intersection->computeWindingNumbers();
-    // char s[50];
-    // sprintf(s, "%d-%d", i, j);
-    // saveWithShells(intersection, s);
-    for (int k=1; k<intersection->cells.size(); k++) {
-      PTR<Point> p = pointInCell(intersection, k);
-      // bool valid = intersection->contains(p); 
-      // bool valid = !intersection->cells[k]->getShell(0)->getHFaces()[0]->pos();
-      bool valid = intersection->cells[k]->getWN() == 0;
-      if (valid) {
-        cout<<"  "<<k<<": "<<p->getP().getX().mid()<<" "<<p->getP().getY().mid()<<" "<<p->getP().getZ().mid()<<endl;
-        int ci = cspaces[i]->containingCell(p);
-        int cj = cspaces[j]->containingCell(p);
-        FreeSpace::Node * ni = findOrAddNode(i, ci);
-        FreeSpace::Node * nj = findOrAddNode(j, cj);
-        edges.push_back(new Edge(ni, nj, p));
+    if (COMPUTE_USING_BLOCK_SPACE) {
+      block_union->computeWindingNumbers();
+      char s[50];
+      sprintf(s, "%d-%d", i, j);
+      saveWithShells(block_union, s);
+
+      for (int k=0; k<block_union->cells.size(); k++) {
+        PTR<Point> p = pointInCell(block_union, k);
+        bool valid = (block_union->cells[k]->getWN() == 0);
+        if (valid) {
+          cout<<"  "<<k<<": "<<p->getP().getX().mid()<<" "<<p->getP().getY().mid()<<" "<<p->getP().getZ().mid()<<endl;
+          int ci = cspaces[i]->containingCell(p);
+          int cj = cspaces[j]->containingCell(p);
+          FreeSpace::Node * ni = findOrAddNode(i, ci);
+          FreeSpace::Node * nj = findOrAddNode(j, cj);
+          edges.push_back(new Edge(ni, nj, p));
+        }
       }
+
+    } else {
+      Polyhedron * intersection = bb->boolean(block_union, Complement);
+      intersection->computeWindingNumbers();
+      char s[50];
+      sprintf(s, "%d-%d", i, j);
+      saveWithShells(intersection, s);
+
+      for (int k=0; k<intersection->cells.size(); k++) {
+        PTR<Point> p = pointInCell(intersection, k);
+        bool valid = (intersection->cells[k]->getWN() == 1);
+        if (valid) {
+          cout<<"  "<<k<<": "<<p->getP().getX().mid()<<" "<<p->getP().getY().mid()<<" "<<p->getP().getZ().mid()<<endl;
+          int ci = cspaces[i]->containingCell(p);
+          int cj = cspaces[j]->containingCell(p);
+          FreeSpace::Node * ni = findOrAddNode(i, ci);
+          FreeSpace::Node * nj = findOrAddNode(j, cj);
+          edges.push_back(new Edge(ni, nj, p));
+        }
+      }
+      delete intersection;
     }
     delete block_union;
-    delete intersection;
-    cout<<endl;
   }
 
   for (int i=0; i<numRotations; i++)
