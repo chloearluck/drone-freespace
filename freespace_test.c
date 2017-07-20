@@ -37,6 +37,9 @@ void savePoly(Polyhedron * p, char * filename) {
 }
 
 void bfs(FreeSpace * fs, FreeSpace::Node * start, FreeSpace::Node * end) {
+  if (start == NULL || end == NULL)
+    return;
+
   queue<FreeSpace::Node *> q;
   start->discovered = true;
   q.push(start);
@@ -106,11 +109,8 @@ int main (int argc, char *argv[]) {
   bfs(fs, start, end);
 
   FreeSpace::Node * current = end;
-  while (current->parent != NULL) {
+  while (current != NULL && current->parent != NULL) {
     cout<<"cspaces["<<current->cspace_index<<"] cell "<<current->cell_index<<endl;
     current = current->parent;
   }
-
-
-
 }
