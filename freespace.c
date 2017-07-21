@@ -442,12 +442,9 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta, do
 
   cout<<"split triangles"<<endl;
 
-  // char str[30];
   std::vector<Polyhedron *> polyList;
   for (int i=0; i<splitTList.size(); i++) {
     polyList.push_back(triangleOuterApprox(splitTList[i]));
-    // sprintf(str, "poly-%d", i);
-    // savePolyTmp(polyList[i], str);
   }
   cout<<"found triangle polyhedrons"<<endl;
 
@@ -474,14 +471,6 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta, do
   for (int i=0; i<allRotations.size(); i++) {
     Polyhedron * mSum = minkowskiSumFull(allRotations[i], obstacle); 
     Polyhedron * mSum_complement = bb->boolean(mSum, Complement);
-    char s[50];
-    // sprintf(s,"cspaces-%d",i);
-    // savePolyTmp(mSum_complement, s);
-    // sprintf(s,"blockspaces-%d",i);
-    // savePolyTmp(mSum, s);
-    // sprintf(s,"allRotations-%d",i);
-    // savePolyTmp(allRotations[i], s);
-
     cspaces.push_back(mSum_complement); 
     blockspaces.push_back(mSum);
   }

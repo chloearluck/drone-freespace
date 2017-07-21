@@ -19,12 +19,6 @@ int IsTangent::sign () {
   PV3 nsplit = PV3(n.getY(), -n.getX(), Parameter::constant(0)); 
   PV3 norm = nsplit/nsplit.dot(nsplit).sqrt();
   //check is a,b,c are all on the same side of plane n=nsplit k=0
-  assert(nsplit.dot(nsplit) > 0);
-  if ((a.getZ().mid() < -.4) && (b.getZ().mid() < -.4) && (c.getZ().mid() < -.4)) {
-    cout<<nsplit.getX().mid()<<" "<<nsplit.getY().mid()<<" "<<nsplit.getZ().mid()<<endl;
-    cout<<norm.getX().mid()<<" "<<norm.getY().mid()<<" "<<norm.getZ().mid()<<endl;
-  }  
-
   int psa = nsplit.dot(a).sign();
   int psb = nsplit.dot(b).sign();
   int psc = nsplit.dot(c).sign();
