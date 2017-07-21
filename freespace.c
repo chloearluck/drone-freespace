@@ -534,8 +534,4 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta, do
     }
     delete block_union;
   }
-
-  for (int i=0; i<numRotations; i++)
-    delete blockspaces[i];
-  blockspaces.clear();
 }
