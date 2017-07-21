@@ -87,7 +87,7 @@ int main (int argc, char *argv[]) {
     obstacle = box(bounds);
   }
   
-  double theta = M_PI / 10;
+  double theta = M_PI / 20;
   double bb_bounds[6] = {-20, 20, -20, 20, -20, 20};
 
   FreeSpace * fs  = new FreeSpace(poly, obstacle, theta, bb_bounds);
@@ -104,8 +104,8 @@ int main (int argc, char *argv[]) {
     cout<<"finding path from cell "<<starti<<" in blockspaces["<<startRotationIndex
         <<"] to cell "<<endi<<" in blockspaces["<<endRotationIndex<<"]"<<endl;
   } else {
-    starti = fs->cspaces[0]->containingCell(startp);
-    endi = fs->cspaces[0]->containingCell(endp);
+    starti = fs->cspaces[startRotationIndex]->containingCell(startp);
+    endi = fs->cspaces[endRotationIndex]->containingCell(endp);
     cout<<"finding path from cell "<<starti<<" in cspaces["<<startRotationIndex
         <<"] to cell "<<endi<<" in cspaces["<<endRotationIndex<<"]"<<endl;
   }
