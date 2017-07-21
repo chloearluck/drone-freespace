@@ -12,19 +12,25 @@ int IsTangent::sign () {
   PV3 a  = v0->getP();
   PV3 b  = v1->getP();
   PV3 c  = v2->getP();
+
   PV3 n = (b - a).cross(c - a); 
   Parameter k = n.dot(a);
-  PV3 p = k / (n.dot(n)) * n;
+  
+  PV3 nsplit = PV3(n.getY(), -n.getX(), Parameter::constant(0)); 
+  PV3 norm = nsplit/nsplit.dot(nsplit).sqrt();
+  //check is a,b,c are all on the same side of plane n=nsplit k=0
+  assert(nsplit.dot(nsplit) > 0);
+  if ((a.getZ().mid() < -.4) && (b.getZ().mid() < -.4) && (c.getZ().mid() < -.4)) {
+    cout<<nsplit.getX().mid()<<" "<<nsplit.getY().mid()<<" "<<nsplit.getZ().mid()<<endl;
+    cout<<norm.getX().mid()<<" "<<norm.getY().mid()<<" "<<norm.getZ().mid()<<endl;
+  }  
 
-  PV3 n0 = (a-b).cross(n); Parameter k0 = n0.dot(b);
-  PV3 n1 = (b-c).cross(n); Parameter k1 = n1.dot(c);
-  PV3 n2 = (c-a).cross(n); Parameter k2 = n2.dot(a);
-
-  if ( ((n0.dot(p) - k0).sign() == (n0.dot(c) - k0).sign()) && 
-       ((n1.dot(p) - k1).sign() == (n1.dot(a) - k0).sign()) && 
-       ((n2.dot(p) - k2).sign() == (n2.dot(b) - k0).sign()) )
-    return 1;  
-  return 0;
+  int psa = nsplit.dot(a).sign();
+  int psb = nsplit.dot(b).sign();
+  int psc = nsplit.dot(c).sign();
+  if (psa == psb && psb == psc)
+    return 0;
+  return 1;
 }
 
 
@@ -113,11 +119,9 @@ PlaneData SplitPlane::calculate () {
   PV3 c  = v2->getP();
   PV3 n_tri = (b - a).cross(c - a); 
   Parameter k_tri = n_tri.dot(a); 
-  PV3 p = k_tri / (n_tri.dot(n_tri)) * n_tri;
 
   PV3 n = PV3(n_tri.getY(), -n_tri.getX(), Parameter::constant(0));
-  Parameter k = n.dot(p);
-  return(PlaneData(n,k));
+  return(PlaneData(n,Parameter::constant(0)));
 }
 
 PV3 RotationPoint::calculate () {
