@@ -34,7 +34,6 @@ void saveShell(HFaces hf,  char * filename) {
 
 void saveWithShells(Polyhedron * poly, char * filename) {
   savePolyTmp(poly, filename);
-  poly->formCells();
   for (int i=0; i<poly->cells.size(); i++) {
     Cell * c = poly->cells[i];
     for (int j=0; j<c->nShells(); j++) {
