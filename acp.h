@@ -52,6 +52,24 @@ namespace acp {
 
 double randomNumber (double rmin, double rmax);
 
+inline double nextD (double x) {
+  static double p = 1.0/(1 << 26)/(1 << 26);
+  double x2 = x + p*fabs(x);
+  if (x2 == x)
+    return nextafter(x, 1.0);
+  double x3 = 0.5*(x + x2);
+  return x3 > x ? x3 : x2;
+}
+ 
+inline double prevD (double x) {
+  static double p = 1.0/(1 << 26)/(1 << 26);
+  double x2 = x - p*fabs(x);
+  if (x2 == x)
+    return nextafter(x, -1.0);
+ double x3 = 0.5*(x + x2);
+ return x3 < x ? x3 : x2;
+}
+
 class SignException : public std::exception {
  public:
   virtual const char* what() const throw() {
@@ -144,7 +162,17 @@ class MValue {
     mpfr_root(res.m, m, k, round);
     return res;
   }
- 
+  MValue cos (mpfr_rnd_t round) const {
+    MValue res(p);
+    mpfr_cos(res.m, m, round);
+    return res;
+  }
+  MValue acos (mpfr_rnd_t round) const {
+    MValue res(p);
+    mpfr_acos(res.m, m, round);
+    return res;
+  }
+
   mpfr_t m;
   unsigned int p;
 };
@@ -310,6 +338,8 @@ public:
   virtual MInt* intersect (const MInt* b) const = 0;
   virtual MInt* sqrt () const = 0;
   virtual MInt* root (unsigned long int k) const = 0;
+  virtual MInt* cos () const = 0;
+  virtual MInt* acos () const = 0;
 };
 
 class AnglePoly;
@@ -364,12 +394,16 @@ class Parameter {
 
   // Call Parameter::enable() before using ACP
   static void enable () { 
+#ifndef NO_MODE
     if (!enabled) { enabled = true; fesetround(FE_UPWARD); }
+#endif
   }
 
   // Call Parameter::disable() before non-ACP calculations.
   static void disable () { 
+#ifndef NO_MODE
     if (enabled) { enabled = false; fesetround(FE_TONEAREST); }
+#endif
   }
 
   static bool isEnabled () { return enabled; }
@@ -484,7 +518,11 @@ class Parameter {
   // Hence 2 * p does not perturb the 2.
   Parameter operator+ (const Parameter &b) const {
     if (l != sentinel && b.l != sentinel)
+#ifndef NO_MODE
       return Parameter(- no_optimize(no_optimize(- l) - b.l), u.r + b.u.r);
+#else
+      return Parameter(prevD(l + b.l), nextD(u.r + b.u.r));
+#endif    
     assert(l == sentinel && b.l == sentinel);
     return Parameter(u.m->plus(b.u.m));
   }
@@ -493,7 +531,11 @@ class Parameter {
   
   Parameter operator- (const Parameter &b) const {
     if (l != sentinel && b.l != sentinel)
+#ifndef NO_MODE
       return Parameter(- no_optimize(b.u.r - l), u.r - b.l);
+#else
+      return Parameter(prevD(l - b.u.r), nextD(u.r - b.l));
+#endif    
     assert(l == sentinel && b.l == sentinel);
     return Parameter(u.m->minus(b.u.m));
   }
@@ -507,6 +549,7 @@ class Parameter {
   }
   
   Parameter operator* (const Parameter &b) const {
+#ifndef NO_MODE
     if (l != sentinel && b.l != sentinel) {
       Parameter s = u.r < 0.0 ? - *this : *this, t = u.r < 0.0 ? - b : b;
       if (s.l > 0.0) {
@@ -528,6 +571,25 @@ class Parameter {
         cu = cu1 < cu2 ? cu2 : cu1;
       return Parameter(cl, cu);
     }
+#else
+    if (l != sentinel && b.l != sentinel) {
+      Parameter s = u.r < 0.0 ? - *this : *this, t = u.r < 0.0 ? - b : b;
+      if (s.l >= 0.0)
+	if (t.l >= 0.0)
+	  return Parameter(prevD(s.l*t.l), nextD(s.u.r*t.u.r));
+	else if (t.u.r <= 0.0)
+	  return Parameter(prevD(s.u.r*t.l), nextD(s.l*t.u.r));
+	else
+	  return Parameter(prevD(s.u.r*t.l), nextD(s.u.r*t.u.r));
+      if (t.l >= 0.0)
+	return Parameter(prevD(s.l*t.u.r), nextD(s.u.r*t.u.r));
+      if (t.u.r <= 0.0)
+	return Parameter(prevD(s.u.r*t.l), nextD(s.l*t.l));
+      double k1 = s.l*t.u.r, k2 = s.u.r*t.l, nl = k1 < k2 ? k1 : k2,
+	k3 = s.l*t.l, k4 = s.u.r*t.u.r, nu = k3 < k4 ? k4 : k3;
+      return Parameter(prevD(nl), nextD(nu));
+    }
+#endif
     assert(l == sentinel && b.l == sentinel);
     return Parameter(u.m->times(b.u.m));
   }
@@ -535,8 +597,9 @@ class Parameter {
   Parameter operator* (double b) const { return *this * constant(b); }
 
   Parameter operator/ (const Parameter &b) const {
-    double v;
     int bs = b.sign();
+    assert(bs != 0);
+#ifndef NO_MODE
     if (l != sentinel && b.l != sentinel) {
       if (bs == 1) {
 	if (l >= 0.0)
@@ -551,6 +614,22 @@ class Parameter {
 	return Parameter(- no_optimize(no_optimize(- u.r)/b.l), l/b.u.r);
       return Parameter(- no_optimize(no_optimize(- u.r)/b.u.r), l/b.u.r);
     }
+#else
+    if (l != sentinel && b.l != sentinel) {
+      if (bs == 1)
+	if (l >= 0.0)
+	  return Parameter(prevD(l/b.u.r), nextD(u.r/b.l));
+	else if (u.r <= 0.0)
+	  return Parameter(prevD(l/b.l), nextD(u.r/b.u.r));
+	else
+	  return Parameter(prevD(l/b.l), nextD(u.r/b.l));
+      if (l >= 0.0)
+	return Parameter(prevD(u.r/b.u.r), nextD(l/b.l));
+      if (u.r <= 0.0)
+	return Parameter(prevD(u.r/b.l), nextD(l/b.u.r));
+      return Parameter(prevD(u.r/b.u.r), nextD(l/b.u.r));
+    }
+#endif
     assert(l == sentinel && b.l == sentinel);
     return Parameter(u.m->divide(b.u.m));
   }
@@ -580,6 +659,57 @@ class Parameter {
     if (n < 0)
       return constant(1) / Parameter::pow(*this, -n);
     return Parameter::pow(*this, n);
+  }
+
+  Parameter cos () const {
+    if (highPrecision == 106u) {
+      highPrecision = 212u;
+      throw signException;
+    }
+    if (l != sentinel) {
+      bool save_enabled = isEnabled();
+      if (save_enabled)
+        disable();
+      double c1 = ::cos(l), c2 = ::cos(u.r), cl, cu;
+      if (c1 < c2) {
+	cl = nextafter(c1, -10.0);
+	cu = nextafter(c2, 10.0);
+      }
+      else {
+	cl = nextafter(c2, -10.0);
+	cu = nextafter(c1, 10.0);
+      }
+      if (save_enabled)
+        enable();
+      return Parameter(cl, cu);
+    }
+    return Parameter(u.m->cos());
+  }
+
+  Parameter acos () const {
+    if (highPrecision == 106u) {
+      highPrecision = 212u;
+      throw signException;
+    }
+    if (l != sentinel) {
+      bool save_enabled = isEnabled();
+      if (save_enabled)
+        disable();
+      double a1 = ::acos(l < -1.0 ? -1.0 : l),
+	a2 = ::acos(u.r > 1.0 ? 1.0 : u.r), al, au;
+      if (a1 < a2) {
+      	al = nextafter(a1, -10.0);
+	au = nextafter(a2, 10.0);
+      }
+      else {
+	al = nextafter(a2, -10.0);
+	au = nextafter(a1, 10.0);
+      }
+      if (save_enabled)
+        enable();
+      return Parameter(al, au);
+    }
+    return Parameter(u.m->acos());
   }
 
   void print ();
@@ -844,6 +974,10 @@ class PInt : public MInt {
   MInt* sqrt () const { assert(0); return new PInt(p.sqrt()); }
 
   MInt* root (unsigned long int k) const { assert(0); return new PInt(p.root(k)); }
+
+  MInt* cos () const { assert(0); }
+
+  MInt* acos () const { assert(0); }
 };
 
 class EInt : public MInt {
@@ -942,6 +1076,14 @@ class EInt : public MInt {
 
   MInt* root (unsigned long int k) const {
     return new EInt(lm.root(k, GMP_RNDD), um.root(k, GMP_RNDU));
+  }
+
+  MInt* cos () const {
+    return new EInt(lm.cos(GMP_RNDD), um.cos(GMP_RNDU));
+  }
+
+  MInt* acos () const {
+    return new EInt(lm.acos(GMP_RNDD), um.acos(GMP_RNDU));
   }
 
   MValue lm, um;

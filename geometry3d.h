@@ -136,13 +136,13 @@ public:
 };
 
 // Point defined as the projection of a point onto a plane
-class PlanePoint : public Point {
+class PlanePointX : public Point {
   PTR<Plane> plane;
   PTR<Point> point;
   PV3 calculate ();
   
 public:
-  PlanePoint (PTR<Plane> plane, PTR<Point> point) : plane(plane), point(point) {}
+  PlanePointX (PTR<Plane> plane, PTR<Point> point) : plane(plane), point(point) {}
 };
 
 class IntersectionPoint : public Point {

@@ -124,7 +124,8 @@ void BSPLeaf (const BSPElts &aelts, const BSPElts &belts, BSPElts &ea,
 
 class MinkHullFace {
  public:
-  MinkHullFace (HEdge *e, MinkHullFace *prev, MinkHullFace *next) : e(e), prev(prev), next(next) {}
+  MinkHullFace (HEdge *e, MinkHullFace *prev, MinkHullFace *next)
+    : e(e), prev(prev), next(next) {}
   bool inCset (HEdge *f) const
   { return find(cset.begin(), cset.end(), f) != cset.end(); }
   void updateCset (MinkHullFace *h, HEdge *f);

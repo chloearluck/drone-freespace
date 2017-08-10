@@ -4,12 +4,6 @@
 #include "polyhedron.h"
 #include <sstream>
 
-typedef vector<PV3> PV3s;
-
-typedef vector<ID> IVector;
-
-typedef vector<IVector> IVectors;
-
 class FaceRecord {
  public:
   FaceRecord () : m1(0), m2(0), p(0), o1(false), o2(false) {}
@@ -65,5 +59,7 @@ Polyhedron * readPolyhedronSTL (istream &istr);
 void ptriangles (const Triangles &tr, ostream &ostr);
 
 string outi (int i);
+
+void plines (const vector<PV3s> &lines, int i);
 
 #endif

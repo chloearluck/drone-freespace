@@ -161,7 +161,7 @@ PV3 CellInternalPoint::calculate () {
   return fp - unit * n;
 }
 
-PV3 PlanePoint::calculate ()  {
+PV3 PlanePointX::calculate ()  {
   PV3 v = plane->getN();
   Parameter d = plane->getK();
   PV3 p = point->getP();

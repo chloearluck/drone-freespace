@@ -76,7 +76,7 @@ class ProjectionCoordinate : Object<Parameter> {
   }
  public:
   ProjectionCoordinate (Plane *p) : p(p) {}
-  int getPC () { return get().mid(); }
+  int getPC () { return getApprox(1e-6).mid(); }
 };
 
 int projectionCoordinate (Plane *p);
@@ -246,7 +246,7 @@ class EPPoint : public Point {
 };
 
 class RayPlanePoint : public Point {
-  Point *t, *r;
+  PTR<Point> t, r;
   TrianglePlane p;
   PV3 calculate () {
     PV3 a = t->getP(), u = r->getP(), n = p.getN();
@@ -254,7 +254,7 @@ class RayPlanePoint : public Point {
     return a + k*u;
   }
  public:
-  RayPlanePoint (Point *t, Point*r, TrianglePlane *q)
+  RayPlanePoint (Point *t, Point *r, TrianglePlane *q)
     : t(t), r(r), p(q->a, q->b, q->c) {}
 };
 
@@ -284,7 +284,7 @@ class Vertex {
   double * getBBox () { return bbox; }
   HEdge * getOutgoing (int i) const;
   void outgoingHEdges (vector<HEdge *> &ed) const;
-  void incidentFaces (set<Face *> &fs) const;
+  vector<Face *> incidentFaces () const;
   HEdge * connected (Vertex *a) const;
   int order (Vertex *v) const;
 };
@@ -364,7 +364,7 @@ class Edge {
   void setBBox ();
   HEdge * addHEdge (bool forward);
   void removeHEdge (HEdge *e);
-  PV3 getU () { return h->p->getP() - t->p->getP(); }
+  PV3 getU () { return h->p->getApprox(1e-6) - t->p->getApprox(1e-6); }
   Vertex * getT () const { return t; }
   Vertex * getH () const { return h; }
   int HEdgesN () const { return hedges.size(); }
@@ -811,7 +811,7 @@ class Polyhedron {
   Polyhedron * negativeTranslate (Point *t) const;
   bool intersects (Polyhedron *a) const;
   bool contains (Point *p) const;
-  int containingCell(Point * p);
+  int containingCell (Point *p) const;
   bool intersectsEdges (const Polyhedron *a) const;
   Polyhedron * boolean (Polyhedron *a, SetOp op);
   void replaceVertex (Face *f, Vertex *v, Vertex *w);

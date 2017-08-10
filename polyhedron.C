@@ -1,6 +1,6 @@
 #include "polyhedron.h"
 
-bool inputPerturbed = true;
+bool inputPerturbed = false;
 
 double getTime ()
 {
@@ -49,7 +49,7 @@ int projectionCoordinate (Plane *p)
 
 void Point::getBBox (double *bbox)
 {
-  PV3 p = getP();
+  PV3 p = getApprox(1e-6);
   bbox[0] = p.x.lb();
   bbox[1] = p.x.ub();
   bbox[2] = p.y.lb();
@@ -80,7 +80,9 @@ int Point::order (Point *a)
 
 bool Point::identicalI (Point *a)
 {
-  PV3 p = getP(), q = a->getP();
+  if (!dynamic_cast<InputPoint *>(this) || !dynamic_cast<InputPoint *>(a))
+    return false;
+  PV3 p = getApprox(), q = a->getApprox();
   return p.x.lb() == q.x.lb() && p.y.lb() == q.y.lb() &&
     p.z.lb() == q.z.lb();
 }
@@ -192,7 +194,7 @@ Vertex::Vertex (Point *p) : p(p), node(0)
 {
   p->getBBox(bbox);
   if (!inputPerturbed) {
-    Parameter k = Rdir.getP().dot(p->getP());
+    Parameter k = Rdir.getApprox(1e-6).dot(p->getApprox(1e-6));
     rint[0] = k.lb();
     rint[1] = k.ub();
   }
@@ -212,12 +214,14 @@ void Vertex::outgoingHEdges (HEdges &ed) const
 	ed.push_back(*f);
 }
 
-void Vertex::incidentFaces (FaceSet &fs) const
+Faces Vertex::incidentFaces () const
 {
+  Faces fa;
   for (Edges::const_iterator e = edges.begin(); e != edges.end(); ++e)
     for (HEdges::iterator f = (*e)->hedges.begin(); f != (*e)->hedges.end(); ++f)
       if ((*f)->tail() == this)
-	fs.insert((*f)->getF());
+	fa.push_back((*f)->getF());
+  return fa;
 }
 
 HEdge * Vertex::connected (Vertex *a) const
@@ -600,8 +604,8 @@ bool Face::intersectRay (Point *a, Point *r)
 {
   if (a->side(&p) == 0)
     return false;
-  RayPlanePoint q(a, r, &p);
-  return contains(&q) && PointOrder(a, &q, r) == 1;
+  PTR<Point> q = new RayPlanePoint(a, r, &p);
+  return contains(q) && PointOrder(a, q, r) == 1;
 }
 
 PTR<Point> Face::rayIntersection (Point *a, Point *r)
@@ -670,22 +674,24 @@ bool Face::boundaryContains (Point *a, int i)
 
 bool Face::intersects (Edge *e)
 {
-  if (e->t->p->side(&p)*e->h->p->side(&p) != -1)
+  if (!bboxOverlap(bbox, e->bbox) ||
+      e->t->p->side(&p)*e->h->p->side(&p) != -1)
     return false;
-  EPPoint a(e->t->p, e->h->p, &p);
-  if (!bboxOverlap(&a, bbox))
+  PTR<Point> a = new EPPoint(e->t->p, e->h->p, &p);
+  if (!bboxOverlap(a, bbox))
     return false;
   HEdges ed;
   boundaryHEdges(ed);
   int pc = getPC();
   for (HEdges::iterator f = ed.begin(); f != ed.end(); ++f) {
     Point *t = (*f)->tail()->p, *h = (*f)->head()->p;
-    if (LeftTurn(&a, t, h, pc) < 1)
+    if (LeftTurn(a, t, h, pc) < 1)
       return false;
   }
   return true;
 }
 
+/*
 bool Face::intersects (Face *f)
 {
   if (!bboxOverlap(bbox, f->bbox))
@@ -702,6 +708,7 @@ bool Face::intersects (Face *f)
       return true;
   return false;
 }
+*/
 
 PTR<Point> Face::centroid () const
 {
@@ -793,15 +800,15 @@ void Shell::setOctree ()
 
 bool Shell::outer () const
 {
-  InputPoint r(0.0, 0.0, 1.0);
-  Vertex *vm = vmax(&r);
+  PTR<Point> r = new InputPoint(0.0, 0.0, 1.0);
+  Vertex *vm = vmax(r);
   HEdge *em = 0;
   HFace *fm = 0;
   for (Edges::iterator e = vm->edges.begin(); e != vm->edges.end(); ++e)
     for (HEdges::iterator h = (*e)->hedges.begin(); h != (*e)->hedges.end(); ++h)
       for (int i = 0; i < 2; ++i)
 	if ((*h)->f->hfaces[i].s == this) {
-	  if (!em || em->e != *e && SlopeOrder(*e, em->e, &r) == 1) {
+	  if (!em || em->e != *e && SlopeOrder(*e, em->e, r) == 1) {
 	    em = *h;
 	    fm = (*h)->f->hfaces + i;
 	  }
@@ -862,9 +869,9 @@ bool Shell::contains (Shell *s) const
 
 int Shell::contains (Point *a) const
 {
-  InputPoint r(0.0, 0.0, 1.0);
+  PTR<Point> r = new InputPoint(0.0, 0.0, 1.0);
   double rb[6];
-  rayBBox(a, &r, rb);
+  rayBBox(a, r, rb);
   Faces fa;
   octreef->find(rb, fa);
   bool res = false;
@@ -872,7 +879,7 @@ int Shell::contains (Point *a) const
     if ((*f)->boundaryVertex(a) ||
 	a->side((*f)->getP()) == 0 && (*f)->contains(a, false))
       return 0;
-  else if ((*f)->intersectRay(a, &r))
+  else if ((*f)->intersectRay(a, r))
     res = !res;
   return res ? 1 : -1;
 }
@@ -880,7 +887,7 @@ int Shell::contains (Point *a) const
 void Shell::rayBBox (Point *a, Point *r, double *rb) const
 {
   a->getBBox(rb);
-  PV3 ap = a->getP(), rp = r->getP();
+  PV3 ap = a->getApprox(1e-6), rp = r->getApprox(1e-6);
   Parameter k = (bbox[5] - ap.z)/rp.z;
   InputPoint q(ap + k*rp);
   double qb[6];
@@ -943,22 +950,11 @@ bool Cell::contains (Point *p) const
   return true;
 }
 
-int Polyhedron::containingCell(Point * p) 
-{
-  for (int i=0; i< cells.size(); i++)
-    if (cells[i]->contains(p))
-      return i;
-  return -1;
-}
-
 PTR<Point> Cell::interiorPoint () const
 {
   HFace *hf = getShell(0)->hfaces[0];
   Face *f = hf->f;
-  PTR<Point> p = f->centroid();
-  // HFaceNormal n(hf);
-  HFaceNormal * n = new HFaceNormal(hf);
-  PTR<Point> qmin = 0;
+  PTR<Point> p = f->centroid(), n = new HFaceNormal(hf), qmin = 0;
   for (int i = 0; i < nShells(); ++i) {
     Shell *s = getShell(i);
     for (HFaces::iterator h = s->hfaces.begin(); h != s->hfaces.end(); ++h) {
@@ -1748,18 +1744,27 @@ bool Polyhedron::contains (Point *p) const
   return false;
 }
 
+int Polyhedron::containingCell (Point *p) const
+{
+  for (int i = 0; i< cells.size(); i++)
+    if (cells[i]->contains(p))
+      return i;
+  return -1;
+}
+
 bool Polyhedron::intersectsEdges (const Polyhedron *a) const
 {
   Octree<Face *> *octree = a->faceOctree();
-  for (Edges::const_iterator e = edges.begin(); e != edges.end(); ++e) {
-    Faces fa;
-    octree->find((*e)->bbox, fa);
-    for (Faces::iterator f = fa.begin(); f != fa.end(); ++f)
-      if ((*f)->intersects(*e)) {
-	delete octree;
-	return true;
-      }
-  }
+  for (Edges::const_iterator e = edges.begin(); e != edges.end(); ++e)
+    if (!(*e)->hedges.empty()) {
+      Faces fa;
+      octree->find((*e)->bbox, fa);
+      for (Faces::iterator f = fa.begin(); f != fa.end(); ++f)
+	if (!(*f)->boundary.empty() && (*f)->intersects(*e)) {
+	  delete octree;
+	  return true;
+	}
+    }
   delete octree;
   return false;
 }
@@ -1971,10 +1976,9 @@ Polyhedron * Polyhedron::encaseNonManifold (double d)
 
 bool Polyhedron::manifold (Vertex *v) const
 {
-  FaceSet fs;
-  v->incidentFaces(fs);
+  Faces fa = v->incidentFaces();
   set<Shell *> ss;
-  for (FaceSet::iterator f = fs.begin(); ss.size() < 3 && f != fs.end(); ++f)
+  for (Faces::iterator f = fa.begin(); ss.size() < 3 && f != fa.end(); ++f)
     for (int i = 0; i < 2; ++i)
       ss.insert((*f)->hfaces[i].s);
   return ss.size() == 2;
@@ -1997,6 +2001,8 @@ void Polyhedron::addTetrahedron (Point *o, double r)
 
 void Polyhedron::describe () const
 {
+  if (cells.empty())
+    return;
   Cell *c = cells[0];
   cerr << "unbounded cell: " << c->inner.size() << " shells: ";
   for (Shells::iterator s = c->inner.begin(); s != c->inner.end(); ++s)
@@ -2035,8 +2041,6 @@ bool inSet (bool ina, bool inb, SetOp op)
 
 Polyhedron * overlay (Polyhedron **poly, int n)
 {
-  bool oip = inputPerturbed;
-  inputPerturbed = false;
   Polyhedron *c = new Polyhedron;
   VVMap vvmap;
   for (int i = 0; i < n; ++i) {
@@ -2046,7 +2050,6 @@ Polyhedron * overlay (Polyhedron **poly, int n)
   }
   Polyhedron *d = c->subdivide();
   delete c;
-  inputPerturbed = oip;
   return d;
 }
 

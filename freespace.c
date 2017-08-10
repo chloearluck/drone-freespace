@@ -1,6 +1,7 @@
 #include "freespace.h"
+#include "simplify.h"
 
-void savePolyTmp(Polyhedron * p, char * filename) {
+void savePolyTmp(Polyhedron * p, const char * filename) {
   int n = strlen(filename);
   char str[n+9];
   strncpy(str, filename, n);
@@ -452,7 +453,7 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta, do
   Polyhedron * tmp = outerApprox->boolean(robot, Union);
   delete outerApprox;
   outerApprox = tmp;
-  // savePolyTmp(outerApprox, "outerApprox");
+  savePolyTmp(outerApprox, "outerApprox");
   // save_triangulation(splitTList, "outerApprox", sin_cos_alpha);
 
   for (int i=0; i<polyList.size(); i++)
@@ -467,12 +468,70 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta, do
   cout<<"found all rotations"<<endl;
 
 
-  for (int i=0; i<allRotations.size(); i++) {
+  const char *mSumName[] = { "sum00",
+		       "sum01",
+		       "sum02",
+		       "sum03",
+		       "sum04",
+		       "sum05",
+		       "sum06",
+		       "sum07",
+		       "sum08",
+		       "sum09",
+		       "sum10",
+		       "sum11",
+		       "sum12",
+		       "sum13",
+		       "sum14",
+		       "sum15",
+		       "sum16",
+		       "sum17",
+		       "sum18",
+		       "sum19",
+		       "sum20",
+		       "sum21",
+		       "sum22",
+		       "sum23",
+		       "sum24",
+		       "sum25",
+		       "sum26",
+		       "sum27",
+		       "sum28",
+		       "sum29",
+		       "sum30",
+		       "sum31",
+		       "sum32",
+		       "sum33",
+		       "sum34",
+		       "sum35",
+		       "sum36",
+		       "sum37",
+		       "sum38",
+		       "sum39",
+		       "sum40",
+		       "sum41",
+		       "sum42",
+		       "sum43",
+		       "sum44",
+		       "sum45",
+		       "sum46",
+		       "sum47",
+		       "sum48",
+		       "sum49" };
+
+  for (int i=0; i< allRotations.size(); i++) {
     cout<<"minkowskiSum "<<i<<" of "<<allRotations.size()-1<<endl;
-    Polyhedron * mSum = minkowskiSumFull(allRotations[i], obstacle); 
+    Polyhedron * mSum = minkowskiSumFull(allRotations[i], obstacle);
+    //simplify(mSum, 1e-12);
+    //simplify(mSum, 1e-10);
+    //simplify(mSum, 1e-8);
+    simplify(mSum, 1e-6);
+    bool selfInt = mSum->intersectsEdges(mSum);
+    cout << "selfInt " << selfInt << endl;
     Polyhedron * mSum_complement = bb->boolean(mSum, Complement);
     cspaces.push_back(mSum_complement); 
     blockspaces.push_back(mSum);
+    savePolyTmp(mSum, mSumName[i]);
   }
 
   cout<<"cspaces populated"<<endl;
@@ -492,18 +551,23 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta, do
   for (int i=0; i<numRotations; i++) {
     int j = (i+1)%numRotations;
     cout<<"i,j = "<<i<<","<<j<<endl;
+    savePolyTmp(blockspaces[i], "blockspacesi");
+    savePolyTmp(blockspaces[j], "blockspacesj");
     Polyhedron * block_union = blockspaces[i]->boolean(blockspaces[j], Union);
     if (COMPUTE_USING_BLOCK_SPACE) {
       block_union->computeWindingNumbers();
+      cout << "union has " << block_union->cells.size() << " cells" << endl;
       char s[50];
       sprintf(s, "%d-%d", i, j);
       saveWithShells(block_union, s);
+      savePolyTmp(block_union, "blockunionij");
 
       for (int k=0; k<block_union->cells.size(); k++) {
         bool valid = (block_union->cells[k]->getWN() == 0);
         if (valid) {
           PTR<Point> p = pointInCell(block_union, k);
-          cout<<"  "<<k<<": "<<p->getP().getX().mid()<<" "<<p->getP().getY().mid()<<" "<<p->getP().getZ().mid()<<endl;
+	  PV3 pp = p->getApprox(1e-6);
+          cout<<"  "<<k<<": "<<pp.x.mid()<<" "<<pp.y.mid()<<" "<<pp.z.mid()<<endl;
           int ci = blockspaces[i]->containingCell(p);
           int cj = blockspaces[j]->containingCell(p);
           FreeSpace::Node * ni = findOrAddNode(i, ci);

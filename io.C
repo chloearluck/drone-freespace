@@ -283,7 +283,7 @@ int getPoint (VIMap &vimap, PV3s &pts, Vertex *v)
   if (iter != vimap.end())
     return iter->second;
   int k = pts.size();
-  pts.push_back(v->getP()->getP());
+  pts.push_back(v->getP()->getApprox());
   vimap.insert(VIPair(v, k));
   return k;
 }

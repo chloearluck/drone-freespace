@@ -34,10 +34,7 @@ class RefCnt {
   template<class T> friend class PTR;
   int refCnt;
   void incRef () { refCnt++; }
-  void decRef () {
-    if (--refCnt == 0)
-      delete this;
-  }
+  void decRef () { if (--refCnt == 0) delete this; }
 public:
   RefCnt () : refCnt(0) {}
   virtual ~RefCnt () { assert(refCnt == 0); }
@@ -155,10 +152,13 @@ public:
   }
 
   const P &get () {
+    assert(!Parameter::handleSignException);
     int precis = uninitialized() ? 0 : precision();
     if (precis < Parameter::highPrecision) {
-      if (Parameter::handleSignException)
-        safe_setp();
+      if (precis == 53u && Parameter::highPrecision == 106u)
+        increasePrecision();
+      // else if (Parameter::handleSignException)
+      // safe_setp();
       else
         p = calculate();
 
@@ -170,14 +170,37 @@ public:
     return p;
   }
 
+  const P &getApprox (double accuracy=1e-17) {
+    int precis = uninitialized() ? 0 : precision();
+    if (precis < Parameter::highPrecision) {
+      if (precis == 53u && Parameter::highPrecision == 106u)
+        increasePrecision();
+      else if (Parameter::handleSignException)
+        safe_setp(accuracy);
+      else {
+        p = calculate();
+	if (Parameter::highPrecision > 53u && precis <= 53u)
+	  precisionIncreased.push_back(this);
+        checkAccuracy(accuracy);
+      }
+
+      if (Parameter::highPrecision > 53u && precis <= 53u)
+        precisionIncreased.push_back(this);
+    }
+    else
+      assert(precis == Parameter::highPrecision);
+    return p;
+  }
+
 private:
-  void safe_setp () {
+  void safe_setp (double accuracy) {
     assert(Parameter::handleSignException == true);
     Parameter::handleSignException = false;
     bool failed = false;
     while (true)
       try {
         p = calculate();
+        checkAccuracy(accuracy);
         if (failed) {
           decreasePrecision();  // ???
           decreaseAll();
@@ -188,6 +211,30 @@ private:
       } catch (SignException se) {
         failed = true;
       }
+  }
+
+  void checkAccuracy (double accuracy) {
+    for (int i = 0; i < p.size(); i++) {
+      Parameter &x = p[i];
+      int s = p[i].sign();
+      if (s == 0) {
+        x = Parameter::constant(0);
+        continue;
+      }
+
+      double l = x.lb();
+      double u = x.ub();
+
+      if ((l > 0 && u - l > accuracy * l) ||
+          (u < 0 && u - l > accuracy * -u)) {
+        double m = (l + u) / 2;
+	double lm = (l + m) / 2;
+	double mu = (m + u) / 2;
+	if ((l < lm) + (lm < m) + (m < mu) + (mu < m) <= 3)
+          continue;
+        (x - m).sign();
+      }
+    }
   }
 };
 

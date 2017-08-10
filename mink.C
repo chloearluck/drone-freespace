@@ -143,7 +143,7 @@ void sphereBBox (Point *t, Point *h, double *bbox)
     ty = TripleProduct(&n, t, &py), hy = TripleProduct(&n, &py, h),
     tz = TripleProduct(&n, t, &pz), hz = TripleProduct(&n, &pz, h);
   UnitVector tu(t), hu(h);
-  PV3 tp = tu.getP(), hp = hu.getP();
+  PV3 tp = tu.getApprox(1e-6), hp = hu.getApprox(1e-6);
   bbox[0] = min(tp.x.lb(), hp.x.lb());
   bbox[1] = max(tp.x.ub(), hp.x.ub());
   bbox[2] = min(tp.y.lb(), hp.y.lb());
@@ -152,27 +152,27 @@ void sphereBBox (Point *t, Point *h, double *bbox)
   bbox[5] = max(tp.z.ub(), hp.z.ub());
   if (tx == 1 && hx == 1) {
     UnitVector u(&px);
-    bbox[0] = min(bbox[0], u.getP().x.lb());
+    bbox[0] = min(bbox[0], u.getApprox(1e-6).x.lb());
   }
   else if (tx == -1 && hx == -1) {
     UnitVector u(&px);
-    bbox[1] = max(bbox[1], - u.getP().x.lb());
+    bbox[1] = max(bbox[1], - u.getApprox(1e-6).x.lb());
   }
   if (ty == 1 && hy == 1) {
     UnitVector u(&py);
-    bbox[2] = min(bbox[2], u.getP().y.lb());
+    bbox[2] = min(bbox[2], u.getApprox(1e-6).y.lb());
   }
   else if (ty == -1 && hy == -1) {
     UnitVector u(&py);
-    bbox[3] = max(bbox[3], - u.getP().y.lb());
+    bbox[3] = max(bbox[3], - u.getApprox(1e-6).y.lb());
   }
   if (tz == 1 && hz == 1) {
     UnitVector u(&pz);
-    bbox[4] = min(bbox[4], u.getP().z.lb());
+    bbox[4] = min(bbox[4], u.getApprox(1e-6).z.lb());
   }
   else if (tz == -1 && hz == -1) {
     UnitVector u(&pz);
-    bbox[5] = max(bbox[5], - u.getP().z.lb());
+    bbox[5] = max(bbox[5], - u.getApprox(1e-6).z.lb());
   }
 }
 
@@ -213,7 +213,8 @@ void sphereBBox (const HEdges &ed, double *bbox)
 
 int coordinate (Point *a, int c)
 {
-  Parameter p = a->getP()[c];
+  PV3 ap = a->getApprox(1e-6);
+  Parameter p = ap[c];
   if (p.lb() > 0.0)
     return 1;
   if (p.ub() < 0.0)
@@ -264,7 +265,7 @@ int BSPElt::side (Point *r) const
   PV3 p(Parameter::interval(bbox[0], bbox[1]),
 	Parameter::interval(bbox[2], bbox[3]),
 	Parameter::interval(bbox[4], bbox[5]));
-  Parameter k = p.dot(r->getP());
+  Parameter k = p.dot(r->getApprox(1e-6));
   return k.sign(false);
 }
 
@@ -455,7 +456,8 @@ MinkHullFace * updateHull (MinkHullFace *hull, HEdge *e, bool &flag)
 
 MinkHullFace * updateHullAux (MinkHullFace *fs, MinkHullFace *fe, HEdge *e)
 {
-  MinkHullFace *f1 = new MinkHullFace(fs->e, fs->prev, 0), *f2 = new MinkHullFace(e, f1, fe->next);
+  MinkHullFace *f1 = new MinkHullFace(fs->e, fs->prev, 0),
+    *f2 = new MinkHullFace(e, f1, fe->next);
   f1->next = f2;
   f1->updateCset(fs->prev, e);
   f1->updateCset(fs, e);
@@ -517,6 +519,7 @@ Polyhedron * minkowskiSumFull (Polyhedron *a, Polyhedron *b)
   Shells sh;
   c->formShells(sh);
   VVMap vvmap;
+  b->computeWindingNumbers();
   for (Shells::iterator s = sh.begin(); s != sh.end(); ++s)
     if (minkowskiShell(a, b, *s)) {
       const HFaces &hf = (*s)->getHFaces();
@@ -537,6 +540,7 @@ bool minkowskiShell (Polyhedron *a, Polyhedron *b, Shell *s)
       return false;
   Point *p = hf[0]->getF()->getBoundary(0)->tail()->getP();
   Polyhedron *c = a->negativeTranslate(p);
+  c->computeWindingNumbers();
   bool res = !c->intersects(b);
   delete c;
   return res;

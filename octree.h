@@ -13,6 +13,15 @@ class Octree {
   public:
     Ocelt (T d) : d(d), label(0u) {}
     bool compatible (const Ocelt &e) const { return (label & e.label) == 0u; }
+    
+    void expandBBox (double s) {
+      double *bb = d->getBBox();
+      for (int i = 0; i < 3; ++i) {
+	bb[2*i] -= s;
+	bb[2*i+1] += s;
+      }
+    }
+
     T d;
     unsigned int label;
   };
@@ -37,11 +46,14 @@ class Octree {
 
   ~Octree () { if (l) { delete l; delete r; } }
 
-  static Octree * octree (const vector<T> &data, const double *bbox, int nmax = 40,
-		   int dmax = 20) {
+  static Octree * octree (const vector<T> &data, const double *bbox,
+			  double s = 0.0, int nmax = 40, int dmax = 20) {
     Ocelts edata;
     for (int i = 0; i < data.size(); ++i)
       edata.push_back(data[i]);
+    if (s != 0.0)
+      for (int i = 0; i < data.size(); ++i)
+	edata[i].expandBBox(s);
     return octree(edata, bbox, nmax, dmax, 0u);
   }
   

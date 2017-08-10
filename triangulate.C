@@ -196,7 +196,6 @@ void monotoneLoop (Edge2 *e, Vertices2 &u)
 
 void triangulateLoop (const Vertices2 &u, Triangles &tr)
 {
-  assert(u.size() >= 2);
   Vertices2 stack;
   stack.push_back(u[0]);
   stack.push_back(u[1]);
