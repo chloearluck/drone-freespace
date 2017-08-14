@@ -4,3 +4,4 @@ freespace_test
 output
 .DS_Store
 *out.vtk
+*.lp
