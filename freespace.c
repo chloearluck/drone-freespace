@@ -197,11 +197,13 @@ PTR<Point> pointInCell(Polyhedron * poly, int i) {
 
   while (true) {
     fp = new FacePoint(cell, unit);
-    if (face->contains(fp))
-      break;
+    if (face->contains(fp)) {
+      cout<<"+"<<endl; break;
+    }
     fp = new FacePoint(cell, -unit);
-    if (face->contains(fp))
-      break;
+    if (face->contains(fp)){
+      cout<<"-"<<endl; break;
+    }
     unit= unit/2;
   }
 
@@ -210,11 +212,13 @@ PTR<Point> pointInCell(Polyhedron * poly, int i) {
   
   while (true) {
     p = new CellInternalPoint(cell, fp, unit);
-    if (cell->contains(p))
-      break;
+    if (cell->contains(p)){
+      cout<<"    +"<<endl; break;
+    }
     p = new CellInternalPoint(cell, fp, -unit);
-    if (cell->contains(p))
-      break;
+    if (cell->contains(p)){
+      cout<<"    -"<<endl; break;
+    }
     unit = unit/2;
   }
   return p;
