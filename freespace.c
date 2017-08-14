@@ -362,26 +362,6 @@ void split(std::vector<OuterApproxFace> & tList, SimpleTriangle t) {
     tList.push_back(OuterApproxFace(verts[2], newVert2, verts[3], NULL)); 
 }
 
-Polyhedron * union_all(std::vector<Polyhedron*> pList, int start, int end) {
-  if (start == end) 
-    return pList[start];
-  if ((start+1) == end) 
-    return pList[start]->boolean(pList[end], Union);
-  int mid = (start+end)/2;
-  Polyhedron * p1 = union_all(pList, start, mid);
-  Polyhedron * p2 = union_all(pList, mid+1, end);
-  Polyhedron * p3 = p1->boolean(p2, Union);
-  if (start != mid)
-    delete p1;
-  if ((mid+1) != end)
-    delete p2;
-  return p3;
-}
-
-Polyhedron * union_all(std::vector<Polyhedron*> pList) {
-  return union_all(pList, 0, pList.size()-1);
-}
-
 Polyhedron * rotate(Polyhedron * p) {
   Polyhedron * poly = p->triangulate(); 
   for (int i = 0; i< poly->vertices.size(); i++) {
@@ -448,7 +428,7 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta, do
   }
   cout<<"found triangle polyhedrons"<<endl;
 
-  Polyhedron * outerApprox = union_all(polyList);
+  Polyhedron * outerApprox = multiUnion(&polyList[0], polyList.size());
   cout<<"found outerApprox"<<endl;
   Polyhedron * tmp = outerApprox->boolean(robot, Union);
   delete outerApprox;
