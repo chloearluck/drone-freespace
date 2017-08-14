@@ -611,9 +611,9 @@ bool Face::intersectRay (Point *a, Point *r)
 PTR<Point> Face::rayIntersection (Point *a, Point *r)
 {
   if (a->side(&p) == 0)
-    return 0;
+    return contains(a, false) ? a : 0;
   PTR<Point> q = new RayPlanePoint(a, r, &p);
-  if (contains(q) && PointOrder(a, q, r) == 1)
+  if (contains(q, false) && PointOrder(a, q, r) == 1)
     return q;
   return 0;
 }
@@ -691,7 +691,6 @@ bool Face::intersects (Edge *e)
   return true;
 }
 
-/*
 bool Face::intersects (Face *f)
 {
   if (!bboxOverlap(bbox, f->bbox))
@@ -708,7 +707,6 @@ bool Face::intersects (Face *f)
       return true;
   return false;
 }
-*/
 
 PTR<Point> Face::centroid () const
 {
@@ -961,7 +959,7 @@ PTR<Point> Cell::interiorPoint () const
       Face *g = (*h)->f;
       if (g != f) {
 	PTR<Point> q = g->rayIntersection(p, n);
-	if (q && (!qmin || CloserPair(p, q, p, qmin) == 1))
+	if (q && p != q && (!qmin || CloserPair(p, q, p, qmin) == 1))
 	  qmin = q;
       }
     }
