@@ -17,7 +17,6 @@ int IsTangent::sign () {
   Parameter k = n.dot(a);
   
   PV3 nsplit = PV3(n.getY(), -n.getX(), Parameter::constant(0)); 
-  PV3 norm = nsplit/nsplit.dot(nsplit).sqrt();
   //check is a,b,c are all on the same side of plane n=nsplit k=0
   int psa = nsplit.dot(a).sign();
   int psb = nsplit.dot(b).sign();
@@ -29,7 +28,7 @@ int IsTangent::sign () {
 
 
 int DiffLength::sign() {
-  return (i->getP().dot(i->getP()) - j->getP().dot(i->getP())).sign();
+  return (i->getP().dot(i->getP()) - j->getP().dot(j->getP())).sign();
 }
 
 // Comment out to test how ACP handles inaccuracy.
