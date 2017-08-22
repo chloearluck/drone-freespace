@@ -36,20 +36,20 @@ triangulate.o: triangulate.C triangulate.h polyhedron.h octree.h rbtree.h object
 hull.o: hull.C hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h
 	$(COMPILE) hull.C
 
-freespace.o: freespace.c freespace.h hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h simplify.h
-	$(COMPILE) freespace.c
+freespace.o: freespace.cc freespace.h hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h simplify.h
+	$(COMPILE) freespace.cc
 
 freespace_test: freespace_test.o freespace.o hull.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o mink.o simplify.o expander2.o
 	$(LINK) freespace_test.o freespace.o hull.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o mink.o simplify.o expander2.o $(LFLAGS) -o freespace_test
 
-freespace_test.o: freespace_test.c freespace.h hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h
-	$(COMPILE) freespace_test.c
+freespace_test.o: freespace_test.cc freespace.h hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h
+	$(COMPILE) freespace_test.cc
 
 test_union:  test_union.o hull.o mink.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o
 	$(LINK) test_union.o hull.o mink.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o -lmpfr -o test_union
 
-test_union.o: test_union.c mink.h hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h
-	$(COMPILE) test_union.c
+test_union.o: test_union.cc mink.h hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h
+	$(COMPILE) test_union.cc
 
 mink.o: mink.C mink.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h
 	$(COMPILE) mink.C
