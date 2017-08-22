@@ -143,8 +143,8 @@ PV3 FacePoint::calculate () {
   HFace * hface = cell->getShell(0)->getHFaces()[0];
   HEdge * hedge = hface->getF()->getBoundary(0);
   
-  PV3 h = hedge->head()->getP()->getP();
-  PV3 t = hedge->tail()->getP()->getP();
+  PV3 h = (hface->pos()? hedge->head() : hedge->tail())->getP()->getP();
+  PV3 t = (hface->pos()? hedge->tail() : hedge->head())->getP()->getP();
   PV3 n = hface->getN();
 
   PV3 mid = t + (h-t)/2;
@@ -157,7 +157,7 @@ PV3 CellInternalPoint::calculate () {
   HFace * hface = cell->getShell(0)->getHFaces()[0];
   PV3 fp = facePoint->getP();
   PV3 n = hface->getN();
-  return fp - unit * n;
+  return fp + unit * n;
 }
 
 PV3 PlanePointX::calculate ()  {
