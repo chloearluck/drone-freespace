@@ -91,7 +91,7 @@ int main (int argc, char *argv[]) {
 
   FreeSpace * fs  = new FreeSpace(poly, obstacle, theta);
 
-  cout<<"Finding path"<<endl;
+  /*cout<<"Finding path"<<endl;
   PTR<Point> startp = new InputPoint(5, 5, 2);
   PTR<Point> endp = new InputPoint(15, 15, 2);
   int startRotationIndex = 0; 
@@ -118,5 +118,5 @@ int main (int argc, char *argv[]) {
     else 
       cout<<"cspaces["<<current->space_index<<"] cell "<<current->cell_index<<endl;
     current = current->parent;
-  }
+  }*/
 }

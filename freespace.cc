@@ -507,7 +507,7 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta) {
     delete allRotations[i];
   allRotations.clear(); 
   
-  cout<<"creating nodes and edges"<<endl;
+  /*cout<<"creating nodes and edges"<<endl;
 
   // create all edges
   for (int i=0; i<numRotations; i++) {
@@ -537,5 +537,5 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta) {
       }
     } 
     delete block_union;
-  }
+  }*/
 }
