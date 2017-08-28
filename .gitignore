@@ -1,6 +1,7 @@
 *.o
 test_mink
 freespace_test
+path3d_test
 output
 .DS_Store
 *out.vtk

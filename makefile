@@ -45,6 +45,15 @@ freespace_test: freespace_test.o freespace.o hull.o polyhedron.o triangulate.o i
 freespace_test.o: freespace_test.cc freespace.h hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h
 	$(COMPILE) freespace_test.cc
 
+path3d.o: path3d.cc path3d.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h 
+	$(COMPILE) path3d.cc
+
+path3d_test.o: path3d_test.cc path3d.h polyhedron.h io.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h
+	$(COMPILE) path3d_test.cc
+
+path3d_test: path3d_test.o path3d.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o
+	$(LINK) path3d_test.o path3d.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o $(LFLAGS) -o path3d_test
+
 test_union:  test_union.o hull.o mink.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o
 	$(LINK) test_union.o hull.o mink.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o -lmpfr -o test_union
 
@@ -74,4 +83,4 @@ expander2.o: expander2.C
 	-DIL_STD -Icplex124/include expander2.C
 
 clean: 
-	rm -f *.o *~ hull test_union freespace_test
+	rm -f *.o *~ hull test_union freespace_test path3d_test
