@@ -6,20 +6,12 @@ LINK = g++ $(CFLAGS)
 
 LFLAGS = -lmpfr -lpthread -Lcplex124/lib -lilocplex -lcplex -lconcert
 
-geometry3d.o: geometry3d.cc geometry3d.h acp.h pv.h object.h polyhedron.h
-	$(COMPILE) geometry3d.cc
+acp.o:	acp.cc acp.h
+	$(COMPILE) acp.cc
 
-polyhedron.o: polyhedron.C polyhedron.h octree.h rbtree.h object.h pv.h acp.h
-	$(COMPILE) polyhedron.C
-
-io.o:	io.C io.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h
-	$(COMPILE) io.C
-
-triangulate.o: triangulate.C triangulate.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h
-	$(COMPILE) triangulate.C
-
-hull.o: hull.C hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h
-	$(COMPILE) hull.C
+expander2.o: expander2.C
+	$(COMPILE) -std=c++11 -m64 -fPIC -fno-strict-aliasing -fexceptions -DNDEBUG \
+	-DIL_STD -Icplex124/include expander2.C
 
 freespace.o: freespace.cc freespace.h hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h simplify.h
 	$(COMPILE) freespace.cc
@@ -30,6 +22,21 @@ freespace_test: freespace_test.o freespace.o hull.o polyhedron.o triangulate.o i
 freespace_test.o: freespace_test.cc freespace.h hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h
 	$(COMPILE) freespace_test.cc
 
+geometry3d.o: geometry3d.cc geometry3d.h acp.h pv.h object.h polyhedron.h
+	$(COMPILE) geometry3d.cc
+
+hull.o: hull.C hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h
+	$(COMPILE) hull.C
+
+io.o:	io.C io.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h
+	$(COMPILE) io.C
+
+mink.o: mink.C mink.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h
+	$(COMPILE) mink.C
+
+object.o: object.cc object.h pv.h acp.h
+	$(COMPILE) object.cc
+
 path3d.o: path3d.cc path3d.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h 
 	$(COMPILE) path3d.cc
 
@@ -39,27 +46,20 @@ path3d_test.o: path3d_test.cc path3d.h polyhedron.h io.h octree.h rbtree.h objec
 path3d_test: path3d_test.o path3d.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o
 	$(LINK) path3d_test.o path3d.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o $(LFLAGS) -o path3d_test
 
+polyhedron.o: polyhedron.C polyhedron.h octree.h rbtree.h object.h pv.h acp.h
+	$(COMPILE) polyhedron.C
+
+simplify.o: simplify.C simplify.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h expander2.h
+	$(COMPILE) simplify.C
+
 test_union:  test_union.o hull.o mink.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o
 	$(LINK) test_union.o hull.o mink.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o -lmpfr -o test_union
 
 test_union.o: test_union.cc mink.h hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h
 	$(COMPILE) test_union.cc
 
-mink.o: mink.C mink.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h
-	$(COMPILE) mink.C
-
-simplify.o: simplify.C simplify.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h expander2.h
-	$(COMPILE) simplify.C
-
-object.o: object.cc object.h pv.h acp.h
-	$(COMPILE) object.cc
-
-acp.o:	acp.cc acp.h
-	$(COMPILE) acp.cc
-
-expander2.o: expander2.C
-	$(COMPILE) -std=c++11 -m64 -fPIC -fno-strict-aliasing -fexceptions -DNDEBUG \
-	-DIL_STD -Icplex124/include expander2.C
+triangulate.o: triangulate.C triangulate.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h
+	$(COMPILE) triangulate.C
 
 clean: 
 	rm -f *.o *~ hull test_union freespace_test path3d_test
