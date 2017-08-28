@@ -95,7 +95,8 @@ class OuterApproxFace {
   }
 };
 
-void save_triangulation(std::vector<OuterApproxFace> tList, char * filename, PTR<Point> sin_cos_alpha) {
+Primitive3(SaveTriangulation, std::vector<OuterApproxFace>, tList, char*, filename, PTR<Point>, sin_cos_alpha);
+int SaveTriangulation::sign() {
   std::vector< PTR<Point> > vertList;
   std::vector< PTR<Point> > rotatedVertList;
 
@@ -177,6 +178,7 @@ void save_triangulation(std::vector<OuterApproxFace> tList, char * filename, PTR
   } else {
     cout<<"could not write to file"<<endl;
   }
+  return 0;
 }
 
 Primitive2(DiffZ, PTR<Point>, i, PTR<Point>, j);
@@ -427,7 +429,6 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta, do
   delete outerApprox;
   outerApprox = tmp;
   // savePolyTmp(outerApprox, "outerApprox");
-  // save_triangulation(splitTList, "outerApprox", sin_cos_alpha);
 
   for (int i=0; i<polyList.size(); i++)
     delete polyList[i];
