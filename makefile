@@ -6,21 +6,6 @@ LINK = g++ $(CFLAGS)
 
 LFLAGS = -lmpfr -lpthread -Lcplex124/lib -lilocplex -lcplex -lconcert
 
-# mink:	main.C simplify.o mink.o polyhedron.o triangulate.o io.o object.o acp.o expander.o
-# 	$(LINK) main.C simplify.o mink.o polyhedron.o triangulate.o io.o \
-# 	object.o acp.o expander.o $(LFLAGS) -omink
-
-# pack:	pack.o mink.o polyhedron.o triangulate.o io.o object.o acp.o
-# 	$(LINK) pack.o mink.o polyhedron.o triangulate.o io.o \
-# 	object.o acp.o $(LFLAGS) -opack
-
-# cspace:	cspace.o mink.o polyhedron.o triangulate.o io.o object.o acp.o
-# 	$(LINK) cspace.o mink.o polyhedron.o triangulate.o io.o object.o \
-#         acp.o $(LFLAGS) -ocspace
-
-# hull:   hull.o polyhedron.o triangulate.o io.o object.o acp.o
-# 	$(LINK) hull.o polyhedron.o triangulate.o io.o object.o acp.o -lmpfr -ohull
-
 geometry3d.o: geometry3d.cc geometry3d.h acp.h pv.h object.h polyhedron.h
 	$(COMPILE) geometry3d.cc
 
@@ -65,12 +50,6 @@ mink.o: mink.C mink.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h
 
 simplify.o: simplify.C simplify.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h expander2.h
 	$(COMPILE) simplify.C
-
-# pack.o:	pack.C pack.h mink.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h
-# 	$(COMPILE) pack.C
-
-# cspace.o: cspace.C cspace.h mink.h polyhedron.h io.h octree.h rbtree.h object.h pv.h acp.h
-# 	$(COMPILE) cspace.C
 
 object.o: object.cc object.h pv.h acp.h
 	$(COMPILE) object.cc
