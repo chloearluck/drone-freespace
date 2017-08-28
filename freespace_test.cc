@@ -70,10 +70,10 @@ int main (int argc, char *argv[]) {
 
   char * filename =  argv[1];
 
-  // if (argc == 3) { 
-    // unsigned seed = atoi(argv[2]);
-    srandom(10);
-  // }
+  if (argc == 4) { 
+    unsigned seed = atoi(argv[3]);
+    srandom(seed);
+  }
 
   Polyhedron * poly = loadPoly(filename);
   if (poly == NULL)
@@ -88,9 +88,8 @@ int main (int argc, char *argv[]) {
   }
   
   double theta = M_PI / 20;
-  double bb_bounds[6] = {-20, 20, -20, 20, -20, 20};
 
-  FreeSpace * fs  = new FreeSpace(poly, obstacle, theta, bb_bounds);
+  FreeSpace * fs  = new FreeSpace(poly, obstacle, theta);
 
   cout<<"Finding path"<<endl;
   PTR<Point> startp = new InputPoint(5, 5, 2);
@@ -98,17 +97,10 @@ int main (int argc, char *argv[]) {
   int startRotationIndex = 0; 
   int endRotationIndex = 0; 
   int starti, endi;
-  if (fs->COMPUTE_USING_BLOCK_SPACE) {
-    starti = fs->blockspaces[startRotationIndex]->containingCell(startp);
-    endi = fs->blockspaces[endRotationIndex]->containingCell(endp);
-    cout<<"finding path from cell "<<starti<<" in blockspaces["<<startRotationIndex
-        <<"] to cell "<<endi<<" in blockspaces["<<endRotationIndex<<"]"<<endl;
-  } else {
-    starti = fs->cspaces[startRotationIndex]->containingCell(startp);
-    endi = fs->cspaces[endRotationIndex]->containingCell(endp);
-    cout<<"finding path from cell "<<starti<<" in cspaces["<<startRotationIndex
-        <<"] to cell "<<endi<<" in cspaces["<<endRotationIndex<<"]"<<endl;
-  }
+  starti = fs->blockspaces[startRotationIndex]->containingCell(startp);
+  endi = fs->blockspaces[endRotationIndex]->containingCell(endp);
+  cout<<"finding path from cell "<<starti<<" in blockspaces["<<startRotationIndex
+      <<"] to cell "<<endi<<" in blockspaces["<<endRotationIndex<<"]"<<endl;   
   FreeSpace::Node * start =  fs->findNode(startRotationIndex, starti);
   if (start == NULL)
     cout<<"start is null"<<endl;

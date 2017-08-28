@@ -6,9 +6,7 @@
 
 class FreeSpace {
 public:
-  bool COMPUTE_USING_BLOCK_SPACE = true;
-  Polyhedron * robot, * obstacle, * bb;
-  std::vector<Polyhedron*> cspaces;
+  Polyhedron * robot, * obstacle;
   std::vector<Polyhedron*> blockspaces;
   
   class Edge;
@@ -38,7 +36,7 @@ public:
   std::vector<Edge*> edges;
   int numRotations;
 
-  FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta, double * bounding_box);
+  FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta);
   Node * findNode(int space_index, int cell_index); 
 
 private:
