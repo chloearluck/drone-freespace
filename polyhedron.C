@@ -2352,15 +2352,15 @@ void pp (PV3 p)
 
 void ppla (Plane *p)
 {
-  PV3 n = p->getN();
-  Parameter k = p->getK();
+  PV3 n = p->getApprox().n;
+  Parameter k = p->getApprox().k;
   cerr << "(" << n.x.mid() << " " << n.y.mid() << " " << n.z.mid() << " "
        << k.mid() << ")" << endl;
 }
 
 void pp (Point *p)
 {
-  pp(p->getP());
+  pp(p->getApprox());
 }
 
 void pv (Vertex *v)

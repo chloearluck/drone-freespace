@@ -861,4 +861,23 @@ Polyhedron * room (double x1, double x2, double x3, double y1, double y2,
 		   double y3, double y4, double y5, double z1, double z2,
 		   bool perturb = true);
 
+void pp (PV3 p);
+void ppla (Plane *p);
+void pp (Point *p);
+void pv (Vertex *v);
+void pvs (const Vertices &ve);
+void ptr (const Triangle &t);
+void ptrs (const Triangles &tr);
+void pids (const IDSet &ids);
+void pe (Edge *e);
+void pes (const Edges &ed);
+void pes (const EdgeSet &ed);
+void pe (HEdge *e);
+void pes (const HEdges &ed);
+void pes (const HHEdges &ed);
+void pl (HEdge *e);
+void pf (Face *f);
+void pfs (const Faces &fa);
+void pfs (const HFaces &fa);
+
 #endif
