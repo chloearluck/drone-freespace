@@ -180,3 +180,11 @@ PV3 IntersectionPoint::calculate () {
   return(t + (h - t) * s);
 }
 
+PV3 FaceIntersectionPoint::calculate () {
+  TrianglePlane * p = hface->getF()->getP();
+  PV3 t = tail->getP();
+  PV3 v = head->getP()-t;
+  PV3 n = p->getN();
+  Parameter k = -(n.dot(t) + p->getK())/n.dot(v);
+  return t + k*v;
+}

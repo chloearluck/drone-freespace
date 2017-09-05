@@ -158,3 +158,15 @@ public:
     : tail(tail), head(head), plane(plane) {}
 };
 
+class FaceIntersectionPoint : public Point {
+  PV3 calculate ();
+
+protected:
+  PTR<Point> head, tail;
+  HFace * hface;
+
+public:
+  FaceIntersectionPoint (PTR<Point> tail, PTR<Point> head, HFace * hface) : tail(tail), head(head), hface(hface) {}
+  HFace * getHFace() { return hface; }
+};
+
