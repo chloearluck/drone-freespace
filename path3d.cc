@@ -39,7 +39,7 @@ void bfs(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, Points & pa
     HFace * current = q.front(); q.pop();
     if (current == fb) {
       cout<<"found path"<<endl;
-      while(parents[current] != NULL) {
+      while(current != NULL) {
         pathfaces.push_back(current);
         current = parents[current];
       }
@@ -70,7 +70,7 @@ void bfs(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, Points & pa
 }
 
 void findPath(Polyhedron * blockspace, PTR<Point> start, PTR<Point> end, Points &path) {
-  //make sure start and end are not in blackspace
+  //make sure start and end are not in blockspace
   if (blockspace->contains(start)) {
     cout<<"invalid start"<<endl;
     return;

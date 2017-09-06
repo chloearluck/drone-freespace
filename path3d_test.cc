@@ -1,7 +1,7 @@
 #include "path3d.h"
 #include "io.h"
 
-Polyhedron * loadPoly(char * filename) {
+Polyhedron * loadPoly(const char * filename) {
   int n = strlen(filename);
   char str[n+5];
   strncpy(str, filename, n);
@@ -18,6 +18,25 @@ Polyhedron * loadPoly(char * filename) {
   }
 
   return poly;
+}
+
+void savePathVTK(Points path, const char * filename) {
+  ofstream ostr;
+  ostr.open(filename);
+  if (ostr.is_open()) { 
+    ostr << setprecision(20) << "# vtk DataFile Version 3.0" << endl
+         << "vtk output" << endl << "ASCII" << endl
+         << "DATASET POLYDATA" << endl 
+         << "POINTS " << path.size() << " double" << endl;
+    for (int i=0; i<path.size(); i++)
+      ostr << path[i]->getApprox().getX().mid() << " " << path[i]->getApprox().getY().mid() << " " << path[i]->getApprox().getZ().mid() << endl;
+    ostr<<endl<<"LINES 1 "<<path.size()+1<<endl<<path.size()<<" ";
+    for (int i=0; i<path.size(); i++)
+      ostr<<i<<" ";
+    ostr.close();
+  } else {
+    cout<<"could not write to file"<<endl;
+  }
 }
 
 int main (int argc, char *argv[]) {
@@ -41,4 +60,5 @@ int main (int argc, char *argv[]) {
   Points path;
 
   findPath(blockspace, start, end, path);
+  savePathVTK(path, "path.vtk");
 }
