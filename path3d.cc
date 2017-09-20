@@ -22,13 +22,22 @@ HEdge * commonEdge(HFace * hf1, HFace * hf2) {
   return NULL;
 }
 
-void bfs(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, Points & path) {
+void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFaces & pathfaces, Points & path) {
+  path.push_back((PTR<Point>) a);
+  for (int i=1; i<pathfaces.size(); i++) {
+    HEdge * e = commonEdge(pathfaces[i], pathfaces[i-1]);
+    assert(e != NULL);
+    path.push_back(new MidPoint(e->tail()->getP(), e->head()->getP()));
+  }
+}
+
+void bfs(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFaces & pathfaces) {
   cout<<"finding a sequence of faces connecting"<<endl;
   pp(a); cout<<"and"<<endl; pp(b);
 
   HFace * fa  = a->getHFace();
   HFace * fb  = b->getHFace();
-  HFaces pathfaces;
+  HFaces pathfaces_rev;
 
   std::map<HFace *, HFace *> parents;
   std::queue<HFace *> q;
@@ -40,7 +49,7 @@ void bfs(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, Points & pa
     if (current == fb) {
       cout<<"found path"<<endl;
       while(current != NULL) {
-        pathfaces.push_back(current);
+        pathfaces_rev.push_back(current);
         current = parents[current];
       }
       break;
@@ -56,17 +65,13 @@ void bfs(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, Points & pa
       }
     }
   }
-  if (pathfaces.size() == 0) {
+  if (pathfaces_rev.size() == 0) {
     cout<<"no path found"<<endl;
     return;
   }
 
-  path.push_back((PTR<Point>) a);
-  for (int i=pathfaces.size()-1; i>0; i--) {
-    HEdge * e = commonEdge(pathfaces[i], pathfaces[i-1]);
-    assert(e != NULL);
-    path.push_back(new MidPoint(e->tail()->getP(), e->head()->getP()));
-  }
+  for (int i=pathfaces_rev.size()-1; i>=0; i--)
+    pathfaces.push_back(pathfaces_rev[i]);
 }
 
 void findPath(Polyhedron * blockspace, PTR<Point> start, PTR<Point> end, Points &path) {
@@ -118,7 +123,11 @@ void findPath(Polyhedron * blockspace, PTR<Point> start, PTR<Point> end, Points 
 
   path.push_back(start);
   for (int i=0; i<points.size(); i+=2) {
-    bfs(points[i], points[i+1], path);
+    HFaces subHfaces;
+    Points subPath;
+    bfs(points[i], points[i+1], subHfaces);
+    localPath(points[i], points[i+1], subHfaces, subPath);
+    path.insert(path.end(), subPath.begin(), subPath.end());
   }
   if (points.size()>0)
     path.push_back((PTR<Point>) points[points.size()-1]);
