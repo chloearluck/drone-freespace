@@ -99,7 +99,7 @@ struct ComparePointOrder {
   }
 };
 
-HEdge * commonEdge(HFace * hf1, HFace * hf2) {
+Edge * commonEdge(HFace * hf1, HFace * hf2) {
   Face * f1 = hf1->getF();
   Face * f2 = hf2->getF();
   HEdge * start_edge = f1->getBoundary(0);
@@ -107,18 +107,96 @@ HEdge * commonEdge(HFace * hf1, HFace * hf2) {
   HEdge * common_edge = NULL;
   do {
     if (curr_edge->getE()->otherFace(f1) == f2) 
-      return curr_edge;
+      return curr_edge->getE();
     curr_edge = curr_edge->getNext();
   } while (curr_edge != start_edge);
   return NULL;
 }
 
+class PathTriangle {
+ public:
+  PTR<Point> p[3];
+  PathTriangle();
+  PathTriangle(PTR<Point> p0, PTR<Point> p1, PTR<Point> p2) {
+    p[0] = p0;  p[1] = p1;  p[2] = p2;
+  }
+  PathTriangle(const PathTriangle& t) {
+    p[0] = t.p[0];  p[1] = t.p[1];  p[2] = t.p[2];
+  }
+};
+
+void savePathTriangles(std::vector<PathTriangle> ts, const char * filename) {
+  ofstream ostr;
+  ostr.open(filename);
+  if (ostr.is_open()) {
+    ostr << setprecision(20) << "# vtk DataFile Version 3.0" << endl
+         << "vtk output" << endl << "ASCII" << endl
+         << "DATASET POLYDATA" << endl 
+         << "POINTS " << ts.size()*3 << " double" << endl;
+    for (int i=0; i<ts.size(); i++)
+      for (int j=0; j<3; j++)
+        ostr << ts[i].p[j]->getApprox().getX().mid() << " " << ts[i].p[j]->getApprox().getY().mid() << " " << ts[i].p[j]->getApprox().getZ().mid() << endl;
+  
+    ostr << endl << "POLYGONS " << ts.size() << " " << 4*ts.size() << endl;
+    for (int i=0; i<ts.size(); i++)
+      ostr << "3 " << 3*i << " " << 3*i+1 << " " << 3*i+2 << endl;
+    ostr.close();
+  } else { cout<<"could not open file"<<endl; return; }
+}
+
+
+
+
+
+
+
+void flattenTriangles(std::vector<PathTriangle> & triangles, std::vector<PTR<Transformation> > & transformations, std::vector<PathTriangle> & flattenedTriangles) {
+  flattenedTriangles.push_back(triangles[0]);
+  PTR<Transformation> cumulative = 0;
+  for (int i=1; i<triangles.size(); i++) {
+    PathTriangle t(triangles[i]);
+    if (cumulative) {
+      t.p[0] = new TransformedPoint(t.p[0], cumulative);
+      t.p[1] = new TransformedPoint(t.p[1], cumulative);
+      t.p[2] = new TransformedPoint(t.p[2], cumulative);
+    }
+    t.p[2] = new TransformedPoint(t.p[2], transformations[i-1]);
+
+    flattenedTriangles.push_back(t);
+    cumulative = (cumulative? new CompositeTransformation(transformations[i-1], cumulative) : transformations[0]);
+  }
+}
+
 void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFaces & pathfaces, Points & path) {
+  /* ---- unoptimized BFS solution ---- */
   path.push_back((PTR<Point>) a);
   for (int i=1; i<pathfaces.size(); i++) {
-    HEdge * e = commonEdge(pathfaces[i], pathfaces[i-1]);
+    Edge * e = commonEdge(pathfaces[i], pathfaces[i-1]);
     assert(e != NULL);
-    path.push_back(new MidPoint(e->tail()->getP(), e->head()->getP()));
+    path.push_back(new MidPoint(e->getT()->getP(), e->getH()->getP()));
+  }
+  /* ---------------------------------- */
+
+  std::vector<PathTriangle> triangles;
+  std::vector<PTR<Transformation> > transformations;
+  for (int i=1; i<pathfaces.size(); i++) {
+    HFace * hf1 = pathfaces[i-1];    
+    HFace * hf2 = pathfaces[i];
+    Edge * ce = commonEdge(hf1, hf2);
+    HEdge * he1 = (ce->getHEdge(0)->getF() == hf1->getF() ? ce->getHEdge(0) : ce->getHEdge(1) );
+    HEdge * he2 = (he1 == ce->getHEdge(0) ? ce->getHEdge(1) : ce->getHEdge(0));
+    PTR<Point> p1 = he1->getNext()->head()->getP();
+    PTR<Point> p2 = he2->getNext()->head()->getP();
+    PTR<Transformation> t = new UnfoldTriangleTransformation(p1, ce->getT()->getP(), ce->getH()->getP(), p2);
+    transformations.push_back(t);
+    if (i == 1) triangles.push_back(PathTriangle(p1, ce->getT()->getP(), ce->getH()->getP()));
+    triangles.push_back(PathTriangle(ce->getT()->getP(), ce->getH()->getP(), p2));
+  }
+  std::vector<PathTriangle> flattenedTriangles;
+  
+
+
+
   }
 }
 
