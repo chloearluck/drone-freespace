@@ -22,7 +22,7 @@ void readVertices (istream &istr, Polyhedron *a)
     ID id;
     double x, y, z;
     istr >> id >> x >> y >> z;
-    a->getVertex(new InputPoint(PV3::constant(x, y, z)));
+    a->getVertex(x, y, z, false);
   }
   Parameter::enable();
 }
@@ -237,9 +237,7 @@ Polyhedron * readPolyhedronVTK (istream &istr, bool perturb)
   for (int i = 0; i < nv; ++i) {
     double x, y, z;
     istr >> x >> y >> z;
-    Point *p = perturb ? new InputPoint(x, y, z) :
-      new InputPoint(PV3::constant(x, y, z));
-    a->getVertex(p);
+    a->getVertex(x, y, z, perturb);
   }
   Parameter::enable();
   int nt;
@@ -356,7 +354,7 @@ Polyhedron * readPolyhedronSTL (istream &istr)
       string dummy;
       double x, y, z;
       istr >> dummy >> x >> y >> z;
-      v[i] = a->getVertex(new InputPoint(PV3::constant(x, y, z)));
+      v[i] = a->getVertex(x, y, z, false);
     }
     istr.getline(cd, 1000);
     istr.getline(cd, 1000);

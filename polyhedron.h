@@ -76,7 +76,7 @@ class ProjectionCoordinate : Object<Parameter> {
   }
  public:
   ProjectionCoordinate (Plane *p) : p(p) {}
-  int getPC () { return getApprox(1e-6).mid(); }
+  int getPC () { return getApprox(1e-6).lb(); }
 };
 
 int projectionCoordinate (Plane *p);
@@ -96,7 +96,6 @@ class Point : public Object<PV3> {
  protected:
   IDSet ps;
  public:
-  Point () {}
   PV3 getP () { return get(); }
   IDSet getps () const { return ps; }
   void getBBox (double *bbox);
@@ -176,9 +175,21 @@ class TrianglePlane : public Plane {
 
 class InputPoint : public Point {
  public:
-  InputPoint (double x, double y, double z) { set(PV3::input(x, y, z)); }
-  InputPoint (const PV3 &p) { set(p); }
+  //InputPoint (double x, double y, double z) { set(PV3::input(x, y, z)); }
+  InputPoint (const PV3 &p) { set(PV3::constant(p.x.mid(), p.y.mid(), p.z.mid())); }
+  InputPoint (double x, double y, double z, bool perturb = true) {
+    set(perturb ? PV3::input(x, y, z) : PV3::constant(x, y, z));
+  }
+
 };
+/*
+class InputPoint : public Point {
+ public:
+  InputPoint (double x, double y, double z, bool perturb = false) {
+    set(perturb ? PV3::input(x, y, z) : PV3::constant(x, y, z));
+  }
+};
+*/
 
 extern InputPoint Rdir;
 
@@ -256,6 +267,19 @@ class RayPlanePoint : public Point {
  public:
   RayPlanePoint (Point *t, Point *r, TrianglePlane *q)
     : t(t), r(r), p(q->a, q->b, q->c) {}
+};
+
+class RayZPlanePoint : public Point {
+  PTR<Point> t, r;
+  double z;
+  PV3 calculate () {
+    PV3 a = t->getP(), u = r->getP();
+    Parameter k = (z - a.z)/z;
+    return a + k*u;
+  }
+ public:
+  RayZPlanePoint (Point *t, Point *r, double z)
+    : t(t), r(r), z(z) {}
 };
 
 class Edge;
@@ -459,7 +483,7 @@ typedef vector<HFace *> HFaces;
 
 class HFaceNormal : public Point {
   HFace *f;
-  PV3 calculate () { return f->getN().unit(); }
+  PV3 calculate () { return f->getN(); }
  public:
   HFaceNormal (HFace *f) : f(f) {}
 };
@@ -761,7 +785,7 @@ class Polyhedron {
   ~Polyhedron ();
   Vertex * getVertex (Point *p);
   Vertex * getVertex (double x, double y, double z, bool perturb = true) {
-    Point *p = new InputPoint(perturb ? PV3::input(x, y, z) : PV3::constant(x, y, z));
+    Point *p = new InputPoint(x, y, z, perturb);
     return getVertex(p);
   }
   Vertex * getVertex (Vertex *v, VVMap &vmap);
@@ -879,5 +903,6 @@ void pl (HEdge *e);
 void pf (Face *f);
 void pfs (const Faces &fa);
 void pfs (const HFaces &fa);
+bool firstFace (Vertex *v, Face *f);
 
 #endif

@@ -47,7 +47,7 @@ extern bool inGCD;
 #ifdef MOD_PRIME26
 extern int prime26;
 #endif
-
+extern bool inGetApprox;
 namespace acp {
 
 double randomNumber (double rmin, double rmax);
@@ -447,9 +447,14 @@ class Parameter {
       u.m->decRef();
   }
   
+  void intersectIntervals (const Parameter &p);
+
   Parameter & operator= (const Parameter &p) {
-    if (p.l == sentinel)
+    if (p.l == sentinel) {
       p.u.m->incRef();
+      if (l != sentinel && l <= u.r && p.u.m->precision() == 106u)
+	intersectIntervals(p);
+    }
     if (l == sentinel)
       u.m->decRef();
     l = p.l;
@@ -466,6 +471,8 @@ class Parameter {
 	return 1;
       if (u.r < 0.0)
 	return -1;
+      if (handleIdentity && l == 0 && u.r == 0)
+	return 0;
       if (fail) {
 	highPrecision = 106u;
 	throw signException;
@@ -888,6 +895,7 @@ inline bool operator> (double a, const Parameter &b)
 
 class PInt : public MInt {
   Parameter p;
+  friend class Parameter;
  public:
   PInt (const Parameter &p) { this->p = p;
     assert(p.l != Parameter::sentinel);
@@ -979,6 +987,13 @@ class PInt : public MInt {
 
   MInt* acos () const { assert(0); }
 };
+
+inline void Parameter::intersectIntervals (const Parameter &p) {
+  Parameter &pp = dynamic_cast<PInt*>(p.u.m)->p;
+  assert(!(u.r < pp.l || pp.u.r < l));
+  pp.l = l > pp.l ? l : pp.l;
+  pp.u.r = u.r < pp.u.r ? u.r : pp.u.r;
+}
 
 class EInt : public MInt {
  public:
@@ -1079,11 +1094,18 @@ class EInt : public MInt {
   }
 
   MInt* cos () const {
-    return new EInt(lm.cos(GMP_RNDD), um.cos(GMP_RNDU));
+    MValue v[] = {lm.cos(GMP_RNDD), lm.cos(GMP_RNDU), um.cos(GMP_RNDD),
+		  um.cos(GMP_RNDU)}, vmin = v[0], vmax = v[0];
+    for (int i = 1; i < 4; ++i)
+      if (v[i] < vmin)
+	vmin = v[i];
+      else if (vmax < v[i])
+	vmax = v[i];
+    return new EInt(vmin, vmax);
   }
 
   MInt* acos () const {
-    return new EInt(lm.acos(GMP_RNDD), um.acos(GMP_RNDU));
+    return new EInt(um.acos(GMP_RNDD), lm.acos(GMP_RNDU));
   }
 
   MValue lm, um;

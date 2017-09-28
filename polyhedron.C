@@ -675,6 +675,7 @@ bool Face::boundaryContains (Point *a, int i)
 bool Face::intersects (Edge *e)
 {
   if (!bboxOverlap(bbox, e->bbox) ||
+      boundaryVertex(e->t) || boundaryVertex(e->h) ||
       e->t->p->side(&p)*e->h->p->side(&p) != -1)
     return false;
   PTR<Point> a = new EPPoint(e->t->p, e->h->p, &p);
@@ -892,6 +893,15 @@ void Shell::rayBBox (Point *a, Point *r, double *rb) const
   q.getBBox(qb);
   mergeBBox(qb, rb);
 }
+
+/*void Shell::rayBBox (Point *a, Point *r, double *rb) const
+{
+  a->getBBox(rb);
+  RayZPlanePoint q(a, r, rb[5]);
+  double qb[6];
+  q.getBBox(qb);
+  mergeBBox(qb, rb);
+  }*/
 
 int Shell::euler () const
 {

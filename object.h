@@ -155,12 +155,7 @@ public:
     assert(!Parameter::handleSignException);
     int precis = uninitialized() ? 0 : precision();
     if (precis < Parameter::highPrecision) {
-      if (precis == 53u && Parameter::highPrecision == 106u)
-        increasePrecision();
-      // else if (Parameter::handleSignException)
-      // safe_setp();
-      else
-        p = calculate();
+      p = calculate();
 
       if (Parameter::highPrecision > 53u && precis <= 53u)
         precisionIncreased.push_back(this);
@@ -170,15 +165,20 @@ public:
     return p;
   }
 
+  void copyMod (P q) {
+    assert(p.size() == q.size());
+    for (int i = 0; i < p.size(); i++)
+      p[i].copyMod(q[i]);
+  }
+
   const P &getApprox (double accuracy=1e-17) {
+    inGetApprox = (accuracy == 1e-7);
     int precis = uninitialized() ? 0 : precision();
     if (precis < Parameter::highPrecision) {
-      if (precis == 53u && Parameter::highPrecision == 106u)
-        increasePrecision();
-      else if (Parameter::handleSignException)
+      if (Parameter::handleSignException)
         safe_setp(accuracy);
       else {
-        p = calculate();
+	p = calculate();
 	if (Parameter::highPrecision > 53u && precis <= 53u)
 	  precisionIncreased.push_back(this);
         checkAccuracy(accuracy);
@@ -189,6 +189,7 @@ public:
     }
     else
       assert(precis == Parameter::highPrecision);
+    inGetApprox = false;
     return p;
   }
 
@@ -196,10 +197,11 @@ private:
   void safe_setp (double accuracy) {
     assert(Parameter::handleSignException == true);
     Parameter::handleSignException = false;
+    int precis = uninitialized() ? 0 : precision();
     bool failed = false;
     while (true)
       try {
-        p = calculate();
+	p = calculate();
         checkAccuracy(accuracy);
         if (failed) {
           decreasePrecision();  // ???

@@ -25,6 +25,8 @@ pages 37-52, 2012
 #include "acp.h"
 using namespace acp;
 
+bool inGetApprox;
+
 namespace acp {
 
 double randomNumber (double rmin, double rmax)
@@ -126,9 +128,11 @@ Parameter Parameter::sqrt () const {
     highPrecision = 212u;
     throw signException;
   }
-  assert(sign() > 0);
+  int s = sign();
+  assert(s > -1);
   if (l != sentinel)
-    return Parameter(Parameter::sqrt(l).l, Parameter::sqrt(u.r).u.r);
+    return s == 0 ? Parameter(0, 0) : 
+      Parameter(Parameter::sqrt(l).l, Parameter::sqrt(u.r).u.r);
   return Parameter(u.m->sqrt());
 }
 
