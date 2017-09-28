@@ -2341,7 +2341,7 @@ int find (Cell *c, const Cells &cells)
 void pp1 (PV3 p)
 {
   cerr << setprecision(16);
-  cerr << "(" << p.x.mid() << " " << p.y.mid() << " " << p.z.mid() << ")";
+  cerr /*<< "("*/ << p.x.mid() << " " << p.y.mid() << " " << p.z.mid() /*<< ")"*/;
 }
 
 void pp (PV3 p)
