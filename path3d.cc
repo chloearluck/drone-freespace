@@ -144,26 +144,20 @@ void savePathTriangles(std::vector<PathTriangle> ts, const char * filename) {
   } else { cout<<"could not open file"<<endl; return; }
 }
 
-
-
-
-
-
-
-void flattenTriangles(std::vector<PathTriangle> & triangles, std::vector<PTR<Transformation> > & transformations, std::vector<PathTriangle> & flattenedTriangles) {
-  flattenedTriangles.push_back(triangles[0]);
+void flattenTriangles(std::vector<PathTriangle> & triangles, std::vector<PTR<Transformation> > & transformations, std::vector<PathTriangle> & flattened) {
+  flattened.push_back(triangles[0]);
   PTR<Transformation> cumulative = 0;
   for (int i=1; i<triangles.size(); i++) {
     PathTriangle t(triangles[i]);
+    t.p[2] = new TransformedPoint(t.p[2], transformations[i-1]);
     if (cumulative) {
       t.p[0] = new TransformedPoint(t.p[0], cumulative);
       t.p[1] = new TransformedPoint(t.p[1], cumulative);
       t.p[2] = new TransformedPoint(t.p[2], cumulative);
     }
-    t.p[2] = new TransformedPoint(t.p[2], transformations[i-1]);
 
-    flattenedTriangles.push_back(t);
-    cumulative = (cumulative? new CompositeTransformation(transformations[i-1], cumulative) : transformations[0]);
+    flattened.push_back(t);
+    cumulative = (cumulative? new CompositeTransformation(cumulative, transformations[i-1]) : transformations[0]);
   }
 }
 
@@ -192,12 +186,10 @@ void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFace
     if (i == 1) triangles.push_back(PathTriangle(p1, ce->getT()->getP(), ce->getH()->getP()));
     triangles.push_back(PathTriangle(ce->getT()->getP(), ce->getH()->getP(), p2));
   }
-  std::vector<PathTriangle> flattenedTriangles;
-  
-
-
-
-  }
+  std::vector<PathTriangle> flattened;
+  flattenTriangles(triangles, transformations, flattened);
+  savePathTriangles(triangles, "triangles.vtk");
+  savePathTriangles(flattened, "flattened.vtk");
 }
 
 void bfs(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFaces & pathfaces) {
