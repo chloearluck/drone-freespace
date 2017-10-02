@@ -277,10 +277,6 @@ void findPath(Polyhedron * blockspace, PTR<Point> start, PTR<Point> end, Points 
   assert(points.size() % 2 == 0);
 
   std::sort(points.begin(), points.end(), ComparePointOrder(r));
-  pp(start);
-  for (int i=0; i<points.size(); i++)
-    pp(points[i]);
-  pp(end);
 
   path.push_back(start);
   for (int i=0; i<points.size(); i+=2) {
@@ -293,7 +289,4 @@ void findPath(Polyhedron * blockspace, PTR<Point> start, PTR<Point> end, Points 
   if (points.size()>0)
     path.push_back((PTR<Point>) points[points.size()-1]);
   path.push_back(end);
-
-  for (int i=0; i<path.size(); i++)
-    pp(path[i]);
 }
