@@ -132,6 +132,14 @@ Edge * commonEdge(HFace * hf1, HFace * hf2) {
   return NULL;
 }
 
+class XYComponents : public Object<PV2> {
+ protected:
+  PTR<Point> p;
+  PV2 calculate () { return PV2(p->getP().getX(), p->getP().getY()); }
+ public:
+  XYComponents (PTR<Point> p) : p(p) {} 
+};
+
 class PathTriangle3D {
  public:
   PTR<Point> p[3];
@@ -141,6 +149,17 @@ class PathTriangle3D {
   }
   PathTriangle3D(const PathTriangle3D& t) {
     p[0] = t.p[0];  p[1] = t.p[1];  p[2] = t.p[2];
+  }
+};
+
+class PathTriangle2D {
+ public:
+  PTR<Object<PV2> > p[3];
+  PathTriangle2D();
+  PathTriangle2D(PathTriangle3D t) {
+    p[0] = new XYComponents(t.p[0]);
+    p[1] = new XYComponents(t.p[1]);
+    p[2] = new XYComponents(t.p[2]);
   }
 };
 
@@ -211,6 +230,10 @@ void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFace
   flattenTriangles(triangles, transformations, flattened, xyplane);
   savePathTriangles(triangles, "triangles.vtk");
   savePathTriangles(flattened, "flattened.vtk");
+
+  std::vector<PathTriangle2D> flattened2d;
+  for (int i=0; i<flattened.size(); i++) 
+    flattened2d.push_back(PathTriangle2D(flattened[i]));
 }
 
 void bfs(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFaces & pathfaces) {
