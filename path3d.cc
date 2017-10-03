@@ -48,6 +48,25 @@ class UnfoldTriangleTransformation : public Transformation {
   UnfoldTriangleTransformation(PTR<Point> pa, PTR<Point> pb, PTR<Point> pc, PTR<Point> pd) : pa(pa), pb(pb), pc(pc), pd(pd) {}
 };
 
+//transformation which rotates triangle abc into the xy-plane centered around b
+class XYPlaneTriangleTransfromation : public Transformation {
+  PTR<Point> pa, pb, pc, pd;
+  TransformationData calculate () {
+    PV3 a = pa->getP();
+    PV3 b = pb->getP();
+    PV3 c = pc->getP();
+
+    PV3 u = (c-b).unit();
+    PV3 w = (a-b).cross(u).unit();
+    PV3 v = u.cross(w);
+    PV3 t = b - PV3(b.dot(u), b.dot(v), b.dot(w));
+
+    return TransformationData(u,v,w,t);
+  }
+ public:
+  XYPlaneTriangleTransfromation(PTR<Point> pa, PTR<Point> pb, PTR<Point> pc) : pa(pa), pb(pb), pc(pc) {}
+};
+
 class CompositeTransformation : public Transformation {
   PTR<Transformation> f, g;
   TransformationData calculate () {
@@ -144,22 +163,23 @@ void savePathTriangles(std::vector<PathTriangle> ts, const char * filename) {
   } else { cout<<"could not open file"<<endl; return; }
 }
 
-void flattenTriangles(std::vector<PathTriangle> & triangles, std::vector<PTR<Transformation> > & transformations, std::vector<PathTriangle> & flattened) {
-  flattened.push_back(triangles[0]);
-  PTR<Transformation> cumulative = 0;
+void flattenTriangles(std::vector<PathTriangle> & triangles, std::vector<PTR<Transformation> > & transformations, std::vector<PathTriangle> & flattened, PTR<Transformation> xyplane) {
+  PTR<Transformation> cumulative = xyplane;
+  flattened.push_back(PathTriangle(new TransformedPoint(triangles[0].p[0], cumulative), 
+                                   new TransformedPoint(triangles[0].p[1], cumulative),
+                                   new TransformedPoint(triangles[0].p[2], cumulative)));
+
   for (int i=1; i<triangles.size(); i++) {
     PathTriangle t(triangles[i]);
-    t.p[2] = new TransformedPoint(t.p[2], transformations[i-1]);
-    if (cumulative) {
-      t.p[0] = new TransformedPoint(t.p[0], cumulative);
-      t.p[1] = new TransformedPoint(t.p[1], cumulative);
-      t.p[2] = new TransformedPoint(t.p[2], cumulative);
-    }
-
+    t.p[0] = new TransformedPoint(t.p[0], cumulative);
+    t.p[1] = new TransformedPoint(t.p[1], cumulative);
+    
+    cumulative = new CompositeTransformation(cumulative, transformations[i-1]);
+    t.p[2] = new TransformedPoint(t.p[2], cumulative);
     flattened.push_back(t);
-    cumulative = (cumulative? new CompositeTransformation(cumulative, transformations[i-1]) : transformations[0]);
   }
 }
+
 
 void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFaces & pathfaces, Points & path) {
   /* ---- unoptimized BFS solution ---- */
@@ -187,7 +207,8 @@ void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFace
     triangles.push_back(PathTriangle(ce->getT()->getP(), ce->getH()->getP(), p2));
   }
   std::vector<PathTriangle> flattened;
-  flattenTriangles(triangles, transformations, flattened);
+  PTR<Transformation> xyplane = new XYPlaneTriangleTransfromation(triangles[0].p[0], triangles[0].p[1], triangles[0].p[2]);
+  flattenTriangles(triangles, transformations, flattened, xyplane);
   savePathTriangles(triangles, "triangles.vtk");
   savePathTriangles(flattened, "flattened.vtk");
 }
