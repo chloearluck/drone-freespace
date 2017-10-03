@@ -118,20 +118,6 @@ struct ComparePointOrder {
   }
 };
 
-Edge * commonEdge(HFace * hf1, HFace * hf2) {
-  Face * f1 = hf1->getF();
-  Face * f2 = hf2->getF();
-  HEdge * start_edge = f1->getBoundary(0);
-  HEdge * curr_edge = start_edge;
-  HEdge * common_edge = NULL;
-  do {
-    if (curr_edge->getE()->otherFace(f1) == f2) 
-      return curr_edge->getE();
-    curr_edge = curr_edge->getNext();
-  } while (curr_edge != start_edge);
-  return NULL;
-}
-
 class XYComponents : public Object<PV2> {
  protected:
   PTR<Point> p;
@@ -199,6 +185,19 @@ void flattenTriangles(std::vector<PathTriangle3D> & triangles, std::vector<PTR<T
   }
 }
 
+Edge * commonEdge(HFace * hf1, HFace * hf2) {
+  Face * f1 = hf1->getF();
+  Face * f2 = hf2->getF();
+  HEdge * start_edge = f1->getBoundary(0);
+  HEdge * curr_edge = start_edge;
+  HEdge * common_edge = NULL;
+  do {
+    if (curr_edge->getE()->otherFace(f1) == f2) 
+      return curr_edge->getE();
+    curr_edge = curr_edge->getNext();
+  } while (curr_edge != start_edge);
+  return NULL;
+}
 
 void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFaces & pathfaces, Points & path) {
   /* ---- unoptimized BFS solution ---- */
