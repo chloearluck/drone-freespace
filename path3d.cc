@@ -126,30 +126,24 @@ class XYComponents : public Object<PV2> {
   XYComponents (PTR<Point> p) : p(p) {} 
 };
 
-class PathTriangle3D {
+class PathVertex {
  public:
-  PTR<Point> p[3];
-  PathTriangle3D();
-  PathTriangle3D(PTR<Point> p0, PTR<Point> p1, PTR<Point> p2) {
-    p[0] = p0;  p[1] = p1;  p[2] = p2;
-  }
-  PathTriangle3D(const PathTriangle3D& t) {
-    p[0] = t.p[0];  p[1] = t.p[1];  p[2] = t.p[2];
+  PTR<Point> original;
+  PTR<Object<PV2> > transformed2d;
+  PathVertex(PTR<Point> p) {
+    original = p; transformed2d = 0;
   }
 };
 
-class PathTriangle2D {
+class PathTriangle {
  public:
-  PTR<Object<PV2> > p[3];
-  PathTriangle2D();
-  PathTriangle2D(PathTriangle3D t) {
-    p[0] = new XYComponents(t.p[0]);
-    p[1] = new XYComponents(t.p[1]);
-    p[2] = new XYComponents(t.p[2]);
+  PathVertex * p[3];
+  PathTriangle(PathVertex * p0, PathVertex * p1, PathVertex * p2) {
+    p[0] = p0; p[1] = p1; p[2] = p2;
   }
 };
 
-void savePathTriangles(std::vector<PathTriangle3D> ts, const char * filename) {
+void savePathTriangles(std::vector<PathTriangle> ts, const char * filename) {
   ofstream ostr;
   ostr.open(filename);
   if (ostr.is_open()) {
@@ -159,7 +153,7 @@ void savePathTriangles(std::vector<PathTriangle3D> ts, const char * filename) {
          << "POINTS " << ts.size()*3 << " double" << endl;
     for (int i=0; i<ts.size(); i++)
       for (int j=0; j<3; j++)
-        ostr << ts[i].p[j]->getApprox().getX().mid() << " " << ts[i].p[j]->getApprox().getY().mid() << " " << ts[i].p[j]->getApprox().getZ().mid() << endl;
+        ostr << ts[i].p[j]->transformed2d->getApprox().getX().mid() << " " << ts[i].p[j]->transformed2d->getApprox().getY().mid() << " 0.0" << endl;
   
     ostr << endl << "POLYGONS " << ts.size() << " " << 4*ts.size() << endl;
     for (int i=0; i<ts.size(); i++)
@@ -168,21 +162,32 @@ void savePathTriangles(std::vector<PathTriangle3D> ts, const char * filename) {
   } else { cout<<"could not open file"<<endl; return; }
 }
 
-void flattenTriangles(std::vector<PathTriangle3D> & triangles, std::vector<PTR<Transformation> > & transformations, std::vector<PathTriangle3D> & flattened, PTR<Transformation> xyplane) {
+PathVertex * getVertex(PTR<Point> p, std::vector<PathVertex * > & vertices) {
+  for (int i=0; i<vertices.size(); i++)
+    if (p == vertices[i]->original)
+      return vertices[i];
+  PathVertex * v = new PathVertex(p);
+  vertices.push_back(v);
+  return v;
+}
+
+void flattenTriangles(std::vector<PathTriangle> & triangles, std::vector<PTR<Transformation> > & transformations, PTR<Transformation> xyplane, PathVertex * start, PathVertex * end) {
   PTR<Transformation> cumulative = xyplane;
-  flattened.push_back(PathTriangle3D(new TransformedPoint(triangles[0].p[0], cumulative), 
-                                   new TransformedPoint(triangles[0].p[1], cumulative),
-                                   new TransformedPoint(triangles[0].p[2], cumulative)));
+  triangles[0].p[0]->transformed2d = new XYComponents(new TransformedPoint(triangles[0].p[0]->original, cumulative));
+  triangles[0].p[1]->transformed2d = new XYComponents(new TransformedPoint(triangles[0].p[1]->original, cumulative));
+  triangles[0].p[2]->transformed2d = new XYComponents(new TransformedPoint(triangles[0].p[2]->original, cumulative));
+  start->transformed2d = new XYComponents(new TransformedPoint(start->original, cumulative));
 
   for (int i=1; i<triangles.size(); i++) {
-    PathTriangle3D t(triangles[i]);
-    t.p[0] = new TransformedPoint(t.p[0], cumulative);
-    t.p[1] = new TransformedPoint(t.p[1], cumulative);
+    if (triangles[i].p[0]->transformed2d == 0)
+      triangles[i].p[0]->transformed2d = new XYComponents(new TransformedPoint(triangles[i].p[0]->original, cumulative));
+    if (triangles[i].p[1]->transformed2d == 0)
+      triangles[i].p[1]->transformed2d = new XYComponents(new TransformedPoint(triangles[i].p[1]->original, cumulative));
     
     cumulative = new CompositeTransformation(cumulative, transformations[i-1]);
-    t.p[2] = new TransformedPoint(t.p[2], cumulative);
-    flattened.push_back(t);
+    triangles[i].p[2]->transformed2d = new XYComponents(new TransformedPoint(triangles[i].p[2]->original, cumulative));
   }
+  end->transformed2d = new XYComponents(new TransformedPoint(end->original, cumulative));
 }
 
 Edge * commonEdge(HFace * hf1, HFace * hf2) {
@@ -209,8 +214,9 @@ void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFace
   }
   /* ---------------------------------- */
 
-  std::vector<PathTriangle3D> triangles;
+  std::vector<PathTriangle> triangles;
   std::vector<PTR<Transformation> > transformations;
+  std::vector<PathVertex * > vertices;
   for (int i=1; i<pathfaces.size(); i++) {
     HFace * hf1 = pathfaces[i-1];    
     HFace * hf2 = pathfaces[i];
@@ -221,18 +227,19 @@ void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFace
     PTR<Point> p2 = he2->getNext()->head()->getP();
     PTR<Transformation> t = new UnfoldTriangleTransformation(p1, ce->getT()->getP(), ce->getH()->getP(), p2);
     transformations.push_back(t);
-    if (i == 1) triangles.push_back(PathTriangle3D(p1, ce->getT()->getP(), ce->getH()->getP()));
-    triangles.push_back(PathTriangle3D(ce->getT()->getP(), ce->getH()->getP(), p2));
+    //create the 3 vertices
+    PathVertex * v0 = getVertex(ce->getT()->getP(), vertices);
+    PathVertex * v1 = getVertex(ce->getH()->getP(), vertices);
+    PathVertex * v2 = getVertex(p2, vertices);
+    if (i ==1) 
+      triangles.push_back(PathTriangle(getVertex(p1, vertices), v0, v1));
+    triangles.push_back(PathTriangle(v0, v1, v2));
   }
-  std::vector<PathTriangle3D> flattened;
-  PTR<Transformation> xyplane = new XYPlaneTriangleTransfromation(triangles[0].p[0], triangles[0].p[1], triangles[0].p[2]);
-  flattenTriangles(triangles, transformations, flattened, xyplane);
-  savePathTriangles(triangles, "triangles.vtk");
-  savePathTriangles(flattened, "flattened.vtk");
-
-  std::vector<PathTriangle2D> flattened2d;
-  for (int i=0; i<flattened.size(); i++) 
-    flattened2d.push_back(PathTriangle2D(flattened[i]));
+  PTR<Transformation> xyplane = new XYPlaneTriangleTransfromation(triangles[0].p[0]->original, triangles[0].p[1]->original, triangles[0].p[2]->original);
+  PathVertex * start = new PathVertex((PTR<Point>) a);
+  PathVertex * end = new PathVertex((PTR<Point>) b);
+  flattenTriangles(triangles, transformations, xyplane, start, end);
+  savePathTriangles(triangles, "flattened.vtk");
 }
 
 void bfs(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFaces & pathfaces) {
