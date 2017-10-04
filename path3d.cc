@@ -126,6 +126,23 @@ class XYComponents : public Object<PV2> {
   XYComponents (PTR<Point> p) : p(p) {} 
 };
 
+Primitive3(AreaABC, PTR<Object<PV2> >, pa, PTR<Object<PV2> >, pb, PTR<Object<PV2> >, pc);
+int AreaABC::sign() {
+  PV2 a = pa->get();
+  PV2 b = pb->get();
+  PV2 c = pc->get();
+  return (b-a).cross(c-a).sign();
+}
+
+Primitive2(AEqualB, PTR<Object<PV2> >, pa, PTR<Object<PV2> >, pb);
+int AEqualB::sign() {
+  PV2 a = pa->get();
+  PV2 b = pb->get();
+  if ((b-a).length() == 0)
+    return 1;
+  return 0;
+}
+
 class PathVertex {
  public:
   PTR<Point> original;
@@ -204,6 +221,53 @@ Edge * commonEdge(HFace * hf1, HFace * hf2) {
   return NULL;
 }
 
+void commonEdge(PathTriangle t1, PathTriangle t2, PathVertex *& p, PathVertex *& q) {
+  p = 0; q = 0;
+  for (int i=0; i<3; i++)
+    for (int j=0; j<3; j++)
+      if (t1.p[i] == t2.p[j])
+        if (!p)
+          p = t1.p[1];
+        else {
+          q = t1.p[i];
+          return;
+        }
+}
+
+void shortestPath(std::vector<PathTriangle> triangles, PathVertex * start, PathVertex * end, Points & path) {
+  std::vector<PathVertex *> left;
+  std::vector<PathVertex *> right;
+  left.push_back(start);
+  right.push_back(start);
+
+  for (int i=0; i<triangles.size(); i++) {
+    PathVertex *p, *q, *leftp, *rightp;
+    if (i == triangles.size()-1) {
+      leftp = end; rightp = end;
+    } else {
+      commonEdge(triangles[i], triangles[i+1], p, q);
+      assert(p != 0); assert(q != 0);
+      if (p == left[left.size()-1] || q == left[left.size()-1])
+        leftp = ((AreaABC(right[right.size()-1]->transformed2d, p->transformed2d, q->transformed2d) > 0)? p : q);
+      else
+        leftp = ((AreaABC(left[left.size()-1]->transformed2d, p->transformed2d, q->transformed2d) > 0)? p : q);
+      rightp = (leftp != p? p : q);
+    }
+
+    if (left[left.size()-1] != leftp) {
+      while (left.size() > 1 && AreaABC(left[left.size()-2]->transformed2d, left[left.size()-1]->transformed2d, leftp->transformed2d) < 0)
+        left.pop_back();
+      left.push_back(leftp);
+    }
+
+    if (right[right.size()-1] != rightp) {
+      while (right.size() > 1 && AreaABC(right[right.size()-2]->transformed2d, right[right.size()-1]->transformed2d, rightp->transformed2d) > 0)
+        right.pop_back();
+      right.push_back(rightp);
+    }
+  }
+}
+
 void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFaces & pathfaces, Points & path) {
   /* ---- unoptimized BFS solution ---- */
   path.push_back((PTR<Point>) a);
@@ -240,6 +304,8 @@ void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFace
   PathVertex * end = new PathVertex((PTR<Point>) b);
   flattenTriangles(triangles, transformations, xyplane, start, end);
   savePathTriangles(triangles, "flattened.vtk");
+
+  shortestPath(triangles, start, end, path);
 }
 
 void bfs(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFaces & pathfaces) {
