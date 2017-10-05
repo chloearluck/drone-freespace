@@ -160,7 +160,7 @@ class PathTriangle {
   }
 };
 
-void savePathTriangles(std::vector<PathTriangle> ts, const char * filename) {
+void savePathTriangles(std::vector<PathTriangle> ts, const char * filename, bool saveTranformed) {
   ofstream ostr;
   ostr.open(filename);
   if (ostr.is_open()) {
@@ -170,7 +170,10 @@ void savePathTriangles(std::vector<PathTriangle> ts, const char * filename) {
          << "POINTS " << ts.size()*3 << " double" << endl;
     for (int i=0; i<ts.size(); i++)
       for (int j=0; j<3; j++)
-        ostr << ts[i].p[j]->transformed2d->getApprox().getX().mid() << " " << ts[i].p[j]->transformed2d->getApprox().getY().mid() << " 0.0" << endl;
+        if (saveTranformed)
+          ostr << ts[i].p[j]->transformed2d->getApprox().getX().mid() << " " << ts[i].p[j]->transformed2d->getApprox().getY().mid() << " 0.0" << endl;
+        else
+          ostr << ts[i].p[j]->original->getApprox().getX().mid() << " " << ts[i].p[j]->original->getApprox().getY().mid() << " " << ts[i].p[j]->original->getApprox().getZ().mid() << endl;
   
     ostr << endl << "POLYGONS " << ts.size() << " " << 4*ts.size() << endl;
     for (int i=0; i<ts.size(); i++)
@@ -303,7 +306,8 @@ void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFace
   PathVertex * start = new PathVertex((PTR<Point>) a);
   PathVertex * end = new PathVertex((PTR<Point>) b);
   flattenTriangles(triangles, transformations, xyplane, start, end);
-  savePathTriangles(triangles, "flattened.vtk");
+  savePathTriangles(triangles, "triangles.vtk", false);
+  savePathTriangles(triangles, "flattened.vtk", true);
 
   shortestPath(triangles, start, end, path);
 }
