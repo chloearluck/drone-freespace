@@ -230,7 +230,7 @@ void commonEdge(PathTriangle t1, PathTriangle t2, PathVertex *& p, PathVertex *&
     for (int j=0; j<3; j++)
       if (t1.p[i] == t2.p[j])
         if (!p)
-          p = t1.p[1];
+          p = t1.p[i];
         else {
           q = t1.p[i];
           return;
