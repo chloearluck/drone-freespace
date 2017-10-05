@@ -126,6 +126,23 @@ class XYComponents : public Object<PV2> {
   XYComponents (PTR<Point> p) : p(p) {} 
 };
 
+class ABintersectCD : public Object<PV2> {
+ protected:
+  PTR<Object<PV2> > pa,pb,pc,pd;
+ public:
+  ABintersectCD(PTR<Object<PV2> > pa, PTR<Object<PV2> > pb, PTR<Object<PV2> > pc, PTR<Object<PV2> >pd)
+   : pa(pa), pb(pb), pc(pc), pd(pd) {}
+  PV2 calculate () {
+    PV2 a = pa->get();
+    PV2 b = pb->get();
+    PV2 c = pc->get();
+    PV2 d = pd->get();
+
+    Parameter t = -((a-c).cross(d-c)) / ((b-a).cross(d-c));
+    return a + t *(b-a);
+  }
+};
+
 Primitive3(AreaABC, PTR<Object<PV2> >, pa, PTR<Object<PV2> >, pb, PTR<Object<PV2> >, pc);
 int AreaABC::sign() {
   PV2 a = pa->get();
@@ -149,6 +166,28 @@ class PathVertex {
   PTR<Object<PV2> > transformed2d;
   PathVertex(PTR<Point> p) {
     original = p; transformed2d = 0;
+  }
+  PathVertex(PTR<Point> original, PTR<Object<PV2> > transformed2d) : original(original), transformed2d(transformed2d) {}
+};
+
+//note p and q must be first
+class ABintersectCDto3D : public Point {
+ protected:
+  PathVertex *vp, *vq, *vc, *vd;
+ public:
+  ABintersectCDto3D(PathVertex * vp, PathVertex * vq, PathVertex * vc, PathVertex * vd)
+   : vp(vp), vq(vq), vc(vc), vd(vd) {}
+  PV3 calculate () {
+    PV2 p = vp->transformed2d->get();
+    PV2 q = vq->transformed2d->get();
+    PV2 c = vc->transformed2d->get();
+    PV2 d = vd->transformed2d->get();
+    PV3 p3d = vp->original->getP();
+    PV3 q3d = vq->original->getP();
+
+    Parameter t = -((p-c).cross(d-c)) / ((q-p).cross(d-c));
+    PV3 result = p3d + t *(q3d-p3d);
+    return p3d + t *(q3d-p3d);
   }
 };
 
