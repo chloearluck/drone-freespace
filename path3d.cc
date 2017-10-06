@@ -170,7 +170,7 @@ class PathVertex {
   PathVertex(PTR<Point> original, PTR<Object<PV2> > transformed2d) : original(original), transformed2d(transformed2d) {}
 };
 
-//note p and q must be first
+//find the 3d equivalent of the 2d intersection between triangle edge p->q and line segment c->d
 class ABintersectCDto3D : public Point {
  protected:
   PathVertex *vp, *vq, *vc, *vd;
@@ -276,37 +276,113 @@ void commonEdge(PathTriangle t1, PathTriangle t2, PathVertex *& p, PathVertex *&
         }
 }
 
+//DEBUG
+class State {
+ public:
+  std::vector<PathTriangle> triangles;
+  std::vector<PathVertex*> path;
+  State(std::vector<PathTriangle> & ts, std::vector<PathVertex*> & p, int n) {
+    triangles.insert(triangles.begin(), ts.begin(), ts.begin() + n);
+    path.insert(path.begin(), p.begin(), p.end());
+  }
+  void save(const char * filename) {
+    ofstream ostr;
+    ostr.open(filename);
+    if (ostr.is_open()) {
+      ostr<<triangles.size()<<" 0"<<endl;
+      for (int i=0; i<triangles.size(); i++) 
+        for (int j=0; j<3; j++) 
+          ostr<<triangles[i].p[j]->transformed2d->getApprox().getX().mid()<<" "<<triangles[i].p[j]->transformed2d->getApprox().getY().mid()<<endl;
+      // ostr<<endl;
+      for (int i=0; i<path.size(); i++)
+        ostr<<path[i]->transformed2d->getApprox().getX().mid()<<" "<<path[i]->transformed2d->getApprox().getY().mid()<<endl;
+      ostr.close();
+    }
+  }
+};
+//DEBUG
+
+class PathEdge {
+ public:
+  PathVertex * left;
+  PathVertex * right;
+  PathEdge(PathVertex * left, PathVertex * right) : left(left), right(right) {}
+};
+
 void shortestPath(std::vector<PathTriangle> triangles, PathVertex * start, PathVertex * end, Points & path) {
   std::vector<PathVertex *> left;
-  std::vector<PathVertex *> right;
+  std::vector<int> leftIndices;
+  std::vector<PathEdge> edges;
+  for (int i=0; i<triangles.size()-1; i++) {
+    PathVertex * p, * q;
+    commonEdge(triangles[i], triangles[i+1], p, q);
+    PathVertex * from;
+    for (int j=0; j<3; j++)
+      if (triangles[i].p[j] != p && triangles[i].p[j] != q)
+        from = triangles[i].p[j];
+    PathVertex * l = ((AreaABC(from->transformed2d, p->transformed2d, q->transformed2d) > 0)? p : q);
+    PathVertex * r = ((l != p)? p : q);
+    edges.push_back(PathEdge(l, r)); 
+  }
+  edges.push_back(PathEdge(end, end));
+
+  //DEBUG
+  char s[30];
+  int state_num = 0;
+  //---- 
+
   left.push_back(start);
-  right.push_back(start);
+  leftIndices.push_back(-1);
+  for (int i=0; i<edges.size(); i++) {
+    
+    //DEBUG
+    int n = i+2; if (i == triangles.size()-1) n = i+1;
+    sprintf(s, "state/%d.txt", state_num);
+    State(triangles, left, n).save(s); state_num++;
+    //-----
+    if (left[left.size()-1] == edges[i].left)
+      continue;
 
-  for (int i=0; i<triangles.size(); i++) {
-    PathVertex *p, *q, *leftp, *rightp;
-    if (i == triangles.size()-1) {
-      leftp = end; rightp = end;
-    } else {
-      commonEdge(triangles[i], triangles[i+1], p, q);
-      assert(p != 0); assert(q != 0);
-      if (p == left[left.size()-1] || q == left[left.size()-1])
-        leftp = ((AreaABC(right[right.size()-1]->transformed2d, p->transformed2d, q->transformed2d) > 0)? p : q);
-      else
-        leftp = ((AreaABC(left[left.size()-1]->transformed2d, p->transformed2d, q->transformed2d) > 0)? p : q);
-      rightp = (leftp != p? p : q);
-    }
+    //find the shortest path through edges[0]...edges[i-1] to edges[i].left;
+    if (left.size() > 1) {
+      int bound = left.size()-1;
+      while (bound > 0 && AreaABC(left[bound-1]->transformed2d, left[bound]->transformed2d, edges[i].left->transformed2d) > 0)
+        bound--;
 
-    if (left[left.size()-1] != leftp) {
-      while (left.size() > 1 && AreaABC(left[left.size()-2]->transformed2d, left[left.size()-1]->transformed2d, leftp->transformed2d) < 0)
-        left.pop_back();
-      left.push_back(leftp);
+      if (bound < left.size()-1) {
+        //calculate intersections for edges leftIndices[bound+1]
+        //  (or right point is intersection is invalid)
+        //add them all to newPoints;
+        std::vector<PathVertex *> newPoints;
+        std::vector<int> newPointsIndices;
+        for (int j=leftIndices[bound+1]; j<i; j++) {
+          if (left[bound] == edges[j].left)
+            continue;
+          if (AreaABC(left[bound]->transformed2d, edges[j].right->transformed2d, edges[i].left->transformed2d) > 0) 
+            newPoints.push_back(edges[j].right);
+          else {
+            PTR<Object<PV2> > int2d = new ABintersectCD(edges[j].left->transformed2d, edges[j].right->transformed2d, left[bound]->transformed2d, edges[i].left->transformed2d);
+            PTR<Point> int3d = new ABintersectCDto3D(edges[j].left, edges[j].right, left[bound], edges[i].left);
+            newPoints.push_back(new PathVertex(int3d, int2d));
+          }
+          newPointsIndices.push_back(j);
+        }
+        //remove all elements of left after bound;
+        left.erase(left.begin()+bound+1, left.end());
+        leftIndices.erase(leftIndices.begin()+bound+1, leftIndices.end());
+        //replace them with newPoints
+        left.insert(left.end(), newPoints.begin(), newPoints.end());
+        leftIndices.insert(leftIndices.end(), newPointsIndices.begin(), newPointsIndices.end());
+      }
     }
+    left.push_back(edges[i].left);
+    leftIndices.push_back(i);
+  }
 
-    if (right[right.size()-1] != rightp) {
-      while (right.size() > 1 && AreaABC(right[right.size()-2]->transformed2d, right[right.size()-1]->transformed2d, rightp->transformed2d) > 0)
-        right.pop_back();
-      right.push_back(rightp);
-    }
+  //add 3d points of left to path
+  path.clear();
+  for (int i=0; i<left.size(); i++) {
+    path.push_back(left[i]->original);
   }
 }
 
