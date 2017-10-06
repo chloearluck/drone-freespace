@@ -276,32 +276,6 @@ void commonEdge(PathTriangle t1, PathTriangle t2, PathVertex *& p, PathVertex *&
         }
 }
 
-//DEBUG
-class State {
- public:
-  std::vector<PathTriangle> triangles;
-  std::vector<PathVertex*> path;
-  State(std::vector<PathTriangle> & ts, std::vector<PathVertex*> & p, int n) {
-    triangles.insert(triangles.begin(), ts.begin(), ts.begin() + n);
-    path.insert(path.begin(), p.begin(), p.end());
-  }
-  void save(const char * filename) {
-    ofstream ostr;
-    ostr.open(filename);
-    if (ostr.is_open()) {
-      ostr<<triangles.size()<<" 0"<<endl;
-      for (int i=0; i<triangles.size(); i++) 
-        for (int j=0; j<3; j++) 
-          ostr<<triangles[i].p[j]->transformed2d->getApprox().getX().mid()<<" "<<triangles[i].p[j]->transformed2d->getApprox().getY().mid()<<endl;
-      // ostr<<endl;
-      for (int i=0; i<path.size(); i++)
-        ostr<<path[i]->transformed2d->getApprox().getX().mid()<<" "<<path[i]->transformed2d->getApprox().getY().mid()<<endl;
-      ostr.close();
-    }
-  }
-};
-//DEBUG
-
 class PathEdge {
  public:
   PathVertex * left;
@@ -326,20 +300,10 @@ void shortestPath(std::vector<PathTriangle> triangles, PathVertex * start, PathV
   }
   edges.push_back(PathEdge(end, end));
 
-  //DEBUG
-  char s[30];
-  int state_num = 0;
-  //---- 
-
   left.push_back(start);
   leftIndices.push_back(-1);
   for (int i=0; i<edges.size(); i++) {
     
-    //DEBUG
-    int n = i+2; if (i == triangles.size()-1) n = i+1;
-    sprintf(s, "state/%d.txt", state_num);
-    State(triangles, left, n).save(s); state_num++;
-    //-----
     if (left[left.size()-1] == edges[i].left)
       continue;
 
