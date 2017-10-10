@@ -284,7 +284,7 @@ class PathEdge {
   PathEdge(PathVertex * left, PathVertex * right) : left(left), right(right) {}
 };
 
-void shortestPath(std::vector<PathTriangle> & triangles, PathVertex * start, PathVertex * end, Points & path) {
+void shortestPath(std::vector<PathTriangle> & triangles, PathVertex * start, PathVertex * end, Points & path, std::vector<int> & candidatesToSwap, std::vector<PathVertex*> & verts) {
   std::vector<PathVertex *> left;
   std::vector<int> leftIndices;
   std::vector<PathEdge> edges;
@@ -344,6 +344,14 @@ void shortestPath(std::vector<PathTriangle> & triangles, PathVertex * start, Pat
     leftIndices.push_back(i);
   }
 
+  //check for places when the path is flush with a vertex
+  for (int i=1; i<left.size()-1; i++) 
+    if(left[i] == edges[leftIndices[i]].left ||  left[i] == edges[leftIndices[i]].right) {
+      candidatesToSwap.push_back(leftIndices[i]);
+      candidatesToSwap.push_back(leftIndices[i+1]);
+      verts.push_back(left[i]);
+    } 
+
   //add 3d points of left to path
   path.clear();
   for (int i=0; i<left.size(); i++) {
@@ -380,7 +388,9 @@ void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFace
   savePathTriangles(triangles, "triangles.vtk", false);
   savePathTriangles(triangles, "flattened.vtk", true);
 
-  shortestPath(triangles, start, end, path);
+  std::vector<int> candidatesToSwap;
+  std::vector<PathVertex*> verts;
+  shortestPath(triangles, start, end, path, candidatesToSwap, verts);
 }
 
 void bfs(HFace * fa, HFace * fb, HFaces & pathfaces) {
