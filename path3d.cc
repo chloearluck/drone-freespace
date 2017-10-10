@@ -383,12 +383,7 @@ void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFace
   shortestPath(triangles, start, end, path);
 }
 
-void bfs(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFaces & pathfaces) {
-  cout<<"finding a sequence of faces connecting"<<endl;
-  pp(a); cout<<"and"<<endl; pp(b);
-
-  HFace * fa  = a->getHFace();
-  HFace * fb  = b->getHFace();
+void bfs(HFace * fa, HFace * fb, HFaces & pathfaces) {
   HFaces pathfaces_rev;
 
   std::map<HFace *, HFace *> parents;
@@ -399,7 +394,6 @@ void bfs(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFaces & pa
   while (!q.empty()) {
     HFace * current = q.front(); q.pop();
     if (current == fb) {
-      cout<<"found path"<<endl;
       while(current != NULL) {
         pathfaces_rev.push_back(current);
         current = parents[current];
@@ -418,7 +412,7 @@ void bfs(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFaces & pa
     }
   }
   if (pathfaces_rev.size() == 0) {
-    cout<<"no path found"<<endl;
+    cout<<"no path found by bfs"<<endl;
     return;
   }
 
@@ -473,7 +467,7 @@ void findPath(Polyhedron * blockspace, PTR<Point> start, PTR<Point> end, Points 
   for (int i=0; i<points.size(); i+=2) {
     HFaces subHfaces;
     Points subPath;
-    bfs(points[i], points[i+1], subHfaces);
+    bfs(points[i]->getHFace(), points[i+1]->getHFace(), subHfaces);
     localPath(points[i], points[i+1], subHfaces, subPath);
     path.insert(path.end(), subPath.begin(), subPath.end());
   }
