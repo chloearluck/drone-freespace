@@ -200,7 +200,7 @@ class PathTriangle {
   }
 };
 
-void savePathTriangles(std::vector<PathTriangle> ts, const char * filename, bool saveTranformed) {
+void savePathTriangles(std::vector<PathTriangle> & ts, const char * filename, bool saveTranformed) {
   ofstream ostr;
   ostr.open(filename);
   if (ostr.is_open()) {
@@ -284,7 +284,7 @@ class PathEdge {
   PathEdge(PathVertex * left, PathVertex * right) : left(left), right(right) {}
 };
 
-void shortestPath(std::vector<PathTriangle> triangles, PathVertex * start, PathVertex * end, Points & path) {
+void shortestPath(std::vector<PathTriangle> & triangles, PathVertex * start, PathVertex * end, Points & path) {
   std::vector<PathVertex *> left;
   std::vector<int> leftIndices;
   std::vector<PathEdge> edges;
