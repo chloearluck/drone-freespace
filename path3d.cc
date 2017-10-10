@@ -352,15 +352,6 @@ void shortestPath(std::vector<PathTriangle> triangles, PathVertex * start, PathV
 }
 
 void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFaces & pathfaces, Points & path) {
-  /* ---- unoptimized BFS solution ---- */
-  path.push_back((PTR<Point>) a);
-  for (int i=1; i<pathfaces.size(); i++) {
-    Edge * e = commonEdge(pathfaces[i], pathfaces[i-1]);
-    assert(e != NULL);
-    path.push_back(new MidPoint(e->getT()->getP(), e->getH()->getP()));
-  }
-  /* ---------------------------------- */
-
   std::vector<PathTriangle> triangles;
   std::vector<PTR<Transformation> > transformations;
   std::vector<PathVertex * > vertices;
