@@ -433,13 +433,11 @@ void findPath(Polyhedron * blockspace, PTR<Point> start, PTR<Point> end, Points 
   
   //make sure start and end are in the same component of blockspace
   blockspace->computeWindingNumbers();
-  cout<<"blockspace has "<<blockspace->cells.size()<<" cells"<<endl;
   int cell_index = blockspace->containingCell(start);
   if (blockspace->containingCell(end) != cell_index) {
     cout<<"start and end are not in the same component"<<endl;
     return;
   }
-  cout<<"start and end are in cell "<<cell_index<<endl;   
 
   //do raycasting
   Cell * cell = blockspace->cells[cell_index];
