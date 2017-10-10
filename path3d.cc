@@ -194,8 +194,9 @@ class ABintersectCDto3D : public Point {
 class PathTriangle {
  public:
   PathVertex * p[3];
-  PathTriangle(PathVertex * p0, PathVertex * p1, PathVertex * p2) {
-    p[0] = p0; p[1] = p1; p[2] = p2;
+  HFace * hface;
+  PathTriangle(PathVertex * p0, PathVertex * p1, PathVertex * p2, HFace * hface) {
+    p[0] = p0; p[1] = p1; p[2] = p2; this->hface = hface;
   }
 };
 
@@ -378,8 +379,8 @@ void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFace
     PathVertex * v1 = getVertex(ce->getH()->getP(), vertices);
     PathVertex * v2 = getVertex(p2, vertices);
     if (i ==1) 
-      triangles.push_back(PathTriangle(getVertex(p1, vertices), v0, v1));
-    triangles.push_back(PathTriangle(v0, v1, v2));
+      triangles.push_back(PathTriangle(getVertex(p1, vertices), v0, v1, hf1));
+    triangles.push_back(PathTriangle(v0, v1, v2, hf2));
   }
   PTR<Transformation> xyplane = new XYPlaneTriangleTransfromation(triangles[0].p[0]->original, triangles[0].p[1]->original, triangles[0].p[2]->original);
   PathVertex * start = new PathVertex((PTR<Point>) a);
