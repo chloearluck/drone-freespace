@@ -359,6 +359,13 @@ class PathEdge {
   PathEdge(PathVertex * left, PathVertex * right) : left(left), right(right) {}
 };
 
+bool hasVertexPoint(HFace * hf, PTR<Point> p) {
+  PTR<Point> p0 = hf->getF()->getBoundary(0)->tail()->getP();
+  PTR<Point> p1 = hf->getF()->getBoundary(0)->getNext()->tail()->getP();
+  PTR<Point> p2 = hf->getF()->getBoundary(0)->getNext()->getNext()->tail()->getP();
+  return ((p0 == p) || (p1 == p) || (p2 == p));
+}
+
 void shortestPathHelper(std::vector<PathEdge> & edges, std::vector<PathVertex*> & newPoints, std::vector<int> & newPointsIndices, int startIndex, int endIndex, PathVertex * a, PathVertex * b) {
   //a -> b is the current intersection line
   //we want to find all the point where a->b intersects edge[i] for i in startIndex...endIndex
