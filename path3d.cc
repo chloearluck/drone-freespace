@@ -284,6 +284,33 @@ class PathEdge {
   PathEdge(PathVertex * left, PathVertex * right) : left(left), right(right) {}
 };
 
+void shortestPathHelper(std::vector<PathEdge> & edges, std::vector<PathVertex*> & newPoints, std::vector<int> & newPointsIndices, int startIndex, int endIndex, PathVertex * a, PathVertex * b) {
+  //a -> b is the current intersection line
+  //we want to find all the point where a->b intersects edge[i] for i in startIndex...endIndex
+  //if one of those edges does intersect a->b, we recursively call both sides
+
+  //goes through the list in reverse and check for non-intersections
+  for (int i=endIndex; i>=startIndex; i--) {
+    if (AreaABC(a->transformed2d, edges[i].right->transformed2d, b->transformed2d) > 0) {
+      shortestPathHelper(edges, newPoints, newPointsIndices, startIndex, i-1, a, edges[i].right);
+      if (newPoints.size()>0 && newPoints[newPoints.size()-1] != edges[i].right) {//avoid duplicate points on the path
+        newPoints.push_back(edges[i].right);
+        newPointsIndices.push_back(i);
+      }
+      shortestPathHelper(edges, newPoints, newPointsIndices, i+1, endIndex, edges[i].right, b);
+      return;
+    }
+  }
+
+  //all are simple intersections, calculate them
+  for (int i=startIndex; i<=endIndex; i++) {
+    PTR<Object<PV2> > int2d = new ABintersectCD(edges[i].left->transformed2d, edges[i].right->transformed2d, a->transformed2d, b->transformed2d);
+    PTR<Point> int3d = new ABintersectCDto3D(edges[i].left, edges[i].right, a, b);
+    newPoints.push_back(new PathVertex(int3d, int2d));
+    newPointsIndices.push_back(i);
+  }
+}
+
 void shortestPath(std::vector<PathTriangle> & triangles, PathVertex * start, PathVertex * end, Points & path, std::vector<int> & candidatesToSwap, std::vector<PathVertex*> & verts) {
   std::vector<PathVertex *> left;
   std::vector<int> leftIndices;
@@ -320,18 +347,7 @@ void shortestPath(std::vector<PathTriangle> & triangles, PathVertex * start, Pat
         //add them all to newPoints;
         std::vector<PathVertex *> newPoints;
         std::vector<int> newPointsIndices;
-        for (int j=leftIndices[bound+1]; j<i; j++) {
-          if (left[bound] == edges[j].left)
-            continue;
-          if (AreaABC(left[bound]->transformed2d, edges[j].right->transformed2d, edges[i].left->transformed2d) > 0) 
-            newPoints.push_back(edges[j].right);
-          else {
-            PTR<Object<PV2> > int2d = new ABintersectCD(edges[j].left->transformed2d, edges[j].right->transformed2d, left[bound]->transformed2d, edges[i].left->transformed2d);
-            PTR<Point> int3d = new ABintersectCDto3D(edges[j].left, edges[j].right, left[bound], edges[i].left);
-            newPoints.push_back(new PathVertex(int3d, int2d));
-          }
-          newPointsIndices.push_back(j);
-        }
+        shortestPathHelper(edges, newPoints, newPointsIndices, leftIndices[bound+1], i-1, left[bound], edges[i].left);
         //remove all elements of left after bound;
         left.erase(left.begin()+bound+1, left.end());
         leftIndices.erase(leftIndices.begin()+bound+1, leftIndices.end());
@@ -348,7 +364,11 @@ void shortestPath(std::vector<PathTriangle> & triangles, PathVertex * start, Pat
   for (int i=1; i<left.size()-1; i++) 
     if(left[i] == edges[leftIndices[i]].left ||  left[i] == edges[leftIndices[i]].right) {
       candidatesToSwap.push_back(leftIndices[i]);
-      candidatesToSwap.push_back(leftIndices[i+1]);
+      // candidatesToSwap.push_back(leftIndices[i+1]);
+      int j=leftIndices[i]+1;
+      while(hasVertexPoint(triangles[j+1].hface, left[i]->original))
+        j++;
+      candidatesToSwap.push_back(j);
       verts.push_back(left[i]);
     } 
 
