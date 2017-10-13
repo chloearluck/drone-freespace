@@ -46,6 +46,31 @@ class UnfoldTriangleTransformation : public Transformation {
   }
  public:
   UnfoldTriangleTransformation(PTR<Point> pa, PTR<Point> pb, PTR<Point> pc, PTR<Point> pd) : pa(pa), pb(pb), pc(pc), pd(pd) {}
+  UnfoldTriangleTransformation(HFace * hf1, HFace * hf2) {
+    PTR<Point> p1[3];
+    p1[0] = hf1->getF()->getBoundary(0)->tail()->getP();
+    p1[1] = hf1->getF()->getBoundary(0)->getNext()->tail()->getP();
+    p1[2] = hf1->getF()->getBoundary(0)->getNext()->getNext()->tail()->getP();
+  
+    PTR<Point> p2[3];
+    p2[0] = hf2->getF()->getBoundary(0)->tail()->getP();
+    p2[1] = hf2->getF()->getBoundary(0)->getNext()->tail()->getP();
+    p2[2] = hf2->getF()->getBoundary(0)->getNext()->getNext()->tail()->getP();
+
+    int j1, j2;
+    for (int i=0; i<3; i++)
+      if (p1[i] != p2[0] && p1[i] != p2[1] && p1[i] != p2[2])
+        j1 = i;
+    
+    for (int i=0; i<3; i++)
+      if (p1[0] != p2[i] && p1[1] != p2[i] && p1[2] != p2[i])
+        j2 = i;
+   
+    this->pa = p1[j1];
+    this->pb = p1[(j1+1)%3];      
+    this->pc = p1[(j1+2)%3];
+    this->pd = p2[j2];      
+  }
 };
 
 //transformation which rotates triangle abc into the xy-plane centered around b
@@ -170,6 +195,15 @@ class PathVertex {
   PathVertex(PTR<Point> original, PTR<Object<PV2> > transformed2d) : original(original), transformed2d(transformed2d) {}
 };
 
+PathVertex * getVertex(PTR<Point> p, std::vector<PathVertex * > & vertices) {
+  for (int i=0; i<vertices.size(); i++)
+    if (p == vertices[i]->original)
+      return vertices[i];
+  PathVertex * v = new PathVertex(p);
+  vertices.push_back(v);
+  return v;
+}
+
 //find the 3d equivalent of the 2d intersection between triangle edge p->q and line segment c->d
 class ABintersectCDto3D : public Point {
  protected:
@@ -198,6 +232,26 @@ class PathTriangle {
   PathTriangle(PathVertex * p0, PathVertex * p1, PathVertex * p2, HFace * hface) {
     p[0] = p0; p[1] = p1; p[2] = p2; this->hface = hface;
   }
+  PathTriangle(HFace * hf,  PathTriangle prev,  std::vector<PathVertex * > & vertices) {
+    PTR<Point> ps[3];
+    ps[0] = hf->getF()->getBoundary(0)->tail()->getP();
+    ps[1] = hf->getF()->getBoundary(0)->getNext()->tail()->getP();
+    ps[2] = hf->getF()->getBoundary(0)->getNext()->getNext()->tail()->getP();
+    
+    int uncommon;
+    for (int i=0; i<3; i++)
+      if (ps[i] != prev.p[0]->original  &&  ps[i] != prev.p[1]->original  &&  ps[i] != prev.p[2]->original)
+        uncommon = i;
+
+    PTR<Point> p = ps[uncommon];
+    ps[uncommon] = ps[2];
+    ps[2] = p;
+
+    this->p[0] = getVertex(ps[0], vertices);
+    this->p[1] = getVertex(ps[1], vertices);
+    this->p[2] = getVertex(ps[2], vertices);
+    this->hface = hf;
+  }
 };
 
 void savePathTriangles(std::vector<PathTriangle> & ts, const char * filename, bool saveTranformed) {
@@ -220,15 +274,6 @@ void savePathTriangles(std::vector<PathTriangle> & ts, const char * filename, bo
       ostr << "3 " << 3*i << " " << 3*i+1 << " " << 3*i+2 << endl;
     ostr.close();
   } else { cout<<"could not open file"<<endl; return; }
-}
-
-PathVertex * getVertex(PTR<Point> p, std::vector<PathVertex * > & vertices) {
-  for (int i=0; i<vertices.size(); i++)
-    if (p == vertices[i]->original)
-      return vertices[i];
-  PathVertex * v = new PathVertex(p);
-  vertices.push_back(v);
-  return v;
 }
 
 void flattenTriangles(std::vector<PathTriangle> & triangles, std::vector<PTR<Transformation> > & transformations, PTR<Transformation> xyplane, PathVertex * start, PathVertex * end) {
