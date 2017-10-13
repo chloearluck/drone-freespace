@@ -185,6 +185,36 @@ int AEqualB::sign() {
   return 0;
 }
 
+Primitive2(ComparePathLength, Points, path1, Points, path2);
+int ComparePathLength::sign() {
+  //first check if they are identical
+  if (path1.size() == path2.size()) {
+    int i;
+    for (i=0; i<path1.size(); i++)
+      if (path1[i] != path2[i])
+        break;
+    if (i==path1.size())
+      return 0;
+  }
+
+  Parameter length1 = Parameter::input(0);
+  Parameter length2 = Parameter::input(0);
+
+  for (int i=1; i<path1.size(); i++) {
+    PV3 u = path1[i]->getP() - path1[i-1]->getP();
+    length1 = length1 + u.dot(u).sqrt();
+  }
+  for (int i=1; i<path2.size(); i++) {
+    PV3 u = path2[i]->getP() - path2[i-1]->getP();
+    length2 = length2 + u.dot(u).sqrt();
+  }
+
+  if (length1 < length2)
+    return -1;
+  assert(length1 > length2);
+  return 1;
+}
+
 class PathVertex {
  public:
   PTR<Point> original;
