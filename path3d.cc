@@ -302,16 +302,16 @@ Edge * commonEdge(HFace * hf1, HFace * hf2) {
 }
 
 void commonEdge(PathTriangle t1, PathTriangle t2, PathVertex *& p, PathVertex *& q) {
-  p = 0; q = 0;
+  int uncommon = -1;
+  int commonCount = 0;
   for (int i=0; i<3; i++)
-    for (int j=0; j<3; j++)
-      if (t1.p[i] == t2.p[j])
-        if (!p)
-          p = t1.p[i];
-        else {
-          q = t1.p[i];
-          return;
-        }
+    if (t1.p[i] != t2.p[0] && t1.p[i] != t2.p[1] && t1.p[i] != t2.p[2])
+      uncommon = i;
+    else
+      commonCount++;
+  assert(uncommon > -1); assert(commonCount == 2);
+  p = t1.p[(uncommon+1)%3];
+  q = t1.p[(uncommon+2)%3];
 }
 
 class PathEdge {
