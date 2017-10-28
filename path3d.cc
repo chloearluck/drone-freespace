@@ -170,23 +170,6 @@ class XYComponents : public Object<PV2> {
   XYComponents (PTR<Point> p) : p(p) {} 
 };
 
-class ABintersectCD : public Object<PV2> {
- protected:
-  PTR<Object<PV2> > pa,pb,pc,pd;
- public:
-  ABintersectCD(PTR<Object<PV2> > pa, PTR<Object<PV2> > pb, PTR<Object<PV2> > pc, PTR<Object<PV2> >pd)
-   : pa(pa), pb(pb), pc(pc), pd(pd) {}
-  PV2 calculate () {
-    PV2 a = pa->get();
-    PV2 b = pb->get();
-    PV2 c = pc->get();
-    PV2 d = pd->get();
-
-    Parameter t = -((a-c).cross(d-c)) / ((b-a).cross(d-c));
-    return a + t *(b-a);
-  }
-};
-
 Primitive3(AreaABC, PTR<Object<PV2> >, pa, PTR<Object<PV2> >, pb, PTR<Object<PV2> >, pc);
 int AreaABC::sign() {
   PV2 a = pa->get();
