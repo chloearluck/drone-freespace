@@ -213,7 +213,6 @@ class ABintersectCDto3D : public Point {
     PV3 q3d = vq->original->getP();
 
     Parameter t = -((p-c).cross(d-c)) / ((q-p).cross(d-c));
-    PV3 result = p3d + t *(q3d-p3d);
     return p3d + t *(q3d-p3d);
   }
 };
