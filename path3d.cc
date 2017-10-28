@@ -328,6 +328,55 @@ bool hasVertexPoint(HFace * hf, PTR<Point> p) {
   return ((p0 == p) || (p1 == p) || (p2 == p));
 }
 
+//DEBUG
+class State {
+ public:
+  std::vector<PathTriangle> triangles;
+  std::vector<PathVertex*> path;
+  State(std::vector<PathTriangle> & ts, std::vector<PathVertex*> & p, int n) {
+    triangles.insert(triangles.begin(), ts.begin(), ts.begin() + n);
+    path.insert(path.begin(), p.begin(), p.end());
+  }
+  void save(const char * filename) {
+    ofstream ostr;
+    ostr.open(filename);
+    if (ostr.is_open()) {
+      ostr << setprecision(20) << triangles.size()<<" 0"<<endl;
+      for (int i=0; i<triangles.size(); i++) 
+        for (int j=0; j<3; j++) 
+          ostr<<triangles[i].p[j]->transformed2d->getApprox(1e-16).getX().mid()<<" "<<triangles[i].p[j]->transformed2d->getApprox(1e-16).getY().mid()<<endl;
+      // ostr<<endl;
+      for (int i=0; i<path.size(); i++)
+        ostr<<path[i]->transformed2d->getApprox(1e-16).getX().mid()<<" "<<path[i]->transformed2d->getApprox(1e-16).getY().mid()<<endl;
+      ostr.close();
+    }
+  }
+};
+class State2 {
+ public:
+  std::vector<PathEdge> edges;
+  std::vector<PathVertex*> path;
+  State2(std::vector<PathEdge> & es, std::vector<PathVertex*> & p, int n) {
+    edges.insert(edges.begin(), es.begin(), es.begin() + n);
+    path.insert(path.begin(), p.begin(), p.end());
+  }
+  void save(const char * filename) {
+    ofstream ostr;
+    ostr.open(filename);
+    if (ostr.is_open()) {
+      ostr << setprecision(20)<< edges.size()<<" 0"<<endl;
+      for (int i=0; i<edges.size(); i++) {
+        ostr<<edges[i].left->transformed2d->getApprox(1e-16).getX().mid()<<" "<<edges[i].left->transformed2d->getApprox(1e-16).getY().mid()<<endl;
+        ostr<<edges[i].right->transformed2d->getApprox(1e-16).getX().mid()<<" "<<edges[i].right->transformed2d->getApprox(1e-16).getY().mid()<<endl;
+      }  
+      for (int i=0; i<path.size(); i++)
+        ostr<<path[i]->transformed2d->getApprox(1e-16).getX().mid()<<" "<<path[i]->transformed2d->getApprox(1e-16).getY().mid()<<endl;
+      ostr.close();
+    }
+  }
+};
+//DEBUG
+
 void shortestPathHelper(std::vector<PathEdge> & edges, std::vector<PathVertex*> & newPoints, std::vector<int> & newPointsIndices, int startIndex, int endIndex, PathVertex * a, PathVertex * b) {
   //a -> b is the current intersection line
   //we want to find all the point where a->b intersects edge[i] for i in startIndex...endIndex
