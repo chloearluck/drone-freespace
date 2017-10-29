@@ -707,20 +707,14 @@ void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFace
 
       shortestPath(triangles, start, end, path, candidatesToSwap, verts);
 
-      //does this new path still contain replacingVertex at edge startIndex?
-      //if it doesn't, set trueFlip to true
-      //how can we tell.  If theres a flush vertex, it will be in candidatesToSwap
-      //meaning we should find a j where j%2 ==0 
-      // and candidatesToSwap[j]<= startIndex and candidatesToSwap[j+1] > startIndex
-      // and verts[j] = replacingVertex
-      for (int j=0; j<candidatesToSwap.size(); j++) {
-        if (candidatesToSwap[j] > startIndex)
-          break;
-        if (candidatesToSwap[j+1] > startIndex && verts[j/2] != replacingVertex) {
-          cout<<"trueFlip"<<endl;
-          trueFlip = true;
-        }
-      }
+      //check if the path has changed
+      int j = find(candidatesToSwap.begin(), candidatesToSwap.end(), startIndex) - candidatesToSwap.begin();
+      if (j % 2  == 1) j++;
+      if (j >= candidatesToSwap.size() || candidatesToSwap[j] != startIndex)
+        trueFlip = true;
+      else
+        cout<<"no change"<<endl;
+
 
       //DEBUG save path
       sprintf(s, "path%d-%02d.vtk", iter_num, i);
