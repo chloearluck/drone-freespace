@@ -510,14 +510,14 @@ void shortestPath(std::vector<PathTriangle> & triangles, PathVertex * start, Pat
   //-----
 
   //save candidatesToSwap
-  for (int i=1; i<left.size()-1; i++) 
-      candidatesToSwap.push_back(leftIndices[i]);
-      int j=leftIndices[i]+1;
-      while(edges[j].left == left[i] || edges[j].right == left[i])
-        j++;
-      candidatesToSwap.push_back(j);
-      verts.push_back(left[i]);
-    }
+  for (int i=1; i<left.size()-1; i++) {
+    candidatesToSwap.push_back(leftIndices[i]);
+    int j=leftIndices[i]+1;
+    while(edges[j].left == left[i] || edges[j].right == left[i])
+      j++;
+    candidatesToSwap.push_back(j);
+    verts.push_back(left[i]);
+  }
 
   //populate path with point in left and edge intersections
   path.push_back(start->original);
