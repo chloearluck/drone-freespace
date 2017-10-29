@@ -19,6 +19,32 @@ void save(Points path, const char * filename) {
   }
 }
 
+void savePivots(Points path1, const char * filename) {
+  Points path;
+  for (int i=0; i<path1.size(); i++) {
+    Point * p = path1[i];
+    if ((dynamic_cast<InputPoint *> (p)) != NULL)
+      path.push_back(path1[i]);
+  }
+
+  ofstream ostr;
+  ostr.open(filename);
+  if (ostr.is_open()) { 
+    ostr << setprecision(20) << "# vtk DataFile Version 3.0" << endl
+         << "vtk output" << endl << "ASCII" << endl
+         << "DATASET POLYDATA" << endl 
+         << "POINTS " << path.size() << " double" << endl;
+    for (int i=0; i<path.size(); i++)
+      ostr << path[i]->getApprox(1e-16).getX().mid() << " " << path[i]->getApprox(1e-16).getY().mid() << " " << path[i]->getApprox(1e-16).getZ().mid() << endl;
+    ostr<<endl<<"LINES 1 "<<path.size()+1<<endl<<path.size()<<" ";
+    for (int i=0; i<path.size(); i++)
+      ostr<<i<<" ";
+    ostr.close();
+  } else {
+    cout<<"could not write to file"<<endl;
+  }
+}
+
 class TransformationData {
  public:
   PV3 u, v, w, t;
