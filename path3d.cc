@@ -405,41 +405,31 @@ class State2 {
 //DEBUG
 
 void shortestPathHelper(std::vector<PathEdge> & edges, std::vector<PathVertex*> & newPoints, std::vector<int> & newPointsIndices, int startIndex, int endIndex, PathVertex * a, PathVertex * b) {
-  //alway use the lowest index for a point that is the path point for multiple edges
-  if (edges[endIndex].right == b || edges[endIndex].left == b) {
+  if (edges[endIndex-1].right == b || edges[endIndex-1].left == b) {
     shortestPathHelper(edges, newPoints, newPointsIndices, startIndex, endIndex-1, a, b);
-    if (newPoints.size()==0 || newPoints[newPoints.size()-1] !=  b) {
-      newPoints.push_back(b);
-      newPointsIndices.push_back(endIndex);
-    }
-    return; 
-  }
-
-  if (edges[startIndex].right == a || edges[startIndex].left == a) {
-    shortestPathHelper(edges, newPoints, newPointsIndices, startIndex+1, endIndex, a, b);
     return;
   }
 
   for (int i=endIndex; i>=startIndex; i--) {
+    if (edges[i].right == b || edges[i].left == b || edges[i].right == a || edges[i].left == a)
+      continue;
+
     if (AreaABC(a->transformed2d, edges[i].right->transformed2d, b->transformed2d) > 0) {
-      shortestPathHelper(edges, newPoints, newPointsIndices, startIndex, i-1, a, edges[i].right);
-      if (newPoints.size()==0 || newPoints[newPoints.size()-1] != edges[i].right) {//avoid duplicate points on the path
-        newPoints.push_back(edges[i].right);
-        newPointsIndices.push_back(i);
-      }
+      shortestPathHelper(edges, newPoints, newPointsIndices, startIndex, i, a, edges[i].right);
       shortestPathHelper(edges, newPoints, newPointsIndices, i+1, endIndex, edges[i].right, b);
       return;
     }
 
     if (AreaABC(a->transformed2d, edges[i].left->transformed2d, b->transformed2d) < 0) {
-      shortestPathHelper(edges, newPoints, newPointsIndices, startIndex, i-1, a, edges[i].left);
-      if (newPoints.size()==0 || newPoints[newPoints.size()-1] != edges[i].left) {//avoid duplicate points on the path
-        newPoints.push_back(edges[i].left);
-        newPointsIndices.push_back(i);
-      }
+      shortestPathHelper(edges, newPoints, newPointsIndices, startIndex, i, a, edges[i].left);
       shortestPathHelper(edges, newPoints, newPointsIndices, i+1, endIndex, edges[i].left, b);
       return;
     }
+  }
+
+  if (edges[endIndex].left == b || edges[endIndex].right == b) {
+    newPoints.push_back(b);
+    newPointsIndices.push_back(endIndex);
   }
 }
 
