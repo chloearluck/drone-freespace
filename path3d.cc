@@ -651,31 +651,9 @@ void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFace
       PathVertex * replacingVertex = vertPath[vertPathPos];
       otherWay(triangles, newPath, startIndex, endIndex, replacingVertex);
 
-      PTR<Transformation> cumulative = triangles[startIndex].cumulative;
-      newPath[0].p[0]->transformed2d = new XYComponents(new TransformedPoint(newPath[0].p[0]->original, cumulative));
-      newPath[0].p[1]->transformed2d = new XYComponents(new TransformedPoint(newPath[0].p[1]->original, cumulative));
-      PTR<Transformation> t = new UnfoldTriangleTransformation(triangles[startIndex].hface, newPath[0].hface);
-      cumulative = new CompositeTransformation(cumulative, t);
-      newPath[0].p[2]->transformed2d = new XYComponents(new TransformedPoint(newPath[0].p[2]->original, cumulative));
-      newPath[0].cumulative = cumulative;
-      for (int j=1; j<newPath.size(); j++) {
-        newPath[j].p[0]->transformed2d = new XYComponents(new TransformedPoint(newPath[j].p[0]->original, cumulative));
-        newPath[j].p[1]->transformed2d = new XYComponents(new TransformedPoint(newPath[j].p[1]->original, cumulative));
-        t = new UnfoldTriangleTransformation(newPath[j-1].hface, newPath[j].hface);
-        cumulative = new CompositeTransformation(cumulative, t);
-        newPath[j].p[2]->transformed2d = new XYComponents(new TransformedPoint(newPath[j].p[2]->original, cumulative));
-        newPath[j].cumulative = cumulative;
-      }
-      //DEBUG:
-      if (iter_num == 4 && i == 44) {
-        std::vector<PathTriangle> tmp;
-        tmp.insert(tmp.begin(), triangles.begin()+startIndex, triangles.begin()+endIndex+1);
-        savePathTriangles(tmp, "oldSubPath.vtk", true);
-        savePathTriangles(tmp, "oldSubPath3d.vtk", false);
-        savePathTriangles(newPath, "newSubPath.vtk", true);
-        savePathTriangles(newPath, "newSubPath3d.vtk", false);
-      }
-      //DEBUG
+      triangles.erase(triangles.begin()+startIndex+1, triangles.begin()+endIndex);
+      triangles.insert(triangles.begin()+startIndex+1, newPath.begin(), newPath.end());
+      endIndex = startIndex + newPath.size() + 1;
 
       //give triangles[endIndex] new PathVertices to match the new intermediate path
       //also replace the one that doesn't match with a new vertex, it may match something earlier in the path
@@ -714,25 +692,8 @@ void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFace
         }
       }
 
-      //re-transform the rest of the triangles or else triangle[endIndex] wont necessarily share a face with the last triangle in newPath
-      triangles[endIndex].p[0]->transformed2d = new XYComponents(new TransformedPoint(triangles[endIndex].p[0]->original, cumulative));
-      triangles[endIndex].p[1]->transformed2d = new XYComponents(new TransformedPoint(triangles[endIndex].p[1]->original, cumulative));
-      t = new UnfoldTriangleTransformation(newPath[newPath.size()-1].hface, triangles[endIndex].hface);
-      cumulative = new CompositeTransformation(cumulative, t);
-      triangles[endIndex].p[2]->transformed2d = new XYComponents(new TransformedPoint(triangles[endIndex].p[2]->original, cumulative));
-      triangles[endIndex].cumulative = cumulative;
-      for (int j=endIndex+1; j<triangles.size(); j++) {
-        triangles[j].p[0]->transformed2d = new XYComponents(new TransformedPoint(triangles[j].p[0]->original, cumulative));
-        triangles[j].p[1]->transformed2d = new XYComponents(new TransformedPoint(triangles[j].p[1]->original, cumulative));
-        t = new UnfoldTriangleTransformation(triangles[j-1].hface, triangles[j].hface);
-        cumulative = new CompositeTransformation(cumulative, t);
-        triangles[j].p[2]->transformed2d = new XYComponents(new TransformedPoint(triangles[j].p[2]->original, cumulative));
-        triangles[j].cumulative = cumulative;
-      }
-      end->transformed2d = new XYComponents(new TransformedPoint(end->original, cumulative));
-
-      triangles.erase(triangles.begin()+startIndex+1, triangles.begin()+endIndex);
-      triangles.insert(triangles.begin()+startIndex+1, newPath.begin(), newPath.end());
+      flattenTriangles2(triangles, startIndex+1);
+      end->transformed2d = new XYComponents(new TransformedPoint(end->original, triangles[triangles.size()-1].cumulative));
 
       std::vector<PathVertex*> oldPath;
       oldPath.insert(oldPath.begin(), vertPath.begin(), vertPath.end());
