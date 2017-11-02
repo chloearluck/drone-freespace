@@ -293,27 +293,6 @@ void savePathTriangles(std::vector<PathTriangle> & ts, const char * filename, bo
   } else { cout<<"could not open file"<<endl; return; }
 }
 
-void flattenTriangles(std::vector<PathTriangle> & triangles, std::vector<PTR<Transformation> > & transformations, PTR<Transformation> xyplane, PathVertex * start, PathVertex * end) {
-  PTR<Transformation> cumulative = xyplane;
-  triangles[0].p[0]->transformed2d = new XYComponents(new TransformedPoint(triangles[0].p[0]->original, cumulative));
-  triangles[0].p[1]->transformed2d = new XYComponents(new TransformedPoint(triangles[0].p[1]->original, cumulative));
-  triangles[0].p[2]->transformed2d = new XYComponents(new TransformedPoint(triangles[0].p[2]->original, cumulative));
-  start->transformed2d = new XYComponents(new TransformedPoint(start->original, cumulative));
-  triangles[0].cumulative = cumulative;
-
-  for (int i=1; i<triangles.size(); i++) {
-    if (triangles[i].p[0]->transformed2d == 0)
-      triangles[i].p[0]->transformed2d = new XYComponents(new TransformedPoint(triangles[i].p[0]->original, cumulative));
-    if (triangles[i].p[1]->transformed2d == 0)
-      triangles[i].p[1]->transformed2d = new XYComponents(new TransformedPoint(triangles[i].p[1]->original, cumulative));
-    
-    cumulative = new CompositeTransformation(cumulative, transformations[i-1]);
-    triangles[i].p[2]->transformed2d = new XYComponents(new TransformedPoint(triangles[i].p[2]->original, cumulative));
-    triangles[i].cumulative = cumulative;
-  }
-  end->transformed2d = new XYComponents(new TransformedPoint(end->original, cumulative));
-}
-
 void flattenTriangles2(std::vector<PathTriangle> & triangles, int n) {
   PTR<Transformation> cumulative = triangles[n-1].cumulative;
   for (int i=n; i<triangles.size(); i++) {
@@ -597,12 +576,17 @@ void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFace
 
     PathTriangle t(prev.p[(uncommon1+1)%3], prev.p[(uncommon1+2)%3], new PathVertex(p[uncommon2]), hf);
     triangles.push_back(t);
-    transformations.push_back(new UnfoldTriangleTransformation(prev.p[uncommon1]->original, t.p[0]->original, t.p[1]->original, t.p[2]->original));  
+    // transformations.push_back(new UnfoldTriangleTransformation(prev.p[uncommon1]->original, t.p[0]->original, t.p[1]->original, t.p[2]->original));  
   } 
   PTR<Transformation> xyplane = new XYPlaneTriangleTransfromation(triangles[0].p[0]->original, triangles[0].p[1]->original, triangles[0].p[2]->original);
+  for (int i=0; i<3; i++)
+    triangles[0].p[i]->transformed2d = new XYComponents(new TransformedPoint(triangles[0].p[i]->original, xyplane));
+  triangles[0].cumulative = xyplane;
   PathVertex * start = new PathVertex((PTR<Point>) a);
+  start->transformed2d = new XYComponents(new TransformedPoint(start->original, xyplane));
+  flattenTriangles2(triangles, 1);
   PathVertex * end = new PathVertex((PTR<Point>) b);
-  flattenTriangles(triangles, transformations, xyplane, start, end);
+  end->transformed2d = new XYComponents(new TransformedPoint(end->original, triangles[triangles.size()-1].cumulative));
 
   std::vector<PathVertex*> vertPath; 
   std::vector<int> vertPathIndices; 
