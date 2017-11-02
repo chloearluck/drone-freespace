@@ -370,6 +370,23 @@ bool hasVertexPoint(HFace * hf, PTR<Point> p) {
   return ((p0 == p) || (p1 == p) || (p2 == p));
 }
 
+void path2Dto3D(std::vector<PathVertex*> &vertPath, std::vector<int> &vertPathIndices, std::vector<PathEdge> &edges,  Points &path) {
+  path.push_back(vertPath[0]->original);
+  int j = 1;
+  for (int i=0; i<edges.size(); i++) {
+    assert(j < vertPath.size());
+    if (vertPathIndices[j] == i) {
+      path.push_back(vertPath[j]->original);
+      j++;
+    } else {
+      if (vertPath[j-1] != edges[i].left && vertPath[j-1] != edges[i].right)
+        path.push_back(new ABintersectCDto3D(edges[i].left, edges[i].right, vertPath[j-1], vertPath[j]));
+        // /*DEBUG*/ cout<<"edge "<<i<<endl;
+        /*DEBUG*/ path[path.size()-1]->getApprox();
+    }
+  }
+}
+
 //DEBUG
 class State {
  public:
