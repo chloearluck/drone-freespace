@@ -524,6 +524,9 @@ void otherWay(vector<PathTriangle> & oldPath, vector<PathTriangle> & newPath, in
   hfaceStart->neighbors(neighbors);
   assert(neighbors.size() == 3);
   
+  if (endIndex != startIndex+1 && (neighbors[0] == oldPath[endIndex].hface || neighbors[1] == oldPath[endIndex].hface || neighbors[2] == oldPath[endIndex].hface))
+    return;
+
   for (int i=0; i< neighbors.size(); i++)
     if (neighbors[i] != oldPath[startIndex-1].hface && neighbors[i] != oldPath[startIndex+1].hface && hasVertexPoint(neighbors[i],pv->original))
       nextHF = neighbors[i];
@@ -646,13 +649,13 @@ void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFace
       for (int j=0; j<3; j++) {
         int matchingIndex = -1;
         for (int k=0; k<3; k++)
-          if (triangles[endIndex].p[j]->original == newPath[newPath.size()-1].p[k]->original)
+          if (triangles[endIndex].p[j]->original == triangles[endIndex-1].p[k]->original)
             matchingIndex = k;
         if (matchingIndex == -1) {
           uncommon = j;
           triangles[endIndex].p[j] = new PathVertex(triangles[endIndex].p[j]->original);
         } else {
-          triangles[endIndex].p[j] = newPath[newPath.size()-1].p[matchingIndex];
+          triangles[endIndex].p[j] = triangles[endIndex-1].p[matchingIndex];
           commonCount++;
         }
       }
