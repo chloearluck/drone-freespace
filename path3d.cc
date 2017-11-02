@@ -314,6 +314,21 @@ void flattenTriangles(std::vector<PathTriangle> & triangles, std::vector<PTR<Tra
   end->transformed2d = new XYComponents(new TransformedPoint(end->original, cumulative));
 }
 
+void flattenTriangles2(std::vector<PathTriangle> & triangles, int n) {
+  PTR<Transformation> cumulative = triangles[n-1].cumulative;
+  for (int i=n; i<triangles.size(); i++) {
+    if (triangles[i].p[0]->transformed2d == 0)
+      triangles[i].p[0]->transformed2d = new XYComponents(new TransformedPoint(triangles[i].p[0]->original, cumulative));
+    if (triangles[i].p[1]->transformed2d == 0)
+      triangles[i].p[1]->transformed2d = new XYComponents(new TransformedPoint(triangles[i].p[1]->original, cumulative));
+    t = new UnfoldTriangleTransformation(triangles[i-1].hface, triangles[i].hface);
+
+    cumulative = new CompositeTransformation(cumulative, transformations[i-1]);
+    triangles[i].p[2]->transformed2d = new XYComponents(new TransformedPoint(triangles[i].p[2]->original, cumulative));
+    triangles[i].cumulative = cumulative;
+  }
+}
+
 Edge * commonEdge(HFace * hf1, HFace * hf2) {
   Face * f1 = hf1->getF();
   Face * f2 = hf2->getF();
