@@ -369,80 +369,36 @@ void path2Dto3D(std::vector<PathVertex*> &vertPath, std::vector<int> &vertPathIn
 //DEBUG
 class State {
  public:
-  std::vector<PathTriangle> triangles;
-  std::vector<PathVertex*> path;
-  State(std::vector<PathTriangle> & ts, std::vector<PathVertex*> & p, int n) {
-    triangles.insert(triangles.begin(), ts.begin(), ts.begin() + n);
-    path.insert(path.begin(), p.begin(), p.end());
-  }
-  void save(const char * filename) {
-    ofstream ostr;
-    ostr.open(filename);
-    if (ostr.is_open()) {
-      ostr << setprecision(20) << triangles.size()<<" 0"<<endl;
-      for (int i=0; i<triangles.size(); i++) 
-        for (int j=0; j<3; j++) 
-          ostr<<triangles[i].p[j]->transformed2d->getApprox(1e-16).getX().mid()<<" "<<triangles[i].p[j]->transformed2d->getApprox(1e-16).getY().mid()<<endl;
-      // ostr<<endl;
-      for (int i=0; i<path.size(); i++)
-        ostr<<path[i]->transformed2d->getApprox(1e-16).getX().mid()<<" "<<path[i]->transformed2d->getApprox(1e-16).getY().mid()<<endl;
-      ostr.close();
-    }
-  }
-};
-class State2 {
- public:
   std::vector<PathEdge> edges;
-  std::vector<PathVertex*> path;
-  State2(std::vector<PathEdge> & es, std::vector<PathVertex*> & p, int n) {
-    edges.insert(edges.begin(), es.begin(), es.begin() + n);
-    path.insert(path.begin(), p.begin(), p.end());
+  std::vector<PathVertex*> left;
+  std::vector<PathVertex*> right;
+  int nPath;
+  State3(std::vector<PathEdge> & e, int nedges, std::vector<PathVertex*> & l, std::vector<PathVertex*> r, int n) {
+    edges.insert(edges.begin(), e.begin(), e.begin()+nedges);
+    right.insert(right.begin(), r.begin(), r.end());
+    left.insert(left.begin(), l.begin(), l.end());
+    nPath = n;
   }
   void save(const char * filename) {
     ofstream ostr;
     ostr.open(filename);
     if (ostr.is_open()) {
-      ostr << setprecision(20)<< edges.size()<<" 0"<<endl;
+      ostr << setprecision(20)<< edges.size()<<" "<<nPath<<endl;
+      ostr << left.size()<<" "<<right.size()<<endl;
       for (int i=0; i<edges.size(); i++) {
         ostr<<edges[i].left->transformed2d->getApprox(1e-16).getX().mid()<<" "<<edges[i].left->transformed2d->getApprox(1e-16).getY().mid()<<endl;
         ostr<<edges[i].right->transformed2d->getApprox(1e-16).getX().mid()<<" "<<edges[i].right->transformed2d->getApprox(1e-16).getY().mid()<<endl;
-      }  
-      for (int i=0; i<path.size(); i++)
-        ostr<<path[i]->transformed2d->getApprox(1e-16).getX().mid()<<" "<<path[i]->transformed2d->getApprox(1e-16).getY().mid()<<endl;
+      }
+      for (int i=0; i<left.size(); i++)
+        ostr<<left[i]->transformed2d->getApprox(1e-16).getX().mid()<<" "<<left[i]->transformed2d->getApprox(1e-16).getY().mid()<<endl;
+      for (int i=0; i<right.size(); i++)
+        ostr<<right[i]->transformed2d->getApprox(1e-16).getX().mid()<<" "<<right[i]->transformed2d->getApprox(1e-16).getY().mid()<<endl;
       ostr.close();
-    }
+    } else { cout<<"could not open file"<<endl; }
   }
 };
 //DEBUG
 
-void shortestPathHelper(std::vector<PathEdge> & edges, std::vector<PathVertex*> & newPoints, std::vector<int> & newPointsIndices, int startIndex, int endIndex, PathVertex * a, PathVertex * b) {
-  if (edges[endIndex-1].right == b || edges[endIndex-1].left == b) {
-    shortestPathHelper(edges, newPoints, newPointsIndices, startIndex, endIndex-1, a, b);
-    return;
-  }
-
-  for (int i=endIndex; i>=startIndex; i--) {
-    if (edges[i].right == b || edges[i].left == b || edges[i].right == a || edges[i].left == a)
-      continue;
-
-    if (AreaABC(a->transformed2d, edges[i].right->transformed2d, b->transformed2d) > 0) {
-      shortestPathHelper(edges, newPoints, newPointsIndices, startIndex, i, a, edges[i].right);
-      shortestPathHelper(edges, newPoints, newPointsIndices, i+1, endIndex, edges[i].right, b);
-      return;
-    }
-
-    if (AreaABC(a->transformed2d, edges[i].left->transformed2d, b->transformed2d) < 0) {
-      shortestPathHelper(edges, newPoints, newPointsIndices, startIndex, i, a, edges[i].left);
-      shortestPathHelper(edges, newPoints, newPointsIndices, i+1, endIndex, edges[i].left, b);
-      return;
-    }
-  }
-
-  if (edges[endIndex].left == b || edges[endIndex].right == b) {
-    newPoints.push_back(b);
-    newPointsIndices.push_back(endIndex);
-  }
-}
 
 void shortestPath(std::vector<PathTriangle> & triangles, PathVertex * start, PathVertex * end, std::vector<PathVertex*> & left, std::vector<int> & leftIndices, std::vector<PathEdge> & edges) {
   for (int i=0; i<triangles.size()-1; i++) {
@@ -452,67 +408,59 @@ void shortestPath(std::vector<PathTriangle> & triangles, PathVertex * start, Pat
     for (int j=0; j<3; j++)
       if (triangles[i].p[j] != p && triangles[i].p[j] != q)
         from = triangles[i].p[j];
-    PathVertex * l = ((AreaABC(from->transformed2d, p->transformed2d, q->transformed2d) > 0)? p : q);
+    PathVertex * l = ((AreaABC(from->transformed2d, p->transformed2d, q->transformed2d) > 0)? q : p);
     PathVertex * r = ((l != p)? p : q);
     edges.push_back(PathEdge(l, r)); 
   }
   edges.push_back(PathEdge(end, end));
 
-  int state_num = 0;
-  char s[50];
+  std::vector<PathVertex*> right;
+  std::vector<int> rightIndices;
+  left.push_back(start); leftIndices.push_back(-1);
+  right.push_back(start); rightIndices.push_back(-1);
 
-  left.push_back(start);
-  leftIndices.push_back(-1);
-  for (int i=0; i<edges.size(); i++) {
-    //DEBUG
-    int n = i+2; if (i == triangles.size()-1) n = i+1;
-    sprintf(s, "state/%d.txt", state_num);
-    State(triangles, left, i+1).save(s);
-    sprintf(s, "state/edge%d.txt", state_num);
-    State2(edges, left, i+1).save(s); 
-    state_num++;
-    //-----
+  left.push_back(edges[0].left); leftIndices.push_back(0);
+  right.push_back(edges[0].right); rightIndices.push_back(0);
+  char s[50]; int state_num = 0;
 
-    if (left[left.size()-1] == edges[i].left)
-      continue;
+  int nPath = 1; //left[0] and right[0] are the same, the rest of the path isn't
+  for (int i=1; i<edges.size(); i++) {
+    if (right[right.size()-1] != edges[i].right) {
+      while(right.size()>nPath && AreaABC(right[right.size()-2]->transformed2d, right[right.size()-1]->transformed2d, edges[i].right->transformed2d) > 0)
+      {  right.pop_back(); rightIndices.pop_back();  }
 
-    int bound;
-    if (left.size() > 1)  {
-      bound = left.size()-1;
-      while ((bound > 0) && (left[bound] != edges[leftIndices[bound]].right) && (AreaABC(left[bound-1]->transformed2d, left[bound]->transformed2d, edges[i].left->transformed2d) > 0) )
-        bound--;
+      if (right.size() == nPath) {
+        while (left.size()>nPath && AreaABC(right[right.size()-1]->transformed2d, edges[i].right->transformed2d, left[nPath]->transformed2d) < 0) {
+          right.push_back(left[nPath]);
+          rightIndices.push_back(leftIndices[nPath]);
+          nPath++;
+        }
+      }
+      right.push_back(edges[i].right);
+      rightIndices.push_back(i);
+
+      sprintf(s, "state/%d.txt", state_num++);
+      State(edges, i+1, left, right, nPath).save(s);
     }
 
-    if (left.size() > 1 && bound < left.size()-1) {
-      std::vector<PathVertex *> newPoints;
-      std::vector<int> newPointsIndices;
-      shortestPathHelper(edges, newPoints, newPointsIndices, leftIndices[bound]+1, i, left[bound], edges[i].left);
-      //remove all elements of left after bound;
-      left.erase(left.begin()+bound+1, left.end());
-      leftIndices.erase(leftIndices.begin()+bound+1, leftIndices.end());
-      //replace them with newPoints
-      left.insert(left.end(), newPoints.begin(), newPoints.end());
-      leftIndices.insert(leftIndices.end(), newPointsIndices.begin(), newPointsIndices.end());
-    } else {
+    if (left[left.size()-1] != edges[i].left) {
+      while(left.size()>nPath && AreaABC(left[left.size()-2]->transformed2d, left[left.size()-1]->transformed2d, edges[i].left->transformed2d) < 0)
+      {  left.pop_back(); leftIndices.pop_back();  }
+
+      if (left.size() == nPath) {
+        while (right.size() > nPath && AreaABC(left[left.size()-1]->transformed2d, edges[i].left->transformed2d, right[nPath]->transformed2d) > 0) {
+          left.push_back(right[nPath]);
+          leftIndices.push_back(rightIndices[nPath]);
+          nPath++;
+        }
+      }
       left.push_back(edges[i].left);
       leftIndices.push_back(i);
+
+      sprintf(s, "state/%d.txt", state_num++);
+      State(edges, i+1, left, right, nPath).save(s);
     }
   }
-
-  //DEBUG
-  sprintf(s, "state/%d.txt", state_num);
-  State(triangles, left, triangles.size()).save(s);
-  sprintf(s, "state/edge%d.txt", state_num);
-  State2(edges, left, edges.size()).save(s); 
-  state_num++;
-  //-----
-
-  assert(leftIndices[leftIndices.size()-1] == edges.size()-1);
-  //DEBUG: make sure indices are increasing
-      for (int j=1; j<leftIndices.size(); j++)
-        if (leftIndices[j-1] >= leftIndices[j]) {
-          cout<<j<<endl; assert(false);
-        }
 }
 
 //populate newPath with a sequence of PathTriangles from oldPath[startIndex] to oldPathpendIndex] with goes
