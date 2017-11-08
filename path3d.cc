@@ -1,6 +1,7 @@
 #include "path3d.h"
 
 const bool DEBUG = false;
+const bool VERBOSE = true;
 
 void save(Points path, const char * filename) {
   ofstream ostr;
@@ -364,8 +365,7 @@ void path2Dto3D(std::vector<PathVertex*> &vertPath, std::vector<int> &vertPathIn
     } else {
       if (vertPath[j-1] != edges[i].left && vertPath[j-1] != edges[i].right)
         path.push_back(new ABintersectCDto3D(edges[i].left, edges[i].right, vertPath[j-1], vertPath[j]));
-        // /*DEBUG*/ cout<<"edge "<<i<<endl;
-        /*DEBUG*/ path[path.size()-1]->getApprox();
+        path[path.size()-1]->getApprox();
     }
   }
 }
@@ -563,15 +563,9 @@ void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFace
   do {
     iter_num++;
     changedThisIteration = false;
-    cout<<"new iteration------------------ "<<iter_num<<endl;
+    if (VERBOSE) cout<<"new iteration------------------ "<<iter_num<<endl;
     for (int i=1; i<triangles.size(); i++) {
       
-      //DEBUG: make sure indices are increasing
-      for (int j=1; j<vertPathIndices.size(); j++)
-        if (vertPathIndices[j-1] >= vertPathIndices[j]) {
-          cout<<j<<endl; assert(false);
-        }
-
       if (vertPathIndices[vertPathIndices.size()-2] < i)
         continue;
       int vertPathPos;
@@ -589,7 +583,7 @@ void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFace
         endIndex++;
 
       std:vector<PathTriangle> newPath;
-      cout<<"startIndex: "<<startIndex<<" endIndex: "<<endIndex<<endl;
+      if (VERBOSE) cout<<"startIndex: "<<startIndex<<" endIndex: "<<endIndex<<endl;
 
       PathVertex * replacingVertex = vertPath[vertPathPos];
       otherWay(triangles, newPath, startIndex, endIndex, replacingVertex);
@@ -674,7 +668,7 @@ void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFace
             pathChanged = true;
       changedThisIteration = changedThisIteration || pathChanged;
 
-      if (!pathChanged)
+      if (!pathChanged && VERBOSE)
         cout<<"no change"<<endl;
 
       if (DEBUG && pathChanged) {
@@ -766,7 +760,7 @@ void findPath(Polyhedron * blockspace, PTR<Point> start, PTR<Point> end, Points 
     }
   }
   
-  cout<<"intersections: "<<points.size()<<endl;
+  if (VERBOSE) cout<<"intersections: "<<points.size()<<endl;
   assert(points.size() % 2 == 0);
 
   std::sort(points.begin(), points.end(), ComparePointOrder(r));
