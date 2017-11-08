@@ -1,5 +1,7 @@
 #include "path3d.h"
 
+const bool DEBUG = false;
+
 void save(Points path, const char * filename) {
   ofstream ostr;
   ostr.open(filename);
@@ -375,7 +377,7 @@ class State {
   std::vector<PathVertex*> left;
   std::vector<PathVertex*> right;
   int nPath;
-  State3(std::vector<PathEdge> & e, int nedges, std::vector<PathVertex*> & l, std::vector<PathVertex*> r, int n) {
+  State(std::vector<PathEdge> & e, int nedges, std::vector<PathVertex*> & l, std::vector<PathVertex*> r, int n) {
     edges.insert(edges.begin(), e.begin(), e.begin()+nedges);
     right.insert(right.begin(), r.begin(), r.end());
     left.insert(left.begin(), l.begin(), l.end());
@@ -441,8 +443,10 @@ void shortestPath(std::vector<PathTriangle> & triangles, PathVertex * start, Pat
       right.push_back(edges[i].right);
       rightIndices.push_back(i);
 
-      sprintf(s, "state/%d.txt", state_num++);
-      State(edges, i+1, left, right, nPath).save(s);
+      if (DEBUG) {
+        sprintf(s, "state/%d.txt", state_num++);
+        State(edges, i+1, left, right, nPath).save(s);
+      }
     }
 
     if (left[left.size()-1] != edges[i].left) {
@@ -459,8 +463,10 @@ void shortestPath(std::vector<PathTriangle> & triangles, PathVertex * start, Pat
       left.push_back(edges[i].left);
       leftIndices.push_back(i);
 
-      sprintf(s, "state/%d.txt", state_num++);
-      State(edges, i+1, left, right, nPath).save(s);
+      if (DEBUG) {
+        sprintf(s, "state/%d.txt", state_num++);
+        State(edges, i+1, left, right, nPath).save(s);
+      }
     }
   }
 }
@@ -588,6 +594,15 @@ void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFace
       PathVertex * replacingVertex = vertPath[vertPathPos];
       otherWay(triangles, newPath, startIndex, endIndex, replacingVertex);
 
+      if (DEBUG) {
+        std::vector<PathTriangle> tmp;
+        tmp.insert(tmp.begin(), triangles.begin()+startIndex, triangles.begin()+endIndex+1);
+        sprintf(s, "old%d-%02d-2d.vtk", iter_num, i);
+        savePathTriangles(tmp, s, true);
+        sprintf(s, "old%d-%02d.vtk", iter_num, i);
+        savePathTriangles(tmp, s, false);
+      }
+
       triangles.erase(triangles.begin()+startIndex+1, triangles.begin()+endIndex);
       triangles.insert(triangles.begin()+startIndex+1, newPath.begin(), newPath.end());
       endIndex = startIndex + newPath.size() + 1;
@@ -632,6 +647,15 @@ void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFace
       flattenTriangles2(triangles, startIndex+1);
       end->transformed2d = new XYComponents(new TransformedPoint(end->original, triangles[triangles.size()-1].cumulative));
 
+      if (DEBUG) {
+        std::vector<PathTriangle> tmp;
+        tmp.insert(tmp.begin(), triangles.begin()+startIndex, triangles.begin()+endIndex+1);
+        sprintf(s, "new%d-%02d-2d.vtk", iter_num, i);
+        savePathTriangles(tmp, s, true);
+        sprintf(s, "new%d-%02d.vtk", iter_num, i);
+        savePathTriangles(tmp, s, false);
+      }
+
       std::vector<PathVertex*> oldPath;
       oldPath.insert(oldPath.begin(), vertPath.begin(), vertPath.end());
 
@@ -640,20 +664,7 @@ void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFace
       edges.clear();
 
       shortestPath(triangles, start, end, vertPath, vertPathIndices, edges);
-      //DEBUG: make sure indices are increasing
-      for (int j=1; j<vertPathIndices.size(); j++)
-        if (vertPathIndices[j-1] >= vertPathIndices[j]) {
-          cout<<j<<endl; assert(false);
-        }
 
-      // // //check if the path has changed
-      // // int j = find(candidatesToSwap.begin(), candidatesToSwap.end(), startIndex) - candidatesToSwap.begin();
-      // // if (j % 2  == 1) j++;
-      // // if (j >= candidatesToSwap.size() || candidatesToSwap[j] != startIndex)
-      // if (vertPath[vertPathPos] != replacingVertex)
-      //   changedThisIteration = true;
-      // else
-      //   cout<<"no change"<<endl;
       bool pathChanged = false;
       if (oldPath.size() != vertPath.size())
         pathChanged = true;
@@ -666,16 +677,15 @@ void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFace
       if (!pathChanged)
         cout<<"no change"<<endl;
 
-      if (pathChanged) {
-        //DEBUG save path
+      if (DEBUG && pathChanged) {
         path.clear();
         path2Dto3D(vertPath, vertPathIndices, edges, path);
         sprintf(s, "path%d-%02d.vtk", iter_num, i);
         save(path, s);
-        //DEBUG
+        sprintf(s, "pivot%d-%02d.vtk", iter_num, i);
+        savePivots(path, s);
       }
 
-      //i += newPath.size();
     }
   } while(changedThisIteration);
 
