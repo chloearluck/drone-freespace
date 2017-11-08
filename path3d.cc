@@ -230,6 +230,8 @@ class ABintersectCDto3D : public Point {
     PV3 q3d = vq->original->getP();
 
     Parameter t = -((p-c).cross(d-c)) / ((q-p).cross(d-c));
+    assert(t>0);
+    assert(t<1);
     return p3d + t *(q3d-p3d);
   }
 };
@@ -555,7 +557,7 @@ void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFace
   do {
     iter_num++;
     changedThisIteration = false;
-    cout<<"new iteration------------------"<<endl;
+    cout<<"new iteration------------------ "<<iter_num<<endl;
     for (int i=1; i<triangles.size(); i++) {
       
       //DEBUG: make sure indices are increasing
