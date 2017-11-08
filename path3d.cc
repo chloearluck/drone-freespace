@@ -298,7 +298,7 @@ void savePathTriangles(std::vector<PathTriangle> & ts, const char * filename, bo
   } else { cout<<"could not open file"<<endl; return; }
 }
 
-void flattenTriangles2(std::vector<PathTriangle> & triangles, int n) {
+void flattenTriangles(std::vector<PathTriangle> & triangles, int n) {
   PTR<Transformation> cumulative = triangles[n-1].cumulative;
   for (int i=n; i<triangles.size(); i++) {
     if (triangles[i].p[0]->transformed2d == 0)
@@ -543,7 +543,7 @@ void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFace
   triangles[0].cumulative = xyplane;
   PathVertex * start = new PathVertex((PTR<Point>) a);
   start->transformed2d = new XYComponents(new TransformedPoint(start->original, xyplane));
-  flattenTriangles2(triangles, 1);
+  flattenTriangles(triangles, 1);
   PathVertex * end = new PathVertex((PTR<Point>) b);
   end->transformed2d = new XYComponents(new TransformedPoint(end->original, triangles[triangles.size()-1].cumulative));
 
@@ -638,7 +638,7 @@ void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFace
         }
       }
 
-      flattenTriangles2(triangles, startIndex+1);
+      flattenTriangles(triangles, startIndex+1);
       end->transformed2d = new XYComponents(new TransformedPoint(end->original, triangles[triangles.size()-1].cumulative));
 
       if (DEBUG) {
