@@ -313,20 +313,6 @@ void flattenTriangles(std::vector<PathTriangle> & triangles, int n) {
   }
 }
 
-Edge * commonEdge(HFace * hf1, HFace * hf2) {
-  Face * f1 = hf1->getF();
-  Face * f2 = hf2->getF();
-  HEdge * start_edge = f1->getBoundary(0);
-  HEdge * curr_edge = start_edge;
-  HEdge * common_edge = NULL;
-  do {
-    if (curr_edge->getE()->otherFace(f1) == f2) 
-      return curr_edge->getE();
-    curr_edge = curr_edge->getNext();
-  } while (curr_edge != start_edge);
-  return NULL;
-}
-
 void commonEdge(PathTriangle t1, PathTriangle t2, PathVertex *& p, PathVertex *& q) {
   int uncommon = -1;
   int commonCount = 0;
@@ -370,7 +356,6 @@ void path2Dto3D(std::vector<PathVertex*> &vertPath, std::vector<int> &vertPathIn
   }
 }
 
-//DEBUG
 class State {
  public:
   std::vector<PathEdge> edges;
@@ -401,8 +386,6 @@ class State {
     } else { cout<<"could not open file"<<endl; }
   }
 };
-//DEBUG
-
 
 void shortestPath(std::vector<PathTriangle> & triangles, PathVertex * start, PathVertex * end, std::vector<PathVertex*> & left, std::vector<int> & leftIndices, std::vector<PathEdge> & edges) {
   for (int i=0; i<triangles.size()-1; i++) {
