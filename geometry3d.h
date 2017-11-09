@@ -70,6 +70,14 @@ public:
   RotationPoint(PTR<Point> point, PTR<Point> sin_cos_alpha) : point(point), sin_cos_alpha(sin_cos_alpha) {}
 };
 
+class ScalePoint : public Point {
+  PTR<Point> p;
+  PTR<Object<Parameter> > unit;
+  PV3 calculate () { return unit->get() * p->getP(); }
+ public:
+  ScalePoint(PTR<Point> p, PTR<Object<Parameter> > unit) : p(p), unit(unit) {}
+};
+
 //point defined by the intersection of point1 and point2's tangent lines in the xy plane
 class TangentIntersectionPoint : public Point {
   PTR<Point> point, sin_cos_alpha;
