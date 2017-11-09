@@ -1,11 +1,12 @@
 #include "path3d.h"
+#include "mink.h"
 #include "io.h"
 
 Polyhedron * loadPoly(const char * filename);
 
 class FreeSpaceGraph {
  public: 
-  std::vector<Polyhedron*> blockspaces;
+  std::vector<std::vector<Polyhedron*> > blockspaces;
   Polyhedron * unit_ball;
   double theta;
 
@@ -14,9 +15,9 @@ class FreeSpaceGraph {
     int level;
     int blockspace_index;
     int cell_index;
-    Node * parent; //component of the previous level which contains this component
-    std::vector<Node*> children; //components of the next level which are contained in this component
-    std::vector<Node*> neighbors; //components of neighboring angles which intersect this component
+    Node * parent;  
+    std::vector<Node*> children; 
+    std::vector<Node*> neighbors; 
     Node(int level, int blockspace_index, int cell_index, Node * parent) 
      : level(level), blockspace_index(blockspace_index), cell_index(cell_index), parent(parent) {}
   };
@@ -35,9 +36,7 @@ class FreeSpaceGraph {
   };
 
   std::vector<std::vector<BlockSpaceNode *> > graph;
-  // graph[level][blockspace_index]
-  // graph[level][blockspace_index]->get(cell_index)
 
-  FreeSpaceGraph(std::vector<Polyhedron*> & blockspaces, double theta, double clearance_unit, int num_levels);
+  FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, double theta, double clearance_unit, int num_levels);
 };
 
