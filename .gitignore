@@ -2,6 +2,7 @@
 test_mink
 freespace_test
 path3d_test
+freespace-graph_test
 .DS_Store
 *out.vtk
 *.lp
