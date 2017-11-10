@@ -6,7 +6,6 @@ Polyhedron * loadPoly(const char * filename);
 
 class FreeSpaceGraph {
  public: 
-  std::vector<std::vector<Polyhedron*> > blockspaces;
   Polyhedron * unit_ball;
   double theta;
 
