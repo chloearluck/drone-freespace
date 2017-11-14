@@ -17,6 +17,8 @@ class FreeSpaceGraph {
     Node * parent;  
     std::vector<Node*> children; 
     std::vector<Node*> neighbors; 
+    std::vector<Node*> siblings;
+    std::vector< pair< PTR<Point>, PTR<Point> > > siblingPoints;
     Node(int level, int blockspace_index, int cell_index, Node * parent) 
      : level(level), blockspace_index(blockspace_index), cell_index(cell_index), parent(parent) {}
   };

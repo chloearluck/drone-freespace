@@ -44,6 +44,57 @@ PTR<Point> pointInCell(Polyhedron * poly, int i) {
   return p;
 }
 
+pair <PTR<Point>, PTR<Point> > nearestPointPair(Polyhedron * poly, int i, int j) {
+  PTR<Point> a = NULL;
+  PTR<Point> b = NULL;
+
+  //populate HFace lists
+  HFaces hfs1, hfs2;
+  for (int k=0; k<poly->cells[i]->nShells(); k++) {
+    Shell * s = poly->cells[i]->getShell(k);
+    HFaces hfs = s->getHFaces();
+    hfs1.insert(hfs1.end(), hfs.begin(), hfs.end());
+  }
+  for (int k=0; k<poly->cells[j]->nShells(); k++) {
+    Shell * s = poly->cells[j]->getShell(k);
+    HFaces hfs = s->getHFaces();
+    hfs2.insert(hfs2.end(), hfs.begin(), hfs.end());
+  }
+
+  //populate vertex lists
+  Vertices v1, v2;
+  for (int k=0; k<hfs1.size(); k++) {
+    HEdge * heFirst = hfs1[k]->getF()->getBoundary(0);
+    HEdge * he = heFirst;
+    v1.push_back(he->tail());
+    do {
+      if (std::find(v1.begin(), v1.end(), he->tail()) == v1.end())
+        v1.push_back(he->tail());
+      he = he->getNext();
+    } while (he != heFirst);
+  }
+  for (int k=0; k<hfs2.size(); k++) {
+    HEdge * heFirst = hfs2[k]->getF()->getBoundary(0);
+    HEdge * he = heFirst;
+    v2.push_back(he->tail());
+    do {
+      if (std::find(v2.begin(), v2.end(), he->tail()) == v2.end())
+        v2.push_back(he->tail());
+      he = he->getNext();
+    } while (he != heFirst);
+  }
+
+  //find closest pair
+  for (int k=0; k<v1.size(); k++)
+    for (int l=0; l<v2.size(); l++)
+      if (a == NULL || CloserPair(v1[k]->getP(), v2[l]->getP(), a, b) > 0) {
+        a = v1[k]->getP();
+        b = v2[l]->getP();
+      }
+
+  return std::make_pair(a,b);
+}
+
 FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, double theta, double clearance_unit, int num_levels) {
   //read in the unit sphere and scale it by unit
   unit_ball = loadPoly("sphere.vtk");
@@ -113,5 +164,25 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, 
         }
       delete block_union;  
     }
+
+    cout<<"finding siblings"<<endl;
+    if (level > 0) {
+      for (int i=0; i<blockspaces.size(); i++) 
+        for (int j=0; j<graph[level-1][i]->nodes.size(); j++) {
+          FreeSpaceGraph::Node * parent = graph[level-1][i]->nodes[j];
+          if (parent->children.size() > 1)
+            for (int c1 = 0; c1 < parent->children.size()-1; c1++)
+              for (int c2 = c1+1; c2 < parent->children.size(); c2++) {
+                FreeSpaceGraph::Node * child1 = parent->children[c1];
+                FreeSpaceGraph::Node * child2 = parent->children[c2];
+                child1->siblings.push_back(child2);
+                child2->siblings.push_back(child1);
+                std::pair< PTR<Point>, PTR<Point> > ab = nearestPointPair(blockspaces[i], child1->cell_index, child2->cell_index);
+                child1->siblingPoints.push_back(ab);
+                child2->siblingPoints.push_back(std::make_pair(ab.second,ab.first));
+              }
+        }
+    }
   }
+
 }
