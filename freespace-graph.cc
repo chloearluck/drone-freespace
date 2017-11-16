@@ -95,22 +95,28 @@ pair <PTR<Point>, PTR<Point> > nearestPointPair(Polyhedron * poly, int i, int j)
   return std::make_pair(a,b);
 }
 
-FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, double theta, double clearance_unit, int num_levels) {
+FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, double theta, double clearance_unit, int num_levels, const char * dir) {
   //read in the unit sphere and scale it by unit
-  unit_ball = loadPoly("sphere.vtk");
+  Polyhedron * unit_ball = loadPoly("sphere.vtk");
   PTR<Object<Parameter> > unit =  new InputParameter(clearance_unit);
   scale(unit_ball, unit);
 
   this->theta = theta;
+  this->num_levels = num_levels;
+  this->blockspaces_per_level = original_blockspaces.size();
   std::vector<Polyhedron*> blockspaces;
   blockspaces.insert(blockspaces.begin(), original_blockspaces.begin(), original_blockspaces.end());
+
+  //create directory
+  if (mkdir(dir, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) == -1 && errno != EEXIST)
+    cout<<"could not create directry"<<endl;
 
   //initialize the graph
   for(int i=0; i<num_levels; i++) 
     graph.push_back(std::vector<BlockSpaceNode*>());
-  for (int i=0; i<num_levels; i++) 
+  for (int i=0; i<num_levels; i++) //TO DO: save blockspaces and block unions to file
     for (int j=0; j< blockspaces.size(); j++)
-      graph[i].push_back(new FreeSpaceGraph::BlockSpaceNode(blockspaces[j]));
+      graph[i].push_back(new FreeSpaceGraph::BlockSpaceNode(i, j));
 
   std::vector<Polyhedron*> prev_blockspaces;
   for (int level = 0; level<num_levels; level++) {
@@ -159,8 +165,8 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, 
           PTR<Point> p = pointInCell(block_union, k);
           int ci = blockspaces[i]->containingCell(p);
           int cj = blockspaces[j]->containingCell(p);
-          graph[level][i]->get(ci)->neighbors.push_back(graph[0][j]->get(cj));
-          graph[level][j]->get(cj)->neighbors.push_back(graph[0][i]->get(ci));
+          graph[level][i]->get(ci)->neighbors.push_back(graph[level][j]->get(cj));
+          graph[level][j]->get(cj)->neighbors.push_back(graph[level][i]->get(ci));
         }
       delete block_union;  
     }
@@ -185,4 +191,109 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, 
     }
   }
 
+  delete unit_ball;
+
+  cout<<"saving"<<endl;
+
+  std::string s(dir);
+  s.append("/graph.txt");
+  ofstream out;
+  out.open(s.c_str());
+  out << num_levels << " " << blockspaces_per_level << " " << theta << " " << clearance_unit <<endl;
+  if (out.is_open()) {
+    for (int i=0; i<num_levels; i++)
+      for (int j=0; j<blockspaces_per_level; j++)
+        for (int k=0; k<graph[i][j]->nodes.size(); k++) {
+          FreeSpaceGraph::Node * node = graph[i][j]->nodes[k];
+          out << node->level << " " << node->blockspace_index << " " << node->cell_index << ",";
+          if (node->parent != NULL) out << " " << node->parent->level << " " << node->parent->blockspace_index << " " << node->parent->cell_index << ",";
+          else out << " NULL,";
+          for (int l=0; l<node->children.size(); l++)
+            out<< " " << node->children[l]->level << " " << node->children[l]->blockspace_index << " " << node->children[l]->cell_index;
+          out<<",";
+          for (int l=0; l<node->neighbors.size(); l++)
+            out<< " " << node->neighbors[l]->level << " " << node->neighbors[l]->blockspace_index << " " << node->neighbors[l]->cell_index;
+          if (node->siblings.size()>0) {
+          out<<",";
+            for (int l=0; l<node->siblings.size(); l++)
+              out<< " " << node->siblings[l]->level << " " << node->siblings[l]->blockspace_index << " " << node->siblings[l]->cell_index;
+            out<<",";
+            for (int l=0; l<node->siblingPoints.size(); l++)
+              out << " " << node->siblingPoints[l].first->getApprox().getX().mid()
+                  << " " << node->siblingPoints[l].first->getApprox().getY().mid()
+                  << " " << node->siblingPoints[l].first->getApprox().getZ().mid()
+                  << " " << node->siblingPoints[l].second->getApprox().getX().mid()
+                  << " " << node->siblingPoints[l].second->getApprox().getY().mid()
+                  << " " << node->siblingPoints[l].second->getApprox().getZ().mid();
+          }
+          out<<endl;
+        }
+    out.close();
+  }
+}
+FreeSpaceGraph::FreeSpaceGraph(const char * dir) {
+  std::string s(dir);
+  s.append("/graph.txt");
+  ifstream infile (s.c_str());
+  double clearance_unit;
+  if (infile.is_open()) {
+    infile >> num_levels >> blockspaces_per_level >> theta >> clearance_unit;
+
+    //initialize graph
+    for(int i=0; i<num_levels; i++) 
+      graph.push_back(std::vector<BlockSpaceNode*>());
+    for (int i=0; i<num_levels; i++)
+      for (int j=0; j< blockspaces_per_level; j++)
+        graph[i].push_back(new FreeSpaceGraph::BlockSpaceNode(i, j));
+
+    std::string line;
+    std::getline(infile, line); //eat new line
+    while (std::getline(infile, line)) {
+      istringstream ss(line);
+      string id, parent, children, neighbors, siblings, siblingPoints;
+      FreeSpaceGraph::Node * n;
+      if (getline(ss, id, ',')) {
+        istringstream ss2(id);
+        int i,j,k;
+        if (ss2 >> i >> j >> k)
+          n = graph[i][j]->getOrCreate(k);
+      } else { cout << "cannot read line ("<<line<<")"<<endl; return; }
+      if (getline(ss, parent, ',') && parent.find("NULL") == string::npos) {
+        istringstream ss2(parent);
+        int i,j,k;
+        if (ss2 >> i >> j >> k)
+          n->parent = graph[i][j]->getOrCreate(k);
+      }
+      if (getline(ss, children, ',')) {
+        istringstream ss2(children);
+        int i,j,k;
+        while (ss2 >> i >> j >> k)
+          n->children.push_back(graph[i][j]->getOrCreate(k));
+      }
+      if (getline(ss, neighbors, ',')) {
+        istringstream ss2(neighbors);
+        int i,j,k;
+        while (ss2 >> i >> j >> k)
+          n->neighbors.push_back(graph[i][j]->getOrCreate(k));
+      }
+      if (getline(ss, siblings, ',')) {
+        istringstream ss2(siblings);
+        int i,j,k;
+        while (ss2 >> i >> j >> k)
+          n->siblings.push_back(graph[i][j]->getOrCreate(k));
+      }
+      if (getline(ss, siblingPoints, ',')) {
+        istringstream ss2(siblingPoints);
+        double x1, y1, z1, x2, y2, z2;
+        while (ss2 >> x1 >> y1 >> z1 >> x2 >> y2 >> z2) {
+          PTR<Point> a = new InputPoint(x1, y1, z1);
+          PTR<Point> b = new InputPoint(x2, y2, z2);
+          n->siblingPoints.push_back(std::make_pair(a,b));
+        }
+      }
+    }
+    infile.close();
+  } else {
+    cout<<"could not read from file"<<endl;
+  }
 }
