@@ -7,6 +7,7 @@
 #include <iostream>
 
 Polyhedron * loadPoly(const char * filename);
+void savePoly(Polyhedron * p, char * filename);
 
 class FreeSpaceGraph {
  public: 
@@ -17,13 +18,15 @@ class FreeSpaceGraph {
     int level;
     int blockspace_index;
     int cell_index;
+    bool enabled;
     Node * parent;  
     std::vector<Node*> children; 
-    std::vector<Node*> neighbors; 
+    std::vector<Node*> neighbors;
+    std::vector<int> neighborIntersectionIndex; 
     std::vector<Node*> siblings;
     std::vector< std::pair< PTR<Point>, PTR<Point> > > siblingPoints;
-    Node(int level, int blockspace_index, int cell_index, Node * parent) 
-     : level(level), blockspace_index(blockspace_index), cell_index(cell_index), parent(parent) {}
+    Node(int level, int blockspace_index, int cell_index, Node * parent)
+     : level(level), blockspace_index(blockspace_index), cell_index(cell_index), parent(parent), enabled(true) {}
   };
 
   class BlockSpaceNode {
@@ -50,6 +53,7 @@ class FreeSpaceGraph {
 
   int num_levels;
   int blockspaces_per_level;
+  std::string dir;
   std::vector<std::vector<BlockSpaceNode *> > graph;
 
   FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, double theta, double clearance_unit, int num_levels, const char * dir);

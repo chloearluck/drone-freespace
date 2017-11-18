@@ -23,7 +23,7 @@ freespace_test.o: freespace_test.cc freespace.h hull.h polyhedron.h octree.h rbt
 	$(COMPILE) freespace_test.cc
 
 freespace-graph.o: freespace-graph.cc freespace-graph.h path3d.h polyhedron.h mink.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h 
-	$(COMPILE) freespace-graph.cc
+	$(COMPILE) -std=c++11 freespace-graph.cc
 
 freespace-graph_test.o: freespace-graph_test.cc freespace-graph.h path3d.h polyhedron.h mink.h io.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h
 	$(COMPILE) freespace-graph_test.cc

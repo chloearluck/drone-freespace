@@ -14,6 +14,18 @@ Polyhedron * loadPoly(const char * filename) {
   return poly;
 }
 
+void savePoly(Polyhedron * p, const char * filename) {
+  ofstream out;
+  out.open(filename);
+  if (out.is_open()) {
+    writePolyhedronVTK (p->faces, out);
+    out.close();
+  } else {
+    cout<<"could not write to file"<<endl;
+  }
+}
+
+
 class InputParameter : public Object<Parameter> {
 public:
   InputParameter (double x) { set(Parameter::input(x)); }
@@ -104,6 +116,7 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, 
   this->theta = theta;
   this->num_levels = num_levels;
   this->blockspaces_per_level = original_blockspaces.size();
+  this->dir = dir;
   std::vector<Polyhedron*> blockspaces;
   blockspaces.insert(blockspaces.begin(), original_blockspaces.begin(), original_blockspaces.end());
 
@@ -114,7 +127,7 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, 
   //initialize the graph
   for(int i=0; i<num_levels; i++) 
     graph.push_back(std::vector<BlockSpaceNode*>());
-  for (int i=0; i<num_levels; i++) //TO DO: save blockspaces and block unions to file
+  for (int i=0; i<num_levels; i++) 
     for (int j=0; j< blockspaces.size(); j++)
       graph[i].push_back(new FreeSpaceGraph::BlockSpaceNode(i, j));
 
@@ -167,7 +180,11 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, 
           int cj = blockspaces[j]->containingCell(p);
           graph[level][i]->get(ci)->neighbors.push_back(graph[level][j]->get(cj));
           graph[level][j]->get(cj)->neighbors.push_back(graph[level][i]->get(ci));
+          graph[level][i]->get(ci)->neighborIntersectionIndex.push_back(k);
+          graph[level][j]->get(cj)->neighborIntersectionIndex.push_back(k);
         }
+      std::string s = std::string(dir) + "/" + std::to_string(level) + "-" + std::to_string(i) + "-" + std::to_string(j) + ".vtk";
+      savePoly(block_union, s.c_str());
       delete block_union;  
     }
 
@@ -189,16 +206,21 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, 
               }
         }
     }
+
+    for (int i=0; i<blockspaces.size(); i++) {
+      std::string s = std::string(dir) + "/" + std::to_string(level) + "-" + std::to_string(i) + ".vtk"; 
+      savePoly(blockspaces[i], s.c_str());
+    }
   }
 
   delete unit_ball;
 
   cout<<"saving"<<endl;
 
-  std::string s(dir);
-  s.append("/graph.txt");
+  std::string s = string(dir) + "/graph.txt";
   ofstream out;
   out.open(s.c_str());
+  out << setprecision(20);
   out << num_levels << " " << blockspaces_per_level << " " << theta << " " << clearance_unit <<endl;
   if (out.is_open()) {
     for (int i=0; i<num_levels; i++)
@@ -212,7 +234,7 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, 
             out<< " " << node->children[l]->level << " " << node->children[l]->blockspace_index << " " << node->children[l]->cell_index;
           out<<",";
           for (int l=0; l<node->neighbors.size(); l++)
-            out<< " " << node->neighbors[l]->level << " " << node->neighbors[l]->blockspace_index << " " << node->neighbors[l]->cell_index;
+            out<< " " << node->neighbors[l]->level << " " << node->neighbors[l]->blockspace_index << " " << node->neighbors[l]->cell_index << " " << node->neighborIntersectionIndex[l];
           if (node->siblings.size()>0) {
           out<<",";
             for (int l=0; l<node->siblings.size(); l++)
@@ -231,9 +253,10 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, 
     out.close();
   }
 }
+
 FreeSpaceGraph::FreeSpaceGraph(const char * dir) {
-  std::string s(dir);
-  s.append("/graph.txt");
+  this->dir = dir;
+  std::string s = string(dir) + "/graph.txt";
   ifstream infile (s.c_str());
   double clearance_unit;
   if (infile.is_open()) {
@@ -272,9 +295,11 @@ FreeSpaceGraph::FreeSpaceGraph(const char * dir) {
       }
       if (getline(ss, neighbors, ',')) {
         istringstream ss2(neighbors);
-        int i,j,k;
-        while (ss2 >> i >> j >> k)
+        int i,j,k,l;
+        while (ss2 >> i >> j >> k >> l) {
           n->neighbors.push_back(graph[i][j]->getOrCreate(k));
+          n->neighborIntersectionIndex.push_back(l);
+        }
       }
       if (getline(ss, siblings, ',')) {
         istringstream ss2(siblings);
