@@ -56,6 +56,12 @@ class FreeSpaceGraph {
   std::string dir;
   std::vector<std::vector<BlockSpaceNode *> > graph;
 
+  void deepestPath(FreeSpaceGraph::Node * n, PTR<Point> p, PTR<Point> q, std::vector<pair <FreeSpaceGraph::Node*, PTR<Point> > > & path);
+  void nodePointPath(std::vector<FreeSpaceGraph::Node*> & nodes, PTR<Point> a, PTR<Point> b, std::vector<pair <FreeSpaceGraph::Node*, PTR<Point> > > & path);
+  void bfsPath(FreeSpaceGraph::Node * start, FreeSpaceGraph::Node * end, std::vector<FreeSpaceGraph::Node*> & nodes);
+  bool isConnected(FreeSpaceGraph::Node * start, FreeSpaceGraph::Node * end);
+
+
   FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, double theta, double clearance_unit, int num_levels, const char * dir);
   FreeSpaceGraph(const char * dir);
 };
