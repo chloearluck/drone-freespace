@@ -136,8 +136,9 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, 
     cout<<"level "<<level<<endl;
 
     if (level > 0) {
-      for (int i=0; i<prev_blockspaces.size(); i++)
-        delete prev_blockspaces[i];
+      if (level > 1)
+        for (int i=0; i<prev_blockspaces.size(); i++)
+          delete prev_blockspaces[i];
       prev_blockspaces.clear();
 
       prev_blockspaces.insert(prev_blockspaces.begin(), blockspaces.begin(), blockspaces.end());
@@ -189,22 +190,19 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, 
     }
 
     cout<<"finding siblings"<<endl;
-    if (level > 0) {
-      for (int i=0; i<blockspaces.size(); i++) 
-        for (int j=0; j<graph[level-1][i]->nodes.size(); j++) {
-          FreeSpaceGraph::Node * parent = graph[level-1][i]->nodes[j];
-          if (parent->children.size() > 1)
-            for (int c1 = 0; c1 < parent->children.size()-1; c1++)
-              for (int c2 = c1+1; c2 < parent->children.size(); c2++) {
-                FreeSpaceGraph::Node * child1 = parent->children[c1];
-                FreeSpaceGraph::Node * child2 = parent->children[c2];
-                child1->siblings.push_back(child2);
-                child2->siblings.push_back(child1);
-                std::pair< PTR<Point>, PTR<Point> > ab = nearestPointPair(blockspaces[i], child1->cell_index, child2->cell_index);
-                child1->siblingPoints.push_back(ab);
-                child2->siblingPoints.push_back(std::make_pair(ab.second,ab.first));
-              }
-        }
+    for (int i=0; i<blockspaces.size(); i++) {
+      int nCells = graph[level][i]->nodes.size();
+      if (nCells > 1)
+        for (int s1 = 0; s1 <nCells-1; s1++)
+          for (int s2=s1+1; s2<nCells; s2++) {
+            FreeSpaceGraph::Node * sibling1 = graph[level][i]->nodes[s1];
+            FreeSpaceGraph::Node * sibling2 = graph[level][i]->nodes[s2];
+            sibling1->siblings.push_back(sibling2);
+            sibling2->siblings.push_back(sibling1);
+            std::pair< PTR<Point>, PTR<Point> > ab = nearestPointPair(blockspaces[i], sibling1->cell_index, sibling2->cell_index);
+            sibling1->siblingPoints.push_back(ab);
+            sibling2->siblingPoints.push_back(std::make_pair(ab.second,ab.first));
+          }
     }
 
     for (int i=0; i<blockspaces.size(); i++) {
