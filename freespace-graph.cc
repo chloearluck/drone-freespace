@@ -545,6 +545,14 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, 
     }
   }
 
+  for(int i=0; i<prev_blockspaces.size(); i++)
+    delete prev_blockspaces[i];
+  prev_blockspaces.clear();
+
+  for (int i=0; i<blockspaces.size(); i++)
+    delete blockspaces[i];
+  blockspaces.clear();
+
   delete unit_ball;
 
   cout<<"saving"<<endl;
