@@ -256,7 +256,7 @@ void FreeSpaceGraph::nodePointPath(std::vector<FreeSpaceGraph::Node*> & nodes, P
     int k = std::find(to->neighbors.begin(), to->neighbors.end(), from) - to->neighbors.begin();
     assert(k < to->neighbors.size());
     assert(from->level == to->level);
-    int bi = (from->blockspace_index < to->blockspace_index)? from->blockspace_index : to->blockspace_index;
+    int bi = (to->blockspace_index == (from->blockspace_index+1)%blockspaces_per_level)? from->blockspace_index : to->blockspace_index;
     int bj = (bi == to->blockspace_index)? from->blockspace_index : to->blockspace_index;
     std::string s = std::string(dir) + "/" + std::to_string(to->level) + "-" + std::to_string(bi) + "-" + std::to_string(bj) + ".vtk";
     cout<<"reading in intersection "<<s<<endl;
@@ -378,6 +378,67 @@ bool FreeSpaceGraph::isConnected(FreeSpaceGraph::Node * start, FreeSpaceGraph::N
       q.push(n->parent);
   }
   return false;
+}
+
+double FreeSpaceGraph::angle(int blockspace_index) {
+  return blockspace_index*theta + theta/2;
+}
+
+void FreeSpaceGraph::getPath(Node * start, Node * end, PTR<Point> a, PTR<Point> b, std::vector<std::pair<PTR<Point>, double > > & path) {
+  if (!isConnected(start, end)) {
+    cout<<"no path exists"<<endl;
+    return;
+  }
+
+  for (int i=0; i<num_levels; i++)
+    for (int j=0; j<blockspaces_per_level; j++)
+      for (int k=0; k<graph[i][j]->nodes.size(); k++) 
+        if (graph[i][j]->nodes[k] != start && graph[i][j]->nodes[k] != end) {
+          graph[i][j]->nodes[k]->enabled = false;
+          if (!isConnected(start, end))
+            graph[i][j]->nodes[k]->enabled = true;
+        }
+
+  std::vector<FreeSpaceGraph::Node*> nodes;
+  std::vector<pair <FreeSpaceGraph::Node*, PTR<Point> > > node_point_path;
+  bfsPath(start, end, nodes);
+  nodePointPath(nodes, a, b, node_point_path);
+
+  //TO DO: generate path from node point path, move within cells using path3d
+  path.push_back(make_pair(node_point_path[0].second,angle(node_point_path[0].first->blockspace_index)));
+  for (int i=1; i<node_point_path.size(); i++) {
+    Node * n1 = node_point_path[i-1].first;
+    Node * n2 = node_point_path[i].first;
+    PTR<Point> p1  = node_point_path[i-1].second;
+    PTR<Point> p2  = node_point_path[i].second;
+    cout<<"("<<n1->level<<" "<<n1->blockspace_index<<" "<<n1->cell_index<<")->("<<n2->level<<" "<<n2->blockspace_index<<" "<<n2->cell_index<<")"<<endl;
+    if (n1 == n2 && p1 == p2)
+      continue;
+    if (n1 == n2) {
+      //load blockspace associated with n1
+      std::string s = std::string(dir) + "/" + std::to_string(n1->level) + "-" + std::to_string(n1->blockspace_index) + ".vtk";
+      cout<<"reading blockspace "<<s<<endl;
+      Polyhedron * poly = loadPoly(s.c_str());
+      //use path3d to find a path from p1 to p2
+      Points subPath;
+      cout<<"finding path from ";
+      cout<<p1->getApprox().getX().mid()<<" "<<p1->getApprox().getY().mid()<<" "<<p1->getApprox().getZ().mid()<<" to ";
+      cout<<p2->getApprox().getX().mid()<<" "<<p2->getApprox().getY().mid()<<" "<<p2->getApprox().getZ().mid();
+      cout<<" in ("<<n1->level<<" "<<n1->blockspace_index<<" "<<n1->cell_index<<")"<<endl;
+      findPath(poly, n1->cell_index, p1, p2, subPath);
+      delete poly;
+      for (int i=0; i< subPath.size(); i++)
+        path.push_back(make_pair(subPath[i],angle(n1->blockspace_index)));
+    } else {
+      assert(p1 == p2);
+      //angle change if needed
+      if (n1->blockspace_index != n2->blockspace_index) {
+        path.push_back(make_pair(p2,angle(n2->blockspace_index)));
+        cout<<"angle change "<<n1->blockspace_index<<"->"<<n2->blockspace_index<<endl;
+      }
+    }
+  }
+
 }
 
 FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, double theta, double clearance_unit, int num_levels, const char * dir) {

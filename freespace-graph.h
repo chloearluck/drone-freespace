@@ -60,7 +60,8 @@ class FreeSpaceGraph {
   void nodePointPath(std::vector<FreeSpaceGraph::Node*> & nodes, PTR<Point> a, PTR<Point> b, std::vector<pair <FreeSpaceGraph::Node*, PTR<Point> > > & path);
   void bfsPath(FreeSpaceGraph::Node * start, FreeSpaceGraph::Node * end, std::vector<FreeSpaceGraph::Node*> & nodes);
   bool isConnected(FreeSpaceGraph::Node * start, FreeSpaceGraph::Node * end);
-
+  void getPath(Node * start, Node * end, PTR<Point> a, PTR<Point> b, std::vector<std::pair<PTR<Point>, double > > & path);
+  double angle(int blockspace_index);
 
   FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, double theta, double clearance_unit, int num_levels, const char * dir);
   FreeSpaceGraph(const char * dir);
