@@ -201,6 +201,8 @@ class XYComponents : public Object<PV2> {
 
 Primitive3(AreaABC, PTR<Object<PV2> >, pa, PTR<Object<PV2> >, pb, PTR<Object<PV2> >, pc);
 int AreaABC::sign() {
+  if (pa == pb || pa == pc || pb == pc)
+    return 0;
   PV2 a = pa->get();
   PV2 b = pb->get();
   PV2 c = pc->get();
@@ -344,6 +346,8 @@ void path2Dto3D(std::vector<PathVertex*> &vertPath, std::vector<int> &vertPathIn
   path.push_back(vertPath[0]->original);
   int j = 1;
   for (int i=0; i<edges.size(); i++) {
+    if (j == vertPath.size() && (i == edges.size()-1) && edges[i].right == vertPath[vertPath.size()-1]) 
+      break;
     assert(j < vertPath.size());
     if (vertPathIndices[j] == i) {
       path.push_back(vertPath[j]->original);
@@ -399,6 +403,14 @@ void shortestPath(std::vector<PathTriangle> & triangles, PathVertex * start, Pat
     PathVertex * r = ((l != p)? p : q);
     edges.push_back(PathEdge(l, r)); 
   }
+  if (edges[0].left->original == start->original)
+    start = edges[0].left;
+  if (edges[0].right->original == start->original)
+    start = edges[0].right;
+  if (edges[edges.size()-1].left->original == end->original)
+    end = edges[edges.size()-1].left;
+  if (edges[edges.size()-1].right->original == end->original)
+    end = edges[edges.size()-1].right;
   edges.push_back(PathEdge(end, end));
 
   std::vector<PathVertex*> right;
@@ -487,7 +499,7 @@ void otherWay(vector<PathTriangle> & oldPath, vector<PathTriangle> & newPath, in
   }
 }
 
-void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFaces & pathfaces, Points & path) {
+void localPath(PTR<Point> a, PTR<Point> b, HFaces & pathfaces, Points & path) {
   std::vector<PathTriangle> triangles;
   std::vector<PTR<Transformation> > transformations;
   HFace * hf = pathfaces[0];
@@ -533,6 +545,7 @@ void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFace
   std::vector<PathVertex*> vertPath; 
   std::vector<int> vertPathIndices; 
   std::vector<PathEdge> edges;
+
   shortestPath(triangles, start, end, vertPath, vertPathIndices, edges);
 
   //DEBUG
@@ -642,6 +655,7 @@ void localPath(PTR<FaceIntersectionPoint> a, PTR<FaceIntersectionPoint> b, HFace
 
       shortestPath(triangles, start, end, vertPath, vertPathIndices, edges);
 
+      //to do: simplify this
       bool pathChanged = false;
       if (oldPath.size() != vertPath.size())
         pathChanged = true;
@@ -707,6 +721,190 @@ void bfs(HFace * fa, HFace * fb, HFaces & pathfaces) {
     pathfaces.push_back(pathfaces_rev[i]);
 }
 
+void findPath(Polyhedron * blockspace, int cell_index, PTR<Point> start, PTR<Point> end, bool startOnSurface, bool endOnSurface, Points &path) {
+  //find nearest vertex to any surface points
+  Vertex * v_start = NULL;
+  Vertex * v_end = NULL;
+  HFace * hf_start = NULL;
+  HFace * hf_end = NULL;
+  if (startOnSurface || endOnSurface) {
+    for (int i=0; i<blockspace->vertices.size(); i++) {
+      Vertex * v = blockspace->vertices[i];
+      if (startOnSurface && (v_start == NULL || CloserPair(start, v->getP(), start, v_start->getP()) > 0))
+        v_start = v;
+      if (endOnSurface && (v_end == NULL || CloserPair(end, v->getP(), end, v_end->getP()) > 0))
+        v_end = v;
+    }
+  }
+  if (startOnSurface)
+    start = v_start->getP();
+  if (endOnSurface)
+    end = v_end->getP();
+
+  std::vector<Face *> startIncidentFaces, endIncidentFaces;
+  if (startOnSurface) startIncidentFaces = v_start->incidentFaces();
+  if (endOnSurface) endIncidentFaces = v_end->incidentFaces();
+
+  blockspace->computeWindingNumbers();
+  Cell * cell = blockspace->cells[cell_index];
+  std::vector<PTR<FaceIntersectionPoint> > points;
+  PTR<Point> r =  new DiffPoint(end, start);
+  for (int i=0; i<cell->nShells(); i++) {
+    Shell * shell = cell->getShell(i);
+    for (int j=0; j<shell->getHFaces().size(); j++) {
+      HFace * hface = shell->getHFaces()[j];
+      if (hface->getF()->contains(start) || hface->getF()->contains(end))
+        continue;
+      if (std::find(startIncidentFaces.begin(), startIncidentFaces.end(), hface->getF()) != startIncidentFaces.end()) {
+        hf_start = hface;
+        continue;
+      }
+      if (std::find(endIncidentFaces.begin(), endIncidentFaces.end(), hface->getF()) != endIncidentFaces.end()) {
+        hf_end = hface;
+        continue;
+      }
+      PTR<FaceIntersectionPoint> q = new FaceIntersectionPoint(start, end, hface);
+      bool onFace = hface->getF()->contains(q);
+      bool afterStart = (PointOrder(start, q, r) == 1);
+      bool beforeEnd = (PointOrder(q, end, r) == 1);
+      if (onFace && afterStart && beforeEnd)
+        points.push_back(q);
+    }
+  }
+  
+  std::sort(points.begin(), points.end(), ComparePointOrder(r));
+
+  if (VERBOSE) cout<<"intersections: "<<points.size()<<endl;
+  if (points.size() % 2 != 0) {
+    //DEBUG: find the inside/outside pattern
+    cout<<"start: ";
+    if (startOnSurface)
+      cout<<"surface"<<endl;
+    else 
+      cout<< ((blockspace->containingCell(start) != cell_index)? "outside" : "inside") << endl;
+
+    PTR<Point> p = new MidPoint(start, points[0]);
+    cout<< ((blockspace->containingCell(p) != cell_index)? "outside" : "inside") << endl;
+    cout<<"."<<endl;
+    for (int i=1; i<points.size(); i++) {
+      p = new MidPoint(points[i-1], points[i]);
+      cout<< ((blockspace->containingCell(p) != cell_index)? "outside" : "inside") << endl;
+      cout<<"."<<endl;
+    }
+    p = new MidPoint(points[points.size()-1], end);
+    cout<< ((blockspace->containingCell(p) != cell_index)? "outside" : "inside") << endl;
+    
+    cout<<"end: ";
+    if (endOnSurface)
+      cout<<"surface"<<endl;
+    else 
+      cout<< ((blockspace->containingCell(end) != cell_index)? "outside" : "inside") << endl;
+    cout<<endl;
+  }
+  
+  if ((!startOnSurface || !endOnSurface) && (points.size()%2)==0) {
+    path.push_back(start);
+    for (int i=0; i<points.size(); i+=2) {
+      HFaces subHfaces;
+      Points subPath;
+      bfs(points[i]->getHFace(), points[i+1]->getHFace(), subHfaces);
+      localPath((PTR<Point>)points[i], (PTR<Point>)points[i+1], subHfaces, subPath);
+      path.insert(path.end(), subPath.begin(), subPath.end());
+    }
+    if (points.size()>0)
+      path.push_back((PTR<Point>) points[points.size()-1]);
+    path.push_back(end);
+  } else if (!startOnSurface && !endOnSurface && (points.size()%2)!=0) {
+    assert(false);
+  } else if (startOnSurface && endOnSurface) {
+    assert(hf_start != NULL);
+    assert(hf_end != NULL);
+    PTR<Point> p;
+    path.push_back(start);
+    
+    p = new MidPoint(start, points[0]);
+    if (blockspace->containingCell(p) == cell_index) {
+      path.push_back((PTR<Point>)points[0]);
+    } else {
+      HFaces subHfaces;
+      Points subPath;
+      bfs(hf_start, points[0]->getHFace(), subHfaces);
+      localPath(start, (PTR<Point>)points[0], subHfaces, subPath);
+      path.insert(path.end(), subPath.begin(), subPath.end());
+    }
+
+    for (int i=1; i<points.size(); i++) {
+      cout<<i<<endl;
+      p = new MidPoint(points[i-1], points[i]);
+      if (blockspace->containingCell(p) == cell_index) {
+        cout<<"inside"<<endl;
+        path.push_back((PTR<Point>)points[i]);
+      } else {
+        cout<<"outside"<<endl;
+        HFaces subHfaces;
+        Points subPath;
+        bfs(points[i-1]->getHFace(), points[i]->getHFace(), subHfaces);
+        localPath((PTR<Point>)points[i-1], (PTR<Point>)points[i], subHfaces, subPath);
+        path.insert(path.end(), subPath.begin(), subPath.end());
+      }
+    }
+
+    p = new MidPoint(points[points.size()-1], end);
+    if (blockspace->containingCell(p) == cell_index) {
+      path.push_back(end);
+    } else {
+      HFaces subHfaces;
+      Points subPath;
+      bfs(points[points.size()-1]->getHFace(), hf_end, subHfaces);
+      localPath((PTR<Point>)points[points.size()-1], end, subHfaces, subPath);
+      path.insert(path.end(), subPath.begin(), subPath.end());
+      path.push_back(end);
+    }
+  } else if (startOnSurface) {
+    assert(startOnSurface);
+    assert(!endOnSurface);
+    assert((points.size()%2)!=0);
+    path.push_back(start);
+    HFaces subHfaces;
+    Points subPath; 
+    bfs(hf_start, points[0]->getHFace(), subHfaces);
+    localPath(start, (PTR<Point>)points[0], subHfaces, subPath);
+    path.insert(path.end(), subPath.begin(), subPath.end());
+    for (int i=1; i<points.size(); i+=2) {
+      subHfaces.clear();
+      subPath.clear();
+      bfs(points[i]->getHFace(), points[i+1]->getHFace(), subHfaces);
+      localPath((PTR<Point>)points[i], (PTR<Point>)points[i+1], subHfaces, subPath);
+      path.insert(path.end(), subPath.begin(), subPath.end());
+    }
+    if (points.size() > 1)
+      path.push_back((PTR<Point>) points[points.size()-1]);
+    path.push_back(end);
+
+  } else {
+    assert(!startOnSurface);
+    assert(endOnSurface);
+    assert((points.size()%2)!=0);
+    path.push_back(start);
+    path.push_back((PTR<Point>)points[0]);
+
+    for (int i=0; i<points.size()-1; i+=2) {
+      HFaces subHfaces;
+      Points subPath;
+      bfs(points[i]->getHFace(), points[i+1]->getHFace(), subHfaces);
+      localPath((PTR<Point>)points[i], (PTR<Point>)points[i+1], subHfaces, subPath);
+      path.insert(path.end(), subPath.begin(), subPath.end());
+    }
+
+    HFaces subHfaces;
+    Points subPath;
+    bfs(points[points.size()-1]->getHFace(), hf_end, subHfaces);
+    localPath((PTR<Point>)points[points.size()-1], end, subHfaces, subPath);
+    path.insert(path.end(), subPath.begin(), subPath.end());
+    path.push_back(end);
+  }
+}
+
 void findPath(Polyhedron * blockspace, PTR<Point> start, PTR<Point> end, Points &path) {
   //make sure start and end are not in blockspace
   if (blockspace->contains(start)) {
@@ -725,6 +923,8 @@ void findPath(Polyhedron * blockspace, PTR<Point> start, PTR<Point> end, Points 
     cout<<"start and end are not in the same component"<<endl;
     return;
   }
+
+  //to do: triangulate? can we count on blockspaces already being triangulated?
 
   //do raycasting
   Cell * cell = blockspace->cells[cell_index];
@@ -753,7 +953,7 @@ void findPath(Polyhedron * blockspace, PTR<Point> start, PTR<Point> end, Points 
     HFaces subHfaces;
     Points subPath;
     bfs(points[i]->getHFace(), points[i+1]->getHFace(), subHfaces);
-    localPath(points[i], points[i+1], subHfaces, subPath);
+    localPath((PTR<Point>)points[i], (PTR<Point>)points[i+1], subHfaces, subPath);
     path.insert(path.end(), subPath.begin(), subPath.end());
   }
   if (points.size()>0)
