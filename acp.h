@@ -647,8 +647,6 @@ class Parameter {
   bool operator< (double b) const { return (*this - b).sign() == -1; }
   bool operator> (const Parameter &b) const { return (b - *this).sign() == -1; }
   bool operator> (double b) const { return (*this - b).sign() == 1; }
-  bool operator== (double z) const { assert(z == 0); return lb() == 0 && ub() == 0; }
-  bool operator!= (double z) const { return !(*this == 0); }
 
   static Parameter max (const Parameter &a, const Parameter &b) { return a < b ? b : a; }
 
@@ -762,7 +760,7 @@ class Parameter {
     return Parameter(u.m->ubP());
   }
 
-  Parameter (Parameter &il, Parameter &iu) {
+  Parameter (const Parameter &il, const Parameter &iu) {
     if (il.l != sentinel) {
       l = il.l;
       u.r = iu.u.r;

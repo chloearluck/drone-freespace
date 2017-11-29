@@ -154,8 +154,13 @@ double area (Face *f)
 {
   int c = f->getPC();
   HEdge *e = f->getBoundary(0);
-  PV3 u = e->getU(), v = e->getNext()->getU();
+  PV3 u = getApprox(e, 1e-8), v = getApprox(e->getNext(), 1e-8);
   return 0.5*cross(u, v, c).mid();
+}
+
+PV3 getApprox (HEdge *e, double acc)
+{
+  return e->head()->getP()->getApprox(acc) - e->tail()->getP()->getApprox(acc);
 }
 
 void pack3output (Polyhedron *a, Polyhedron *b, Polyhedron *c,

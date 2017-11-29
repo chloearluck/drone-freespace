@@ -60,6 +60,20 @@ public:
     double dot (const Point &b) {
       return x[0] * b.x[0] + x[1] * b.x[1] + x[2] * b.x[2];
     }
+    Point cross (const Point &b) {
+      return Point(x[1] * b.x[2] - x[2] * b.x[1],
+		   x[2] * b.x[0] - x[0] * b.x[2],
+		   x[0] * b.x[1] - x[1] * b.x[0]);
+    }
+    Point operator- (const Point &b) {
+      return Point(x[0] - b.x[0], x[1] - b.x[1], x[2] - b.x[2]);
+    }
+    Point operator+ (const Point &b) {
+      return Point(x[0] + b.x[0], x[1] + b.x[1], x[2] + b.x[2]);
+    }
+    Point operator* (double s) {
+      return Point(x[0] * s, x[1] * s, x[2] * s);
+    }
   };
 
   class Constraint {
@@ -85,6 +99,8 @@ public:
     void addConstraint (int ab, const Constraint &constraint) {
       constraints[ab].push_back(constraint);
     }
+
+    void reorient ();
   };
 
 private:
@@ -99,13 +115,17 @@ private:
                   map<int, int> &index,
                   int ipair, double t, double s);
 
+  double checkPair2 (IloCplex &cplex, IloNumVarArray& cols,
+		     map<int, int> &index,
+		     int ipair, double t, double s);
+  
 public:
   Expander2 (double uscale=1.0) : uscaleBase(uscale) {}
 
   // vert is index of vertex and disp = (a_current - a_orig)/delta
   void addDisplacement (int vert, Point disp) { disps[vert] = disp; }
 
-  void addPair (const Pair &pair) { pairs.push_back(pair); }
+  void addPair (Pair &pair) { /* pair.reorient(); */ pairs.push_back(pair); }
 
   bool expand ();
 

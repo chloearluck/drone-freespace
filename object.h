@@ -172,9 +172,9 @@ public:
   }
 
   const P &getApprox (double accuracy=1e-17) {
-    inGetApprox = (accuracy == 1e-7);
     int precis = uninitialized() ? 0 : precision();
-    if (precis < Parameter::highPrecision) {
+    if (precis < Parameter::highPrecision || 
+        !checkAccuracy(accuracy, true)) {
       if (Parameter::handleSignException)
         safe_setp(accuracy);
       else {
@@ -189,7 +189,6 @@ public:
     }
     else
       assert(precis == Parameter::highPrecision);
-    inGetApprox = false;
     return p;
   }
 
@@ -201,7 +200,8 @@ private:
     bool failed = false;
     while (true)
       try {
-	p = calculate();
+	if (uninitialized() || precision() < Parameter::highPrecision)
+	  p = calculate();
         checkAccuracy(accuracy);
         if (failed) {
           decreasePrecision();  // ???
@@ -215,9 +215,12 @@ private:
       }
   }
 
-  void checkAccuracy (double accuracy) {
+  bool checkAccuracy (double accuracy, bool nothrow=false) {
+    if (accuracy == 1.0) return true;
     for (int i = 0; i < p.size(); i++) {
       Parameter &x = p[i];
+      if (nothrow && p[i].lb() < p[i].ub() && p[i].sign(false) == 0)
+	return false;
       int s = p[i].sign();
       if (s == 0) {
         x = Parameter::constant(0);
@@ -232,11 +235,15 @@ private:
         double m = (l + u) / 2;
 	double lm = (l + m) / 2;
 	double mu = (m + u) / 2;
-	if ((l < lm) + (lm < m) + (m < mu) + (mu < m) <= 3)
+	if ((l < lm) + (lm < m) + (m < mu) + (mu < u) <= 3)
+        // if (l == m || m == u)
           continue;
-        (x - m).sign();
+        if (!nothrow)
+          (x - m).sign();
+        return false;
       }
     }
+    return true;
   }
 };
 

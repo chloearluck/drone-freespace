@@ -76,7 +76,7 @@ class ProjectionCoordinate : Object<Parameter> {
   }
  public:
   ProjectionCoordinate (Plane *p) : p(p) {}
-  int getPC () { return getApprox(1e-6).lb(); }
+  int getPC () { return getApprox(1.0).lb(); }
 };
 
 int projectionCoordinate (Plane *p);
@@ -139,6 +139,8 @@ Primitive4(Orientation, Point *, a, Point *, b, Point *, c, Point *, d);
 
 Primitive4(CloserPair, Point *, a, Point *, b, Point *, c, Point *, d);
 
+Primitive2(PlaneRayAlignment, Plane *, p, Point *, u);
+
 void copyBBox (const double *bbf, double *bbt);
 
 void mergeBBox (const double *bbf, double *bbt);
@@ -175,21 +177,10 @@ class TrianglePlane : public Plane {
 
 class InputPoint : public Point {
  public:
-  //InputPoint (double x, double y, double z) { set(PV3::input(x, y, z)); }
-  InputPoint (const PV3 &p) { set(PV3::constant(p.x.mid(), p.y.mid(), p.z.mid())); }
   InputPoint (double x, double y, double z, bool perturb = true) {
     set(perturb ? PV3::input(x, y, z) : PV3::constant(x, y, z));
   }
-
 };
-/*
-class InputPoint : public Point {
- public:
-  InputPoint (double x, double y, double z, bool perturb = false) {
-    set(perturb ? PV3::input(x, y, z) : PV3::constant(x, y, z));
-  }
-};
-*/
 
 extern InputPoint Rdir;
 
@@ -274,7 +265,7 @@ class RayZPlanePoint : public Point {
   double z;
   PV3 calculate () {
     PV3 a = t->getP(), u = r->getP();
-    Parameter k = (z - a.z)/z;
+    Parameter k = (z - a.z)/u.z;
     return a + k*u;
   }
  public:
@@ -306,7 +297,6 @@ class Vertex {
   int EdgesN () const { return edges.size(); }
   Edge * getEdge (int i) const { return edges[i]; }
   double * getBBox () { return bbox; }
-  HEdge * getOutgoing (int i) const;
   void outgoingHEdges (vector<HEdge *> &ed) const;
   vector<Face *> incidentFaces () const;
   HEdge * connected (Vertex *a) const;
@@ -388,9 +378,9 @@ class Edge {
   void setBBox ();
   HEdge * addHEdge (bool forward);
   void removeHEdge (HEdge *e);
-  PV3 getU () { return h->p->getApprox(1e-6) - t->p->getApprox(1e-6); }
   Vertex * getT () const { return t; }
   Vertex * getH () const { return h; }
+  PV3 getU () { return h->p->getP() - t->p->getP(); }
   int HEdgesN () const { return hedges.size(); }
   HEdge * getHEdge (int i) const { return i < hedges.size() ? hedges[i] : 0; }
   double * getBBox () { return bbox; }
@@ -527,7 +517,6 @@ class Face {
   bool sharedBoundaryEdge (Face *f) const;
   void edgeVertices (VertexSet &vs) const;
   bool coplanar (Face *f);
-  bool intersectRay (Point *a, Point *r);
   PTR<Point> rayIntersection (Point *a, Point *r);
   bool contains (Point *a, bool strict = true);
   bool triangle () const;
@@ -884,25 +873,5 @@ Polyhedron * lbox (double x1, double x2, double y1, double y2, double z1, double
 Polyhedron * room (double x1, double x2, double x3, double y1, double y2,
 		   double y3, double y4, double y5, double z1, double z2,
 		   bool perturb = true);
-
-void pp (PV3 p);
-void ppla (Plane *p);
-void pp (Point *p);
-void pv (Vertex *v);
-void pvs (const Vertices &ve);
-void ptr (const Triangle &t);
-void ptrs (const Triangles &tr);
-void pids (const IDSet &ids);
-void pe (Edge *e);
-void pes (const Edges &ed);
-void pes (const EdgeSet &ed);
-void pe (HEdge *e);
-void pes (const HEdges &ed);
-void pes (const HHEdges &ed);
-void pl (HEdge *e);
-void pf (Face *f);
-void pfs (const Faces &fa);
-void pfs (const HFaces &fa);
-bool firstFace (Vertex *v, Face *f);
 
 #endif

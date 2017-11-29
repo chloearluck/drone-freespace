@@ -2,6 +2,66 @@
 #include <ilcplex/ilocplex.h>
 #include <string>
 
+void Expander2::Pair::reorient () {
+  int abR, iR, nR = 0;
+
+  for (int ab = 0; ab <= 1; ab++)
+    for (int i = 0; i < constraints[ab].size(); i++)
+      if (constraints[ab][i].r != 0) {
+	abR = ab;
+	iR = i;
+	nR++;
+      }
+
+  if (nR != 1)
+    return;
+
+  int ab1, i1, ab2, i2[2];
+
+  if (constraints[0].size() == 2) {
+    assert(constraints[1].size() == 2);
+    ab1 = abR;
+    ab2 = !abR;
+    i1 = !iR;
+    i2[0] = 0;
+    i2[1] = 1;
+  }
+  else {
+    ab1 = !abR;
+    ab2 = abR;
+    assert(constraints[ab1].size() == 1);
+    assert(constraints[ab2].size() == 3);
+    i1 = 0;
+    i2[0] = (iR+1)%3;
+    i2[1] = (iR+2)%3;
+  }
+  
+  int i2i = (fabs(constraints[ab2][i2[0]].v) < fabs(constraints[ab2][i2[1]].v));
+  double x = constraints[ab2][i2[i2i]].v;
+  double y = constraints[ab2][i2[i2i]].w;
+  double s = sqrt(x * x + y * y);
+  x /= s;
+  y /= s;
+  Point v_ = v * x + w * y;
+  Point w_ = v * -y + w * x;
+  v = v_;
+  w = w_;
+
+  double x1 = constraints[ab1][i1].v * x + constraints[ab1][i1].w * y;
+  double y1 = constraints[ab1][i1].v * -y + constraints[ab1][i1].w * x;
+  constraints[ab1][i1].v = x1;
+  constraints[ab1][i1].w = y1;
+
+  constraints[ab2][i2[i2i]].v = s;
+  constraints[ab2][i2[i2i]].w = 0;
+
+  x = constraints[ab2][i2[!i2i]].v;
+  y = constraints[ab2][i2[!i2i]].w;
+  s = sqrt(x * x + y * y);
+  constraints[ab2][i2[!i2i]].v = -s;
+  constraints[ab2][i2[!i2i]].w = 0;
+}
+
 class Ineq {
 public:
   bool gt;
@@ -367,8 +427,14 @@ bool Expander2::expandV (double e, bool velocityObjective, double velocityBound)
     double uscale = uscaleBase;
     double violation;
     while ((violation = expandV2(e, velocityObjective, velocityBound, uscale)) > 1e-6) {
-      uscale *= 10;
-      cout << "row violation " << violation << " restarting with uscale " << uscale << endl;
+      if (violation == 1234567890) {
+	velocityBound /= 2;
+	cout << "Feature intersection.  Restarting with velocityBound " << velocityBound << endl;
+      }
+      else {
+	uscale *= 10;
+	cout << "row violation " << violation << " restarting with uscale " << uscale << endl;
+      }
     }
     return true;
   }
@@ -390,10 +456,14 @@ bool Expander2::expandV (double e, bool velocityObjective, double velocityBound)
   }
 }
 
+double minSep1;
 
 double Expander2::expandV2 (double e, bool velocityObjective, double velocityBound, double uscale) {
-  values.clear();
   bool verbose = true;
+
+  minSep1 = 1e9;
+
+  values.clear();
   assert(0 < e && e <= 1);
   assert(0 < velocityBound && velocityBound <= 1);
 
@@ -588,7 +658,7 @@ double Expander2::expandV2 (double e, bool velocityObjective, double velocityBou
       row.setLinearCoef(cols[VCol], -(e - pair.d));
       ineqs.back().add(VCol, -(e - pair.d));
     }
-    else {
+    else if (false) {
       // qu' - pu' >=  e * V - (q - p) * u / d
       // qu' - pu' - e * V >= - (q - p) * u / d
       rows.add(IloRange(env, -pair.d, IloInfinity));
@@ -604,7 +674,7 @@ double Expander2::expandV2 (double e, bool velocityObjective, double velocityBou
       ineqs.back().add(VCol, -e);
     }
 
-    for (int ifeat = 0; ifeat < 2; ifeat++) {
+    for (int ifeat = 0; ifeat < 0; ifeat++) {
       vector<Constraint> &constraints = pair.constraints[ifeat];
       for (int ivert = 0; ivert < constraints.size(); ivert++) {
         Constraint con = constraints[ivert];
@@ -642,14 +712,55 @@ double Expander2::expandV2 (double e, bool velocityObjective, double velocityBou
 	  // double uscale = 1;
 	  row.setLinearCoef(cols[pCol + 2],  con.v / uscale);
 	  ineqs.back().add(pCol + 2,  con.v / uscale);
-	  row.setLinearCoef(cols[pCol + 3],  con.w / uscale);
-	  ineqs.back().add(pCol + 3,  con.w / uscale);
+	  if (con.r == 0) {
+	    row.setLinearCoef(cols[pCol + 3],  con.w / uscale);
+	    ineqs.back().add(pCol + 3,  con.w / uscale);
+	  }
 	}
 
         // row.setLinearCoef(cols[VCol], con.r);
         // ineqs.back().add(VCol, con.r);
 
         nrows++;
+      }
+    }
+
+    for (int ivertA = 0; ivertA < pair.constraints[0].size(); ivertA++) {
+      Constraint conA = pair.constraints[0][ivertA];
+      for (int ivertB = 0; ivertB < pair.constraints[1].size(); ivertB++) {
+        Constraint conB = pair.constraints[1][ivertB];
+
+        int vColA = 6 * index[conA.i];
+        int vColB = 6 * index[conB.i];
+
+        rows.add(IloRange(env, -pair.d + conA.r - conB.r, IloInfinity));
+        ineqs.push_back(Ineq(true, -pair.d + conA.r - conB.r));
+        rows[nrows].setName((base + 
+                             "a" + std::to_string(conA.i) +
+                             "b" + std::to_string(conB.i)).c_str());
+        IloRange row = rows[nrows];
+
+        row.setLinearCoef(cols[VCol], -e);
+        ineqs.back().add(VCol, -e);
+
+        for (int xyz = 0; xyz < 3; xyz++) {
+          row.setLinearCoef(cols[vColA + 2 * xyz], -pair.u.x[xyz]);
+          ineqs.back().add(vColA + 2 * xyz, -pair.u.x[xyz]);
+        }
+
+        for (int xyz = 0; xyz < 3; xyz++) {
+          row.setLinearCoef(cols[vColB + 2 * xyz], pair.u.x[xyz]);
+          ineqs.back().add(vColB + 2 * xyz, pair.u.x[xyz]);
+        }
+
+        row.setLinearCoef(cols[pCol + 2],  (conB.v - conA.v) / uscale);
+        ineqs.back().add(pCol + 2,  (conB.v - conA.v) / uscale);
+        if (conA.r == 0 && conB.r == 0) {
+          row.setLinearCoef(cols[pCol + 3],  (conB.w - conA.w) / uscale);
+          ineqs.back().add(pCol + 3,  (conB.w - conA.w) / uscale);
+        }
+
+	nrows++;
       }
     }
   }
@@ -729,7 +840,7 @@ double Expander2::expandV2 (double e, bool velocityObjective, double velocityBou
     }
   }
 
-  if (imaxval >= 0 && (verbose || maxval > 1))
+  if (verbose && imaxval >= 0 && (verbose || maxval > 1))
     cout << (iCall-1) << " row violation " << imaxval << " " << rows[imaxval].getName() << " " << maxval << endl;
 
   if (verbose)
@@ -737,12 +848,21 @@ double Expander2::expandV2 (double e, bool velocityObjective, double velocityBou
   
   double maxT = 1;
   if (maxval < 1e-6) {
-    for (int i = 0; i < pairs.size(); i++)
+    for (int i = 0; i < pairs.size(); i++) {
       while (!checkPair(cplex, cols, index, i, maxT, uscale))
         maxT *= 0.9;
-    cout << "maxT " << maxT << endl;
+    }
+    // maxT = checkPair2(cplex, cols, index, i, maxT, uscale);
+    if (verbose)
+      cout << "maxT " << maxT << endl;
   }
-  cout << endl;
+  if (verbose)
+    cout << endl;
+
+  if (maxT < 0.5)
+    return 1234567890;
+
+  // maxT = 1;
 
   saveV = cplex.getValue(cols[VCol] * maxT);
 
@@ -769,28 +889,38 @@ double Expander2::expandV2 (double e, bool velocityObjective, double velocityBou
 bool Expander2::checkPair (IloCplex &cplex, IloNumVarArray& cols,
                            map<int, int> &index,
                            int ipair, double t, double s) {
+  bool verbose = false;
   Pair &pair = pairs[ipair];
   int pCol = 6 * index.size() + 4 * ipair;
-  double p_ = cplex.getValue(cols[pCol]);
-  double q_ = cplex.getValue(cols[pCol+1]);
+
+  double p_ = 0; //cplex.getValue(cols[pCol]);
+  double q_ = 0; //cplex.getValue(cols[pCol+1]);
 
   double sep = pair.d + t * (q_ - p_);
 
   double sep1 = pair.d + (q_ - p_);
-  static double minSep1 = 1e9;
   if (minSep1 > sep1) {
-    cout << "minSep1 " << sep1 << endl;
+    if (verbose)
+      cout << "minSep1 " << sep1 << endl;
     minSep1 = sep1;
   }
 
+  double x_ = 0, y_ = 0;
+  for (int ab = 0; ab <= 1; ab++) {
+    vector<Constraint> &constraints = pair.constraints[ab];
+    for (int i = 0; i < constraints.size(); i++) {
+      Constraint &c = constraints[i];
+      x_ = c.v != 0 ? cplex.getValue(cols[pCol+2]) : x_;
+      y_ = c.r == 0 && c.w != 0 ? cplex.getValue(cols[pCol+3]) : y_;
+    }
+  }
+
+#ifdef BLEEN
   double disMax[2] = { 0, 0 };
   for (int ab = 0; ab <= 1; ab++) {
     vector<Constraint> &constraints = pair.constraints[ab];
     for (int i = 0; i < constraints.size(); i++) {
       Constraint &c = constraints[i];
-      double x_ = c.v != 0 ? cplex.getValue(cols[pCol+2]) : 0;
-      double y_ = c.w != 0 ? cplex.getValue(cols[pCol+3]) : 0;
-
       int vCol = 6 * index[c.i];
       Point a_(cplex.getValue(cols[vCol+0]),
                cplex.getValue(cols[vCol+2]),
@@ -807,7 +937,8 @@ bool Expander2::checkPair (IloCplex &cplex, IloNumVarArray& cols,
 
 	static double maxDis1 = -1e9;
 	if (maxDis1 < dis1) {
-	  cout << "maxDis1 " << dis1 << endl;
+	  if (verbose)
+	    cout << "maxDis1 " << dis1 << endl;
 	  maxDis1 = dis1;
 	}
       }
@@ -817,21 +948,141 @@ bool Expander2::checkPair (IloCplex &cplex, IloNumVarArray& cols,
 
 	static double minDis1 = 1e9;
 	if (minDis1 > dis1) {
-	  cout << "minDis1 " << dis1 << endl;
+	  if (verbose)
+	    cout << "minDis1 " << dis1 << endl;
 	  minDis1 = dis1;
 	}
       }
     }
   }
+#endif
 
-  double sep2 = sep - disMax[0] + disMax[1];
+  double mindist = 1e9;
+  for (int iA = 0; iA < pair.constraints[0].size(); iA++) {
+      Constraint &cA = pair.constraints[0][iA];
+      int vColA = 6 * index[cA.i];
+      Point a_(cplex.getValue(cols[vColA+0]),
+               cplex.getValue(cols[vColA+2]),
+               cplex.getValue(cols[vColA+4]));
+      for (int iB = 0; iB < pair.constraints[1].size(); iB++) {
+        Constraint &cB = pair.constraints[1][iB];
+        int vColB = 6 * index[cB.i];
+        Point b_(cplex.getValue(cols[vColB+0]),
+                 cplex.getValue(cols[vColB+2]),
+                 cplex.getValue(cols[vColB+4]));
+      double dist = pair.d + cB.r - cA.r +
+        t * (x_ * (cB.v - cA.v) / s + y_ * (cB.w - cA.w) / s + b_.dot(pair.u) - a_.dot(pair.u)) +
+        t * t * (x_ * (b_.dot(pair.v) - a_.dot(pair.v)) / s + 
+                 y_ * (b_.dot(pair.w) - a_.dot(pair.w)) / s);
+   
+      if (dist < mindist)
+        mindist = dist;
+    }
+  }
+
+  double sep2 = mindist; // sep - disMax[0] + disMax[1]; // 
   static double minSep = 1e9;
   if (minSep > sep2) {
-    cout << "minSep " << sep2 << " d " << pair.d << " sep1 " << sep1 << endl;
+    if (verbose)
+      cout << "minSep " << sep2 << " d " << pair.d << " sep1 " << sep1 << endl;
     minSep = sep2;
   }
   if (sep2 < 0)
     minSep = 1e9;
 
   return sep2 > 0;
+}
+
+#include "pv.h"
+using namespace acp;
+
+double Expander2::checkPair2 (IloCplex &cplex, IloNumVarArray& cols,
+			      map<int, int> &index,
+			      int ipair, double t, double s) {
+  bool verbose = false;
+  Pair &pair = pairs[ipair];
+
+  vector<Point> ps[2];
+  vector<Point> vs[2];
+  int abs[4], is[4], n = 0;
+  for (int ab = 0; ab <= 1; ab++) {
+    vector<Constraint> &constraints = pair.constraints[ab];
+    for (int i = 0; i < constraints.size(); i++) {
+      assert(n < 4);
+      abs[n] = ab;
+      is[n] = i;
+      n++;
+      
+      Constraint &c = constraints[i];
+      if (fabs(c.r) > 0.1)
+	return t;
+      
+      double x = c.v;
+      double y = c.w;
+      double z = ab ? c.r + pair.d : c.r;
+      ps[ab].push_back(Point(x, y, z));
+
+      int vCol = 6 * index[c.i];
+      Point a_(Point(cplex.getValue(cols[vCol+0]),
+		     cplex.getValue(cols[vCol+2]),
+		     cplex.getValue(cols[vCol+4])));
+      vs[ab].push_back(Point(pair.v.dot(a_), pair.w.dot(a_), pair.u.dot(a_)));
+    }
+  }
+  assert(n == 0);
+
+  Point p01 = ps[abs[1]][is[1]] - ps[abs[0]][is[0]];
+  Point p02 = ps[abs[2]][is[2]] - ps[abs[0]][is[0]];
+  Point p03 = ps[abs[3]][is[3]] - ps[abs[0]][is[0]];
+  Point v01 = vs[abs[1]][is[1]] - vs[abs[0]][is[0]];
+  Point v02 = vs[abs[2]][is[2]] - vs[abs[0]][is[0]];
+  Point v03 = vs[abs[3]][is[3]] - vs[abs[0]][is[0]];
+  
+  double cs[4];
+  cs[0] = (p01.cross(p02).dot(p03));
+  cs[1] = (v01.cross(p02).dot(p03) +
+	   p01.cross(v02).dot(p03) +
+	   p01.cross(p02).dot(v03));
+  cs[2] = (p01.cross(v02).dot(v03) +
+	   v01.cross(p02).dot(v03) +
+	   v01.cross(v02).dot(p03));
+  cs[3] = (v01.cross(v02).dot(v03));
+
+  double C = cs[1];
+  double B = cs[2] * 2;
+  double A = cs[3] * 3;
+  if (A < 0) {
+    C = -C;
+    B = -B;
+    A = -A;
+  }
+  
+  double D = B * B - A * C * 4;
+
+  if (D < 0)
+    return t;
+
+  double r[2];
+  if (B > 0) {
+    double BD = -B - sqrt(D);
+    r[0] = BD / (A * 2);
+    r[1] = (C * 2) / BD;
+  }
+  else {
+    double BD = -B + sqrt(D);
+    r[0] = (C * 2) / BD;
+    r[1] = BD / (A * 2);
+  }
+  
+  double saveT = t;
+  
+  if (r[0] > 0 && r[0] < t)
+    t = r[0];
+  else if (r[1] > 0 && r[1] < t)
+    t = r[1];
+  
+  if (verbose && t < saveT)
+    cout << "t " << t << endl;
+    
+  return t;
 }

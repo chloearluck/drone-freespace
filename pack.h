@@ -26,6 +26,8 @@ Face * largestFace (Polyhedron *a);
 
 double area (Face *f);
 
+PV3 getApprox (HEdge *e, double acc);
+
 void pack3output (Polyhedron *a, Polyhedron *b, Polyhedron *c,
 		  PTR<Point> t[3], ostream &ostr);
 

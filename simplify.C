@@ -1,21 +1,19 @@
 #include "simplify.h"
 
-bool firstFace (Vertex *v, Face *f);
-
-void simplify (Polyhedron *a, double d, bool opt2)
+void simplify (Polyhedron *a, double d, bool perturb, bool opt2)
 {
-  simplify1(a, d);
+  simplify1(a, d, perturb);
   simplify2(a, d, opt2);
   a->removeNullFaces();
 }
 
-void simplify1 (Polyhedron *a, double d)
+void simplify1 (Polyhedron *a, double d, bool perturb)
 {
   double t = getTime();
   FOctree *octree = faceOctree(a);
   VPMap vpmap;
   int n1 = 0, n2 = 0;
-  while (!simplify1(a, d, octree, vpmap, n1, n2))
+  while (!simplify1(a, d, perturb, octree, vpmap, n1, n2))
     ;
   delete octree;
   t = getTime() - t;
@@ -31,8 +29,8 @@ FOctree * faceOctree (Polyhedron *a, double s)
   return Octree<Face *>::octree(fa, a->bbox, s);
 }
 
-bool simplify1 (Polyhedron *a, double d, FOctree *octree, VPMap &vpmap,
-		int &n1, int &n2)
+bool simplify1 (Polyhedron *a, double d, bool perturb, FOctree *octree,
+		VPMap &vpmap, int &n1, int &n2)
 {
   bool bad = false;
   int n = n1 + n2;
@@ -44,10 +42,10 @@ bool simplify1 (Polyhedron *a, double d, FOctree *octree, VPMap &vpmap,
     fq.pop();
     if (f.valid())
       if (!f.v) {
-	if (collapse(a, d, f.e, fq, octree, vpmap, bad))
+	if (collapse(a, d, perturb, f.e, fq, octree, vpmap, bad))
 	  ++n1;
       }
-      else if (flip(a, d, f.getH(), fq, octree, vpmap, bad))
+      else if (flip(a, d, perturb, f.getH(), fq, octree, vpmap, bad))
 	++n2;
   }
   return n1 + n2 == n || !bad;
@@ -61,12 +59,11 @@ bool closeVE (Vertex *v, Vertex *w, Vertex *x, double d)
 
 void addCollapseFlips (Edge *e, double d, IFeatureQ &fq)
 {
-  int n = e->HEdgesN();
-  if (n == 0 || n > 2)
+  if (e->HEdgesN() != 2)
     return;
   if (DistancePP(e->getT()->getP(), e->getH()->getP(), d) == 1)
     fq.push(IFeature(e));
-  else if (n == 2)
+  else
     addFlips(e, d, fq);
 }
 
@@ -79,18 +76,16 @@ void addFlips (Edge *e, double d, IFeatureQ &fq)
 	fq.push(IFeature(e->getHEdge(i)));
 }
 
-bool collapse (Polyhedron *a, double d, Edge *e, IFeatureQ &fq, FOctree *octree,
-	       VPMap &vpmap, bool &bad)
+bool collapse (Polyhedron *a, double d, bool perturb, Edge *e, IFeatureQ &fq,
+	       FOctree *octree, VPMap &vpmap, bool &bad)
 {
   if (!collapsible(e))
     return false;
-  double dc = collapseDistance(e);
   HEdge *e1 = e->getHEdge(0), *e2 = e->getHEdge(1);
   Vertex *t = e1->tail(), *h = e1->head(), *v = e1->getNext()->head(),
     *w = e2->getNext()->head();
   PTR<Point> tp = t->getP(), hp = h->getP();
-  PV3 q = 0.5*(tp->getApprox() + hp->getApprox());
-  PTR<Point> cp = new InputPoint(q.x.mid(), q.y.mid(), q.z.mid(), true);
+  PTR<Point> cp = collapsePoint(tp, hp, perturb);
   a->removeLoop(e1);
   a->removeLoop(e2);
   vpmap.insert(VPPair(h, h->getP()));
@@ -98,6 +93,7 @@ bool collapse (Polyhedron *a, double d, Edge *e, IFeatureQ &fq, FOctree *octree,
   Faces ft = t->incidentFaces();
   for (Faces::iterator f = ft.begin(); f != ft.end(); ++f)
     a->replaceVertex(*f, t, h);
+  double dc = distanceUB(tp, hp) + 1.733*Parameter::delta;
   if (badCollapse(h, octree, dc)) {
     bad = true;
     for (Faces::iterator f = ft.begin(); f != ft.end(); ++f)
@@ -138,11 +134,28 @@ bool collapsible (Edge *e)
   return true;
 }
 
-double collapseDistance (Edge *e)
+double distanceUB (Point *t, Point *h)
 {
-  PV3 u = e->getU();
+  PV3 u = h->getApprox(1.0) - t->getApprox(1.0);
   Parameter k = u.dot(u);
   return 0.5*sqrt(k.ub());
+}
+
+PTR<Point> collapsePoint (Point *t, Point *h, bool perturb)
+{
+  if (!perturb)
+    return new MidPoint(t, h);
+  double d = Parameter::delta, l = distanceUB(t, h);
+  if (d < l) {
+    PV3 p = 0.5*(t->getApprox(d) + h->getApprox(d));
+    return new InputPoint(p.x.mid(), p.y.mid(), p.z.mid());
+  }
+  double k = 0.144*l;
+  PV3 p = 0.5*(t->getApprox() + h->getApprox());
+  return new InputPoint(p.x.mid() + randomNumber(- k, k),
+			p.y.mid() + randomNumber(- k, k),
+			p.z.mid() + randomNumber(- k, k),
+			false);
 }
 
 bool badCollapse (Vertex *v, FOctree *octree, double dc)
@@ -292,14 +305,15 @@ void addStar (Vertex *v, double d, IFeatureQ &fq)
   }
 }
 
-bool flip (Polyhedron *a, double d, HEdge *e, IFeatureQ &fq, FOctree *octree,
-	   VPMap &vpmap, bool &bad)
+bool flip (Polyhedron *a, double d, bool perturb, HEdge *e, IFeatureQ &fq,
+	   FOctree *octree, VPMap &vpmap, bool &bad)
 {
   Vertex *t = e->tail(), *h = e->head(), *v = e->getNext()->head();
   if (CloserPair(t->getP(), h->getP(), v->getP(), t->getP()) == 1)
-    return collapse(a, d, e->getNext()->getE(), fq, octree, vpmap, bad);
+    return collapse(a, d, perturb, e->getNext()->getE(), fq, octree, vpmap, bad);
   if (CloserPair(t->getP(), h->getP(), h->getP(), v->getP()) == 1)
-    return collapse(a, d, e->getNext()->getNext()->getE(), fq, octree, vpmap, bad);
+    return collapse(a, d, perturb, e->getNext()->getNext()->getE(), fq, octree,
+		    vpmap, bad);
   if (!flippable(e, d))
     return false;
   HEdge *vw = flip(a, e);
@@ -373,13 +387,12 @@ void newEdges (Face *f, Edge *e, bool *ef)
     ef[i] = ed[i]->getE() == e;
 }
 
-
 void describe1 (double t, int n1, int n2, const VPMap &vpmap)
 {
   cerr << "simplify 1: time = " << t;
   if (n1 > 0 || n2 > 0) {
     int nv = vpmap.size();
-    double dmax, dr = displacement(vpmap, dmax)/vpmap.size();
+    double dmax = 0.0, dr = nv ? displacement(vpmap, dmax)/nv : 0.0;
     if (n1)
       cerr << " collapse = " << n1;
     if (n2)
@@ -604,7 +617,7 @@ bool firstFace (Vertex *v, Face *f)
 
 bool closeVVT (Vertex *v, Vertex *w, double d)
 {
-  PV3 u = v->getP()->getApprox(1e-6) - w->getP()->getApprox(1e-6);
+  PV3 u = v->getP()->getApprox(1.0) - w->getP()->getApprox(1.0);
   Parameter k = d*d - u.dot(u);
   return k.ub() > 0.0;
 }
@@ -613,8 +626,8 @@ bool closeVET (Vertex *v, Edge *e, double d)
 {
   if (v == e->getT() || v == e->getH())
     return false;
-  PV3 a = v->getP()->getApprox(1e-6), t = e->getT()->getP()->getApprox(1e-6),
-    h = e->getH()->getP()->getApprox(1e-6), u = h - t;
+  PV3 a = v->getP()->getApprox(1.0), t = e->getT()->getP()->getApprox(1.0),
+    h = e->getH()->getP()->getApprox(1.0), u = h - t;
   Parameter k = u.dot(a - t), uu = u.dot(u);
   if (k.ub() <= 0.0 || k.lb() >= uu.ub())
     return false;
@@ -629,13 +642,13 @@ bool closeVFT (Vertex *v, Face *f, double d)
   Vertex *ve[] = {fb->tail(), fb->head(), fb->getNext()->head()};
   if (v == ve[0] || v == ve[1] || v == ve[2])
     return false;
-  PV3 p = v->getP()->getApprox(1e-6), n = f->getP()->getApprox(1e-6).n;
-  Parameter k1 = n.dot(p) + f->getP()->getApprox(1e-6).k, k2 = d*d*n.dot(n) - k1*k1;
+  PV3 p = v->getP()->getApprox(1.0), n = f->getP()->getApprox(1.0).n;
+  Parameter k1 = n.dot(p) + f->getP()->getApprox(1.0).k, k2 = d*d*n.dot(n) - k1*k1;
   if (k2.sign(false) == -1)
     return false;
   PV3 pts[3];
   for (int i = 0; i < 3; ++i)
-    pts[i] = ve[i]->getP()->getApprox(1e-6);
+    pts[i] = ve[i]->getP()->getApprox(1.0);
   int c = f->getPC();
   for (int i = 0; i < 3; ++i)
     if (cross(pts[(i+1)%3] - pts[i], p - pts[i], c).sign(false) == -1)
@@ -649,8 +662,8 @@ bool closeEET (Edge *e, Edge *f, double d)
     *p = e->getH()->getP(), *q = f->getH()->getP();
   if (a == b || a == q || p == b || p == q)
     return false;
-  PV3 aa = a->getApprox(1e-6), u = p->getApprox(1e-6) - aa,
-    bb = b->getApprox(1e-6), v = q->getApprox(1e-6) - bb, w = bb - aa;
+  PV3 aa = a->getApprox(1.0), u = p->getApprox(1.0) - aa,
+    bb = b->getApprox(1.0), v = q->getApprox(1.0) - bb, w = bb - aa;
   Parameter uu = u.dot(u), uv = u.dot(v), vv = v.dot(v), uw = u.dot(w),
     vw = v.dot(w), den = uu*vv - uv*uv, s = uw*vv - uv*vw, t = uv*uw - uu*vw;
   double dub = den.ub();
@@ -702,12 +715,9 @@ void simplify2s (Polyhedron *a, double d, FeatureSet &fs, VPMap &vpmap,
   fs = smallFeatures(a, 3.465*d, fs, &vpmap);
 }
 
-int nnn = 0;
-
 double * solveLP (const FeatureSet &fs, double d, const VPMap &vpmap,
 		  bool vobj, double vbound, VIMap &vimap)
 {
-  ++nnn;
   Expander2 exp;
   setupLP(fs, d, vimap, exp);
   for (VIMap::iterator i = vimap.begin(); i != vimap.end(); ++i) {
@@ -953,7 +963,7 @@ void moveVertices (Polyhedron *a, VPMap &vpmap, const VIMap &vimap, double *dvw)
       Vertex *v = i->first;
       vpmap.insert(VPPair(v, v->getP()));
       PTR<Point> vp = v->getP(),
-	dp = new InputPoint(di[0], di[1], di[2]),
+	dp = new InputPoint(di[0], di[1], di[2], false),
 	q = new SumPoint(vp, dp);
       a->moveVertex(v, q);
     }
@@ -1018,21 +1028,6 @@ void describe2 (int n, const FeatureSet &fs, double t, const VPMap &vpmap)
 
 // debug
 
-int euler (Polyhedron *a)
-{
-  int n = 0;
-  for (Vertices::iterator v = a->vertices.begin(); v != a->vertices.end(); ++v)
-    if ((*v)->EdgesN() > 0)
-      ++n;
-  for (Faces::iterator f = a->faces.begin(); f != a->faces.end(); ++f)
-    if (!(*f)->getBoundary().empty())
-      ++n;
-  for (Edges::iterator e = a->edges.begin(); e != a->edges.end(); ++e)
-    if ((*e)->HEdgesN() > 0)
-      --n;
-  return n;
-}
-
 int fsn (const FeatureSet &fs)
 {
   return fs.size();
@@ -1046,16 +1041,44 @@ double amax (int n, double *a)
   return x;
 }
 
-bool intersections (Polyhedron *a, const VPMap &vpmap)
+void pedges (const Edges &, int);
+
+void pedges (const FeatureSet &fs, int i)
 {
-  FOctree *octree = a->faceOctree();
-  Faces fa, fb;
-  octree->pairs(fa, fb);
-  delete octree;
-  for (int i = 0; i < fa.size(); ++i)
-    if (!fa[i]->getBoundary().empty() && !fb[i]->getBoundary().empty() &&
-	(moved(fa[i], vpmap) || moved(fb[i], vpmap)) &&
-	fa[i]->intersects(fb[i]))
-      return true;
-  return false;
+  EdgeSet es;
+  for (FeatureSet::const_iterator f = fs.begin(); f != fs.end(); ++f)
+    switch (f->type) {
+    case VV: {
+      HEdge *e = f->v->connected(f->w);
+      if (e)
+	es.insert(e->getE());
+      break;
+    }
+    case VE: {
+      es.insert(f->e);
+      for (int j = 0; j < 2; ++j) {
+	HEdge *e = f->e->getHEdge(j);
+	if (e->getNext()->head() == f->v) {
+	  es.insert(e->getE());
+	  es.insert(e->getNext()->getE());
+	  break;
+	}
+      }
+      break;
+    }
+    case VF: {
+      HEdges ed;
+      f->fa->boundaryHEdges(ed);
+      for (int i = 0; i < 3; ++i)
+	es.insert(ed[i]->getE());
+      break;
+    }
+    case EE:
+      es.insert(f->e);
+      es.insert(f->f);
+    }
+  Edges ed(es.begin(), es.end());
+  pedges(ed, i);
 }
+  
+      
