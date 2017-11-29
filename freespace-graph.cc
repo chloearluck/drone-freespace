@@ -132,7 +132,7 @@ PTR<Point> nearestPoint(Polyhedron * poly, int cell_index, PTR<Point> p) {
 
   PTR<Point> q = v[0]->getP();
   for (int i=1; i<v.size(); i++) {
-    if (CloserPair(v[i]->getP(), p, q, p) < 0)
+    if (CloserPair(v[i]->getP(), p, q, p) > 0)
       q = v[i]->getP();
   }
   return q;
