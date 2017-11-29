@@ -138,32 +138,9 @@ PTR<Point> nearestPoint(Polyhedron * poly, int cell_index, PTR<Point> p) {
   return q;
 }
 
-void FreeSpaceGraph::deepestPath(FreeSpaceGraph::Node * n, PTR<Point> p, PTR<Point> q, std::vector<pair <FreeSpaceGraph::Node*, PTR<Point> > > & path) {
-  // invariant: (n,p) is already on the path
-
-  //if n has no children, the path is (n, p) (n, q)
-
-  // define P - the nearest child to p
-  // define Q - the nearest child to q
-  // define p' = p                        if p lies in P
-  //           = nearest point P to p     otherwise
-  // define q' = (the same)
-
-  // if P == Q
-  // we're going to recurse deepestPath(P, p', q')
-  // if p != p' then we have to traverse from p to p' (using path3d inside component n), ditto q' to q
-
-  // what if P != Q
-  // then P and Q are siblings so we have their sibling pairs a,b
-  //we go from p to p' by path3d
-  //     recurse (P, p', a)
-  //   go from a to b by path3d
-  //     recurse (Q, b, q')
-  //   go from q' to q by path3d
-
+void FreeSpaceGraph::deepestPath(FreeSpaceGraph::Node * n, PTR<Point> p, PTR<Point> q, std::vector<std::tuple<FreeSpaceGraph::Node *, PTR<Point>, bool> > & path) {
+  // invariant: (n,p) is already on the path, (n,q) will be added after return
   if (n->children.size() == 0) {
-    path.push_back(make_pair(n,q));
-    assert(q != NULL);
     return;
   }
 
@@ -194,58 +171,74 @@ void FreeSpaceGraph::deepestPath(FreeSpaceGraph::Node * n, PTR<Point> p, PTR<Poi
   assert(q1 != NULL);
   
   if (P == Q) {
-    path.push_back(make_pair(n, p1));
-    path.push_back(make_pair(P, p1));
+    if (p != p1) {
+      path.push_back(make_tuple(n, p1, false));
+      path.push_back(make_tuple(P, p1, true));
+    } else {
+      path.push_back(make_tuple(P, p, false));
+    }
     deepestPath(P, p1, q1, path);
-    path.push_back(make_pair(Q, q));
-    path.push_back(make_pair(n, q));
+    if (q != q1) {
+      path.push_back(make_tuple(Q, q1, true));
+      path.push_back(make_tuple(n, q1, false));
+    } else {
+      path.push_back(make_tuple(Q, q, false));
+    }
   } else {
     int i = std::find(P->siblings.begin(), P->siblings.end(), Q) - P->siblings.begin();
-    if (i >= P->siblings.size())
-      cout<<i<<endl;
     assert(i < P->siblings.size());
     PTR<Point> a = P->siblingPoints[i].first;
     PTR<Point> b = P->siblingPoints[i].second;
     assert(a != NULL);
     assert(b != NULL);
-    path.push_back(make_pair(n,p1));
-    path.push_back(make_pair(P,p1));
+
+    if (p != p1) {
+      path.push_back(make_tuple(n, p1, false));
+      path.push_back(make_tuple(P, p1, true));
+    } else {
+      path.push_back(make_tuple(P, p, false));
+    }
     deepestPath(P, p1, a, path);
-    path.push_back(make_pair(n,a));
-    path.push_back(make_pair(n,b));
-    path.push_back(make_pair(Q,b));
+    path.push_back(make_tuple(P, a, true));
+    path.push_back(make_tuple(n, a, false));
+    path.push_back(make_tuple(n, b, false));
+    path.push_back(make_tuple(Q, b, true));
     deepestPath(Q, b, q1, path);
-    path.push_back(make_pair(n,q1));
-    path.push_back(make_pair(n,q));
+    if (q != q1) {
+      path.push_back(make_tuple(Q, q1, true));
+      path.push_back(make_tuple(n, q1, false));
+    } else {
+      path.push_back(make_tuple(Q, q, false));
+    }
   }
 }
 
-void FreeSpaceGraph::nodePointPath(std::vector<FreeSpaceGraph::Node*> & nodes, PTR<Point> a, PTR<Point> b, std::vector<pair <FreeSpaceGraph::Node*, PTR<Point> > > & path) {
+void FreeSpaceGraph::nodePointPath(std::vector<FreeSpaceGraph::Node*> & nodes, PTR<Point> a, PTR<Point> b, std::vector<std::tuple<FreeSpaceGraph::Node *, PTR<Point>, bool> > & path) {
   //working backwards, find the points we should go to in each node in the path
-  std::vector<pair <FreeSpaceGraph::Node*, PTR<Point> > > rev;
-  rev.push_back(make_pair(nodes[nodes.size()-1],b));
+  std::vector<std::tuple<FreeSpaceGraph::Node *, PTR<Point>, bool> > rev;
+  rev.push_back(make_tuple(nodes[nodes.size()-1], b, false));
   for (int i=nodes.size()-2; i>=0; i--) {
-    FreeSpaceGraph::Node * from = rev[rev.size()-1].first;
+    FreeSpaceGraph::Node * from = std::get<0>(rev[rev.size()-1]);
     FreeSpaceGraph::Node * to = nodes[i];
-    PTR<Point> p = rev[rev.size()-1].second;
+    PTR<Point> p = std::get<1>(rev[rev.size()-1]);
 
     if (from->parent == to) {
       assert(p != NULL);
-      rev.push_back(make_pair(to, p));
+      rev.push_back(make_tuple(to, p, false));
       continue;
     }
 
-    //parent/child edge
     if (to->parent == from) {
       Polyhedron * to_blockspace = loadPoly((dir + "/" + std::to_string(to->level) + "-" + std::to_string(to->blockspace_index) + ".vtk").c_str());
       assert(to_blockspace != NULL);
       if (to_blockspace->containingCell(p) == to->cell_index) {
-        rev.push_back(make_pair(to, p));
+        rev.push_back(make_tuple(to, p, false));
         assert(p != NULL);
       } else {
         PTR<Point> q = nearestPoint(to_blockspace, to->cell_index, p);
         deepestPath(from, p, q, rev);
-        rev.push_back(make_pair(to, q));
+        rev.push_back(make_tuple(from, q, false));
+        rev.push_back(make_tuple(to, q, true));
         assert(q != NULL);
       }
       delete to_blockspace;
@@ -263,34 +256,24 @@ void FreeSpaceGraph::nodePointPath(std::vector<FreeSpaceGraph::Node*> & nodes, P
     Polyhedron * intersection = loadPoly(s.c_str() );
     assert(intersection != NULL);
     if (intersection->containingCell(p) == to->neighborIntersectionIndex[k]) {
-      rev.push_back(make_pair(to, p));
+      rev.push_back(make_tuple(to, p, false));
       assert(p != NULL);
     } else {
       PTR<Point> q = nearestPoint(intersection, to->neighborIntersectionIndex[k], p);
       assert(p != NULL);
       assert(q != NULL);
       deepestPath(from, p, q, rev);
-      rev.push_back(make_pair(to, q));
+      rev.push_back(make_tuple(from, q, false));
+      rev.push_back(make_tuple(to, q, true));
       assert(q != NULL);
     }
     delete intersection; 
   }
-  rev.push_back(make_pair(nodes[0], a));
+  rev.push_back(make_tuple(nodes[0], a, false));
   assert(a != NULL);
 
   for (int i=rev.size()-1; i>=0; i--)
     path.push_back(rev[i]);
-
-  
-   // in the above consecutive nodes in path look like
-   //   (n1, p)(n2, p)   or   (n1, p)(n2, q)
-   // in the first case, we're either just rotating or not moving at all
-   // in the second case, we're going from p to q  and we know both p and q lie in n1
-   // so we should call deepestPath(n1, p, q) and insert the results before (n2,q)
-   
-   // whats the implication of rev being backwards?
-   // in all cases q belongs to both n1 and n2, p belongs only to n1
-   // it works...
 }
 
 void FreeSpaceGraph::bfsPath(FreeSpaceGraph::Node * start, FreeSpaceGraph::Node * end, std::vector<FreeSpaceGraph::Node*> & nodes) {
@@ -400,17 +383,18 @@ void FreeSpaceGraph::getPath(Node * start, Node * end, PTR<Point> a, PTR<Point> 
         }
 
   std::vector<FreeSpaceGraph::Node*> nodes;
-  std::vector<pair <FreeSpaceGraph::Node*, PTR<Point> > > node_point_path;
+  std::vector<std::tuple<FreeSpaceGraph::Node *, PTR<Point>, bool> > node_point_path;
   bfsPath(start, end, nodes);
   nodePointPath(nodes, a, b, node_point_path);
 
-  //TO DO: generate path from node point path, move within cells using path3d
-  path.push_back(make_pair(node_point_path[0].second,angle(node_point_path[0].first->blockspace_index)));
+  path.push_back(make_pair(std::get<1>(node_point_path[0]), angle(std::get<0>(node_point_path[0])->blockspace_index)));
   for (int i=1; i<node_point_path.size(); i++) {
-    Node * n1 = node_point_path[i-1].first;
-    Node * n2 = node_point_path[i].first;
-    PTR<Point> p1  = node_point_path[i-1].second;
-    PTR<Point> p2  = node_point_path[i].second;
+    Node * n1 = std::get<0>(node_point_path[i-1]);
+    Node * n2 = std::get<0>(node_point_path[i]);
+    PTR<Point> p1 = std::get<1>(node_point_path[i-1]);
+    PTR<Point> p2 = std::get<1>(node_point_path[i]);
+    bool p1_on_surface = std::get<2>(node_point_path[i-1]);
+    bool p2_on_surface = std::get<2>(node_point_path[i]);
     cout<<"("<<n1->level<<" "<<n1->blockspace_index<<" "<<n1->cell_index<<")->("<<n2->level<<" "<<n2->blockspace_index<<" "<<n2->cell_index<<")"<<endl;
     if (n1 == n2 && p1 == p2)
       continue;
@@ -425,7 +409,7 @@ void FreeSpaceGraph::getPath(Node * start, Node * end, PTR<Point> a, PTR<Point> 
       cout<<p1->getApprox().getX().mid()<<" "<<p1->getApprox().getY().mid()<<" "<<p1->getApprox().getZ().mid()<<" to ";
       cout<<p2->getApprox().getX().mid()<<" "<<p2->getApprox().getY().mid()<<" "<<p2->getApprox().getZ().mid();
       cout<<" in ("<<n1->level<<" "<<n1->blockspace_index<<" "<<n1->cell_index<<")"<<endl;
-      findPath(poly, n1->cell_index, p1, p2, subPath);
+      findPath(poly, n1->cell_index, p1, p2, p1_on_surface, p2_on_surface, subPath);
       delete poly;
       for (int i=0; i< subPath.size(); i++)
         path.push_back(make_pair(subPath[i],angle(n1->blockspace_index)));
