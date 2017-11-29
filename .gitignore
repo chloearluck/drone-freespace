@@ -6,3 +6,4 @@ freespace-graph_test
 .DS_Store
 *out.vtk
 *.lp
+*.bak
