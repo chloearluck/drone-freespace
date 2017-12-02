@@ -13,6 +13,12 @@ expander2.o: expander2.C
 	$(COMPILE) -std=c++11 -m64 -fPIC -fno-strict-aliasing -fexceptions -DNDEBUG \
 	-DIL_STD -Icplex124/include expander2.C
 
+create_test_example: create_test_example.o simplify.o expander2.o io.o polyhedron.o triangulate.o object.o acp.o
+	$(LINK) create_test_example.o simplify.o expander2.o io.o polyhedron.o triangulate.o object.o acp.o $(LFLAGS) -o create_test_example
+
+create_test_example.o: create_test_example.cc simplify.h expander2.h io.h polyhedron.h triangulate.h octree.h rbtree.h object.h pv.h acp.h
+	$(COMPILE) create_test_example.cc
+
 freespace.o: freespace.cc freespace.h hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h simplify.h
 	$(COMPILE) freespace.cc
 
