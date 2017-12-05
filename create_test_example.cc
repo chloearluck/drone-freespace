@@ -49,8 +49,9 @@ int main (int argc, char *argv[]) {
   out = out->boolean(room2, Complement);
   out = out->boolean(hall1, Complement);
   out = out->boolean(hall2, Complement);
-  // simplify(out, 1e-6);
   savePoly(out, "tworooms.vtk");
+  simplify(out, 1e-6);
+  savePoly(out, "tworooms2.vtk");
 
 
 }
