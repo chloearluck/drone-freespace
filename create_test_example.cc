@@ -41,7 +41,7 @@ int main (int argc, char *argv[]) {
   double d4[6] = {-2, 2, -.45, .45, -.9, 0};
   Polyhedron * hall1 = box(d4);
 
-  double d5[6] = {-2.95, -2.05, 3, 6, 1, 2.5};
+  double d5[6] = {-2.95, -2.05, 3, 6, 1, 1.9};
   Polyhedron * hall2 = box(d5);
 
   Polyhedron * out = big_box;
@@ -49,7 +49,7 @@ int main (int argc, char *argv[]) {
   out = out->boolean(room2, Complement);
   out = out->boolean(hall1, Complement);
   out = out->boolean(hall2, Complement);
-  simplify(out, 1e-6);
+  // simplify(out, 1e-6);
   savePoly(out, "tworooms.vtk");
 
 
