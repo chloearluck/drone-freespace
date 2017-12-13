@@ -230,6 +230,7 @@ void FreeSpaceGraph::nodePointPath(std::vector<FreeSpaceGraph::Node*> & nodes, P
 
     if (to->parent == from) {
       Polyhedron * to_blockspace = loadPoly((dir + "/" + std::to_string(to->level) + "-" + std::to_string(to->blockspace_index) + ".vtk").c_str());
+      to_blockspace->computeWindingNumbers();
       assert(to_blockspace != NULL);
       if (to_blockspace->containingCell(p) == to->cell_index) {
         rev.push_back(make_tuple(to, p, false));
@@ -254,6 +255,7 @@ void FreeSpaceGraph::nodePointPath(std::vector<FreeSpaceGraph::Node*> & nodes, P
     std::string s = std::string(dir) + "/" + std::to_string(to->level) + "-" + std::to_string(bi) + "-" + std::to_string(bj) + ".vtk";
     cout<<"reading in intersection "<<s<<endl;
     Polyhedron * intersection = loadPoly(s.c_str() );
+    intersection->computeWindingNumbers();
     assert(intersection != NULL);
     if (intersection->containingCell(p) == to->neighborIntersectionIndex[k]) {
       rev.push_back(make_tuple(to, p, false));

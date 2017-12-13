@@ -32,7 +32,7 @@ freespace-graph.o: freespace-graph.cc freespace-graph.h path3d.h polyhedron.h mi
 	$(COMPILE) -std=c++11 freespace-graph.cc
 
 freespace-graph_test.o: freespace-graph_test.cc freespace-graph.h path3d.h polyhedron.h mink.h io.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h
-	$(COMPILE) freespace-graph_test.cc
+	$(COMPILE) -std=c++11 freespace-graph_test.cc
 
 freespace-graph_test: freespace-graph_test.o freespace-graph.o path3d.o polyhedron.o mink.o triangulate.o io.o object.o acp.o geometry3d.o
 	$(LINK) freespace-graph_test.o freespace-graph.o path3d.o polyhedron.o mink.o triangulate.o io.o object.o acp.o geometry3d.o $(LFLAGS) -o freespace-graph_test
