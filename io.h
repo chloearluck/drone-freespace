@@ -47,12 +47,19 @@ void writeHFaces (Polyhedron *a, ostream &ostr);
 
 void writePolyhedronVTK (const Faces &fa, ostream &ostr);
 
+void writePolyhedronOBJ (const Faces &fa, ostream &ostr);
+
 int getPoint (VIMap &vimap, PV3s &pts, Vertex *v);
 
 void outputVTK (const PV3s &pts, const IVector &data, bool pflag, 
-		ostream &ostr);
+    ostream &ostr);
+
+void outputOBJ (const PV3s &pts, const IVector &data, bool pflag, 
+    ostream &ostr);
 
 void writePolyhedronVTK (const HFaces &fa, ostream &ostr);
+
+void writePolyhedronOBJ (const HFaces &fa, ostream &ostr);
 
 Polyhedron * readPolyhedronSTL (istream &istr);
 

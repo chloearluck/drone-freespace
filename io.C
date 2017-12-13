@@ -263,16 +263,39 @@ void writePolyhedronVTK (const Faces &fa, ostream &ostr)
       HEdge *e = fb[0], *e0 = e;
       Vertices ve;
       do {
-	ve.push_back(e->tail());
-	e = e->getNext();
+  ve.push_back(e->tail());
+  e = e->getNext();
       }
       while (e != e0);
       data.push_back(ve.size());
       for (Vertices::iterator v = ve.begin(); v != ve.end(); ++v)
-	data.push_back(getPoint(vimap, pts, *v));
+  data.push_back(getPoint(vimap, pts, *v));
     }
   }
   outputVTK(pts, data, true, ostr);
+}
+
+void writePolyhedronOBJ (const Faces &fa, ostream &ostr)
+{
+  PV3s pts;
+  IVector data;
+  VIMap vimap;
+  for (Faces::const_iterator f = fa.begin(); f != fa.end(); ++f) {
+    const HEdges &fb = (*f)->getBoundary();
+    if (!fb.empty()) {
+      HEdge *e = fb[0], *e0 = e;
+      Vertices ve;
+      do {
+  ve.push_back(e->tail());
+  e = e->getNext();
+      }
+      while (e != e0);
+      data.push_back(ve.size());
+      for (Vertices::iterator v = ve.begin(); v != ve.end(); ++v)
+  data.push_back(getPoint(vimap, pts, *v));
+    }
+  }
+  outputOBJ(pts, data, true, ostr);
 }
 
 int getPoint (VIMap &vimap, PV3s &pts, Vertex *v)
@@ -309,6 +332,24 @@ void outputVTK (const PV3s &pts, const IVector &data, bool pflag,
     ostr << data[i] << " ";
     for (int j = 0; j < data[i]; ++j)
       ostr << data[i+j+1] << " ";
+    ostr << endl;
+    i += data[i] + 1;
+  }
+}
+
+void outputOBJ (const PV3s &pts, const IVector &data, bool pflag, 
+    ostream &ostr)
+{
+  int nv = pts.size();
+  ostr <<setprecision(20) << "g"<<endl;
+  for (PV3s::const_iterator p = pts.begin(); p != pts.end(); ++p) 
+    ostr << "v "<< p->getX().mid() << " " << p->getY().mid() << " " << p->getZ().mid() << endl;
+  
+  int i = 0;
+  while (i < data.size()) {
+    ostr << "f ";
+    for (int j = 0; j < data[i]; ++j)
+      ostr << data[i+j+1]+1 << " ";
     ostr << endl;
     i += data[i] + 1;
   }
