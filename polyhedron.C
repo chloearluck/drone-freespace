@@ -1757,6 +1757,7 @@ int Polyhedron::containingCell (Point *p) const
   for (int i = 0; i< cells.size(); i++)
     if (cells[i]->contains(p))
       return i;
+  assert(false);
   return -1;
 }
 
