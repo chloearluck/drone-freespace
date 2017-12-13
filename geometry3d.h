@@ -151,10 +151,10 @@ class FaceIntersectionPoint : public Point {
 
 protected:
   PTR<Point> head, tail;
+  PTR<Point> a,b,c;
   HFace * hface;
 
 public:
-  FaceIntersectionPoint (PTR<Point> tail, PTR<Point> head, HFace * hface) : tail(tail), head(head), hface(hface) {}
+  FaceIntersectionPoint (PTR<Point> tail, PTR<Point> head, HFace * hface) : tail(tail), head(head), hface(hface) { a = hface->getF()->getP()->getA(); b = hface->getF()->getP()->getB(); c = hface->getF()->getP()->getC(); }
   HFace * getHFace() { return hface; }
 };
-

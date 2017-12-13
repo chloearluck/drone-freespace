@@ -164,7 +164,7 @@ PV3 IntersectionPoint::calculate () {
 }
 
 PV3 FaceIntersectionPoint::calculate () {
-  TrianglePlane * p = hface->getF()->getP();
+  PTR<Plane> p = new TrianglePlane(a,b,c);
   PV3 t = tail->getP();
   PV3 v = head->getP()-t;
   PV3 n = p->getN();
