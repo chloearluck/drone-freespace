@@ -1,5 +1,5 @@
 #include "freespace-graph.h"
-bool DEBUG = true;
+bool DEBUG = false;
 
 Polyhedron * loadPoly(const char * filename) {
   Polyhedron * poly;
