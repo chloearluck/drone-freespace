@@ -721,7 +721,7 @@ void bfs(HFace * fa, HFace * fb, HFaces & pathfaces) {
     pathfaces.push_back(pathfaces_rev[i]);
 }
 
-void findPath(Polyhedron * blockspace, int cell_index, PTR<Point> start, PTR<Point> end, bool startOnSurface, bool endOnSurface, Points &path) {
+void findPath(Polyhedron * blockspace, int cell_index, PTR<Point> start, PTR<Point> end, Points &path) {
   blockspace->computeWindingNumbers();
   bool startOutside = blockspace->containingCell(start) != cell_index;
   bool endOutside = blockspace->containingCell(end) != cell_index;
