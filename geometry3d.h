@@ -117,16 +117,6 @@ public:
   CellInternalPoint(Cell * cell, PTR<Point> facePoint, double unit) : cell(cell), facePoint(facePoint), unit(unit) {}
 };
 
-// Plane defined by triangle of points.
-class TrianglePlane2 : public Plane {
-  ObjPTR<PV3> a, b, c;
-  PlaneData calculate ();
-  
-public:
-  TrianglePlane2 (Object<PV3> *a, Object<PV3> *b, Object<PV3> *c) 
-    : a(a), b(b), c(c) {}
-};
-
 class SplitPlane : public Plane {
   PTR<Point> v0, v1, v2;
   PlaneData calculate ();
@@ -141,16 +131,6 @@ class PointNormalPlane : public Plane {
 
 public:
   PointNormalPlane(PTR<Point> point, PTR<Point> normal) : point(point), normal(normal) {}
-};
-
-// Point defined as the projection of a point onto a plane
-class PlanePointX : public Point {
-  PTR<Plane> plane;
-  PTR<Point> point;
-  PV3 calculate ();
-  
-public:
-  PlanePointX (PTR<Plane> plane, PTR<Point> point) : plane(plane), point(point) {}
 };
 
 class IntersectionPoint : public Point {

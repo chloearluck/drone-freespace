@@ -88,16 +88,6 @@ int InSphere::sign () {
           ed.cross(ea).dot(eb) * ec.dot(ec)).sign();
 }
 
-PlaneData TrianglePlane2::calculate () {
-  PV3 a = this->a->get();
-  PV3 b = this->b->get();
-  PV3 c = this->c->get();
-  PV3 v = (b - a).cross(c - a);
-  Parameter d = v.dot(a);
-  return(PlaneData(v, d));
-}
-
-
 PlaneData PointNormalPlane::calculate () {
   PV3 p = this->point->get();
   PV3 n = this->normal->get();
@@ -158,13 +148,6 @@ PV3 CellInternalPoint::calculate () {
   PV3 fp = facePoint->getP();
   PV3 n = hface->getN();
   return fp + unit * n;
-}
-
-PV3 PlanePointX::calculate ()  {
-  PV3 v = plane->getN();
-  Parameter d = plane->getK();
-  PV3 p = point->getP();
-  return(p - v * ((v.dot(p) - d) / v.dot(v)));
 }
 
 PV3 IntersectionPoint::calculate () {
