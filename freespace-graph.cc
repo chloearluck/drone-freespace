@@ -238,7 +238,7 @@ void FreeSpaceGraph::nodePointPath(std::vector<FreeSpaceGraph::Node*> & nodes, P
         assert(p != NULL);
       } else {
         PTR<Point> q = nearestPoint(to_blockspace, to->cell_index, p);
-        deepestPath(from, p, q, rev);
+        // deepestPath(from, p, q, rev); //I don't think it makes sense to use deepest path when going from parent to child
         rev.push_back(make_tuple(from, q, false));
         rev.push_back(make_tuple(to, q, true));
         assert(q != NULL);
