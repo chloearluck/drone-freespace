@@ -723,6 +723,7 @@ void bfs(HFace * fa, HFace * fb, HFaces & pathfaces) {
 
 void findPath(Polyhedron * blockspace, int cell_index, PTR<Point> start, PTR<Point> end, Points &path) {
   blockspace->computeWindingNumbers();
+  Cell * cell = blockspace->cells[cell_index];
   bool startOutside = blockspace->containingCell(start) != cell_index;
   bool endOutside = blockspace->containingCell(end) != cell_index;
 
@@ -732,12 +733,24 @@ void findPath(Polyhedron * blockspace, int cell_index, PTR<Point> start, PTR<Poi
   HFace * hf_start = NULL;
   HFace * hf_end = NULL;
   if (startOutside || endOutside) {
-    for (int i=0; i<blockspace->vertices.size(); i++) {
-      Vertex * v = blockspace->vertices[i];
-      if (startOutside && (v_start == NULL || CloserPair(start, v->getP(), start, v_start->getP()) > 0))
-        v_start = v;
-      if (endOutside && (v_end == NULL || CloserPair(end, v->getP(), end, v_end->getP()) > 0))
-        v_end = v;
+    for (int i=0; i<cell->nShells(); i++) {
+      Shell * shell = cell->getShell(i);
+      for (int j=0; j<shell->getHFaces().size(); j++) {
+        HFace * hface = shell->getHFaces()[j];
+        HEdge * he = hface->getF()->getBoundary()[0];
+        Vertex * v0 = he->tail();
+        Vertex * v = v0;
+        do {
+          if (startOutside && (v_start == NULL || CloserPair(start, v->getP(), start, v_start->getP()))) {
+            v_start = v;
+            hf_start = hface;
+          }
+          if (endOutside && (v_end == NULL || CloserPair(end, v->getP(), end, v_end->getP()))) {
+            v_end = v;
+            hf_end = hface;
+          }
+        } while (v != v0);
+      }
     }
   }
 
@@ -745,7 +758,6 @@ void findPath(Polyhedron * blockspace, int cell_index, PTR<Point> start, PTR<Poi
   if (startOutside) startIncidentFaces = v_start->incidentFaces();
   if (endOutside) endIncidentFaces = v_end->incidentFaces();
 
-  Cell * cell = blockspace->cells[cell_index];
   std::vector<PTR<FaceIntersectionPoint> > points;
   PTR<Point> r =  new DiffPoint(end, start);
   for (int i=0; i<cell->nShells(); i++) {
