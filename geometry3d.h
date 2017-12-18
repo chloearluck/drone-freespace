@@ -158,3 +158,15 @@ public:
   FaceIntersectionPoint (PTR<Point> tail, PTR<Point> head, HFace * hface) : tail(tail), head(head), hface(hface) { a = hface->getF()->getP()->getA(); b = hface->getF()->getP()->getB(); c = hface->getF()->getP()->getC(); }
   HFace * getHFace() { return hface; }
 };
+
+//assume face is triangular
+class FaceNearestPoint : public Point {
+  PV3 calculate ();
+
+protected:
+  PTR<Point> point;
+  PTR<Point> pa,pb,pc;
+
+public: 
+  FaceNearestPoint (PTR<Point> point, HFace * hf) : point(point) { pa = hf->getF()->getP()->getA(); pb = hf->getF()->getP()->getB(); pc = hf->getF()->getP()->getC(); }
+};

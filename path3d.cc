@@ -722,14 +722,16 @@ void bfs(HFace * fa, HFace * fb, HFaces & pathfaces) {
 }
 
 void findPath(Polyhedron * blockspace, int cell_index, PTR<Point> start, PTR<Point> end, Points &path) {
+  //TO DO: make shortestPath algorithm can handle when start or end is a vertex
+
   blockspace->computeWindingNumbers();
   Cell * cell = blockspace->cells[cell_index];
   bool startOutside = blockspace->containingCell(start) != cell_index;
   bool endOutside = blockspace->containingCell(end) != cell_index;
 
   //find nearest vertex to any surface points
-  Vertex * v_start = NULL;
-  Vertex * v_end = NULL;
+  PTR<Point> p_start = NULL;
+  PTR<Point> p_end = NULL;
   HFace * hf_start = NULL;
   HFace * hf_end = NULL;
   if (startOutside || endOutside) {
@@ -737,27 +739,25 @@ void findPath(Polyhedron * blockspace, int cell_index, PTR<Point> start, PTR<Poi
       Shell * shell = cell->getShell(i);
       for (int j=0; j<shell->getHFaces().size(); j++) {
         HFace * hface = shell->getHFaces()[j];
-        HEdge * he = hface->getF()->getBoundary()[0];
-        Vertex * v0 = he->tail();
-        Vertex * v = v0;
-        do {
-          if (startOutside && (v_start == NULL || CloserPair(start, v->getP(), start, v_start->getP()))) {
-            v_start = v;
+        if (startOutside) {
+          PTR<Point> q = new FaceNearestPoint(start, hface);
+          if (p_start == NULL || CloserPair(start, q, start, p_start) > 0 ) {
+            p_start = q;
             hf_start = hface;
           }
-          if (endOutside && (v_end == NULL || CloserPair(end, v->getP(), end, v_end->getP()))) {
-            v_end = v;
+        }
+        if (endOutside) {
+          PTR<Point> q = new FaceNearestPoint(end, hface);
+          if (p_end == NULL || CloserPair(end, q, end, p_end) > 0 ) {
+            p_end = q;
             hf_end = hface;
           }
-        } while (v != v0);
+        }
       }
     }
   }
 
-  std::vector<Face *> startIncidentFaces, endIncidentFaces;
-  if (startOutside) startIncidentFaces = v_start->incidentFaces();
-  if (endOutside) endIncidentFaces = v_end->incidentFaces();
-
+  
   std::vector<PTR<FaceIntersectionPoint> > points;
   PTR<Point> r =  new DiffPoint(end, start);
   for (int i=0; i<cell->nShells(); i++) {
@@ -766,14 +766,8 @@ void findPath(Polyhedron * blockspace, int cell_index, PTR<Point> start, PTR<Poi
       HFace * hface = shell->getHFaces()[j];
       if (hface->getF()->contains(start) || hface->getF()->contains(end))
         continue;
-      if (std::find(startIncidentFaces.begin(), startIncidentFaces.end(), hface->getF()) != startIncidentFaces.end()) {
-        hf_start = hface;
+      if (hface == hf_start || hface == hf_end)
         continue;
-      }
-      if (std::find(endIncidentFaces.begin(), endIncidentFaces.end(), hface->getF()) != endIncidentFaces.end()) {
-        hf_end = hface;
-        continue;
-      }
       PTR<FaceIntersectionPoint> q = new FaceIntersectionPoint(start, end, hface);
       bool onFace = hface->getF()->contains(q);
       bool afterStart = (PointOrder(start, q, r) == 1);
@@ -784,9 +778,9 @@ void findPath(Polyhedron * blockspace, int cell_index, PTR<Point> start, PTR<Poi
   }
 
   if (startOutside)
-    start = v_start->getP();
+    start = p_start;
   if (endOutside)
-    end = v_end->getP();
+    end = p_end;
 
   
   std::sort(points.begin(), points.end(), ComparePointOrder(r));

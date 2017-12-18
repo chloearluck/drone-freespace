@@ -56,6 +56,8 @@ int Orient3D::sign () {
 #endif
 }
 
+#define vol(a,b,c,d) (a-d).cross(b-d).dot(c-d)
+
 int SegmentIntersect::sign() {
   PV3 a = pa->getP();
   PV3 b = pb->getP();
@@ -170,4 +172,61 @@ PV3 FaceIntersectionPoint::calculate () {
   PV3 n = p->getN();
   Parameter k = -(n.dot(t) + p->getK())/n.dot(v);
   return t + k*v;
+}
+
+PV3 FaceNearestPoint::calculate () {
+  PV3 p = point->getP();
+  PV3 a = pa->getP();
+  PV3 b = pb->getP();
+  PV3 c = pc->getP();
+  PV3 n = (a-b).cross(c-b);
+  Parameter d = n.dot(b);
+
+  //project p onto plane: find the intersection of line (p -> (p+n)) and plane
+  Parameter s = (d - p.dot(n)) / n.dot(n);
+  PV3 q = (p + n * s);
+  
+  bool sideab = vol(q, a, b, b+n).sign() == vol(c, a, b, b+n).sign();//q is on c's side of ab
+  bool sideac = vol(q, a, c, c+n).sign() == vol(b, a, c, c+n).sign();
+  bool sidebc = vol(q, b, c, c+n).sign() == vol(a, b, c, c+n).sign();
+
+  //does q lie on hf?
+  if (sideac && sideab && sideac) 
+    return q;
+
+  //q is on a's side of bc and b's side of ac, then our point is on bc (if <0 or >1, return an endpoint)
+  if (sideab && sideac) { //point is on bc
+    Parameter t = (q-c).dot(b-c);
+    if (t < 0)
+      return c;
+    if (t > 1)
+      return b;
+    return c + t*(b-c);
+  }
+  if (sideab && sidebc) { //point ins on ac
+    Parameter t = (q-c).dot(a-c);
+    if (t < 0)
+      return c;
+    if (t > 1)
+      return a;
+    return c + t*(a-c);
+  }
+  if (sideac && sidebc) { // point is on ab
+    Parameter  t = (q-a).dot(b-a);
+    if (t<0)
+      return a;
+    if (t>1)
+      return b;
+    return a + t*(b-a);    
+  }
+
+  if (!sideab && !sideac)
+    return a;
+  if (!sideab && !sidebc)
+    return b;
+  if (!sideac && !sidebc)
+    return c;
+
+  assert(false);
+  return p;
 }

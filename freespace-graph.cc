@@ -432,7 +432,7 @@ void FreeSpaceGraph::getPath(Node * start, Node * end, PTR<Point> a, PTR<Point> 
       if (n1->blockspace_index != n2->blockspace_index) {
         path.push_back(make_pair(p2,angle(n2->blockspace_index)));
       }
-      if (DEBUG) cout<<p1->getApprox().getX().mid()<<" "<<p1->getApprox().getY().mid()<<" "<<p1->getApprox().getX().mid()<<" "<<angle(n2->blockspace_index)<<" "<<n2->level<<" "<<n2->blockspace_index<<" "<<n2->cell_index<<endl;
+      if (DEBUG) cout<<p1->getApprox().getX().mid()<<" "<<p1->getApprox().getY().mid()<<" "<<p1->getApprox().getZ().mid()<<" "<<angle(n2->blockspace_index)<<" "<<n2->level<<" "<<n2->blockspace_index<<" "<<n2->cell_index<<endl;
     }
   }
 }
