@@ -33,6 +33,7 @@ void testSearchGraph(const char * graph_dir, PTR<Point> start, PTR<Point> end, i
   delete p;
 
   test.getPath(startNode, endNode, start, end, path);
+  cout<<"done search graph"<<endl;
 
   cout<<endl<<endl;
   for (int i=0; i<path.size(); i++)
@@ -45,13 +46,13 @@ int main (int argc, char *argv[]) {
     srandom(seed);
   }
 
-  const char * graph_dir = "frustum";
+  const char * graph_dir = "two_rooms_graph";
 
   //--------------------------------
   // Test creating a freespace-graph
-  const char * blockspace_dir = "output";
+  const char * blockspace_dir = "two_room_output";
   double theta = M_PI / 20;
-  double clearance_unit = 0.25;
+  double clearance_unit = 0.1;
   int num_levels = 4;
   
   testCreateGraph(blockspace_dir, graph_dir, theta, clearance_unit, num_levels);
@@ -59,8 +60,8 @@ int main (int argc, char *argv[]) {
 
   //--------------------------------
   // Test searching a freespace-graph
-  PTR<Point> start = new InputPoint(5,5,5);
-  PTR<Point> end = new InputPoint(-2,-2,-2);
+  PTR<Point> start = new InputPoint(2.5,-1,0);
+  PTR<Point> end = new InputPoint(2.5,8,0);
   int startRotationIndex = 0;
   int endRotationIndex = 0;
   
