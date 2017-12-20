@@ -1738,6 +1738,17 @@ Polyhedron * Polyhedron::negativeTranslate (Point *t) const
   return a;
 }
 
+Polyhedron * Polyhedron::scale (double unit) const
+{
+  Polyhedron *a = new Polyhedron;
+  VVMap vvmap;
+  for (Vertices::const_iterator v = vertices.begin(); v != vertices.end(); ++v)
+    vvmap.insert(VVPair(*v, a->getVertex(new ScalePoint( (*v)->p, unit ) )));
+  for (Faces::const_iterator f = faces.begin(); f != faces.end(); ++f)
+    a->getTriangle(*f, vvmap);
+  return a;
+}
+
 bool Polyhedron::intersects (Polyhedron *a) const
 {
   return contains(a->vertices[0]->p) || a->contains(vertices[0]->p) ||

@@ -1,5 +1,5 @@
 #include "freespace-graph.h"
-bool DEBUG = false;
+bool DEBUG = true;
 
 Polyhedron * loadPoly(const char * filename) {
   Polyhedron * poly;
@@ -31,13 +31,6 @@ class InputParameter : public Object<Parameter> {
 public:
   InputParameter (double x) { set(Parameter::input(x)); }
 };
-
-void scale(Polyhedron * p, PTR<Object<Parameter> > unit) {
-  for (int i=0; i> p->vertices.size(); i++) {
-    Vertex * v = p->vertices[i];
-    p->moveVertex(v, new ScalePoint(v->getP(), unit));
-  }
-}
 
 PTR<Point> pointInCell(Polyhedron * poly, int i) {
   Cell * cell =  poly->cells[i];
@@ -438,11 +431,7 @@ void FreeSpaceGraph::getPath(Node * start, Node * end, PTR<Point> a, PTR<Point> 
 }
 
 FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, double theta, double clearance_unit, int num_levels, const char * dir) {
-  //read in the unit sphere and scale it by unit
-  Polyhedron * unit_ball = loadPoly("sphere.vtk");
-  PTR<Object<Parameter> > unit =  new InputParameter(clearance_unit);
-  scale(unit_ball, unit);
-
+  double unit = clearance_unit;
   this->theta = theta;
   this->num_levels = num_levels;
   this->blockspaces_per_level = original_blockspaces.size();
@@ -474,8 +463,13 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, 
       prev_blockspaces.insert(prev_blockspaces.begin(), blockspaces.begin(), blockspaces.end());
       blockspaces.clear();
 
-      for (int i=0; i<prev_blockspaces.size(); i++) 
+      Polyhedron * ball = loadPoly("sphere.vtk");
+      Polyhedron * unit_ball = ball->scale(unit);
+      unit = unit * 2;
+      for (int i=0; i<prev_blockspaces.size(); i++)
         blockspaces.push_back(minkowskiSumFull(prev_blockspaces[i], unit_ball));
+      
+      delete unit_ball;
     }
 
     cout<<"creating nodes"<<endl;
@@ -549,7 +543,6 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, 
     delete blockspaces[i];
   blockspaces.clear();
 
-  delete unit_ball;
 
   cout<<"saving"<<endl;
 

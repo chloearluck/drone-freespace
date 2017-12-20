@@ -209,6 +209,14 @@ class SumPoint : public Point {
   SumPoint (Point *a, Point *b) : a(a), b(b) {}
 };
 
+class ScalePoint : public Point {
+  PTR<Point> p;
+  double unit;
+  PV3 calculate () { return unit * p->getP(); }
+ public:
+  ScalePoint(PTR<Point> p, double unit) : p(p), unit(unit) {}
+};
+
 class DiffPoint : public Point {
   friend class Point;
   PTR<Point> a, b;
@@ -833,6 +841,7 @@ class Polyhedron {
   Polyhedron * negative () const;
   Polyhedron * translate (Point *t) const;
   Polyhedron * negativeTranslate (Point *t) const;
+  Polyhedron * scale (double unit) const;
   bool intersects (Polyhedron *a) const;
   bool contains (Point *p) const;
   int containingCell (Point *p) const;
