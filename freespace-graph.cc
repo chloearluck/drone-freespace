@@ -467,7 +467,7 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, 
       Polyhedron * unit_ball = ball->scale(unit);
       unit = unit * 2;
       for (int i=0; i<prev_blockspaces.size(); i++)
-        blockspaces.push_back(minkowskiSumFull(prev_blockspaces[i], unit_ball));
+        blockspaces.push_back(minkowskiSumFull(original_blockspaces[i], unit_ball));
       
       delete unit_ball;
     }
