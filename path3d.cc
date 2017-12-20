@@ -678,6 +678,10 @@ void localPath(PTR<Point> a, PTR<Point> b, HFaces & pathfaces, Points & path) {
       }
 
     }
+    if (iter_num > 100) {
+      cout<<"WARN: path3d not terminating"<<endl;
+      break;
+    }
   } while(changedThisIteration);
 
   path.clear();
