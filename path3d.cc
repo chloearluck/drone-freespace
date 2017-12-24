@@ -199,14 +199,11 @@ class XYComponents : public Object<PV2> {
   XYComponents (PTR<Point> p) : p(p) {} 
 };
 
-Primitive3(AreaABC, PTR<Object<PV2> >, pa, PTR<Object<PV2> >, pb, PTR<Object<PV2> >, pc);
-int AreaABC::sign() {
-  if (pa == pb || pa == pc || pb == pc)
-    return 0;
-  PV2 a = pa->get();
-  PV2 b = pb->get();
-  PV2 c = pc->get();
-  return (b-a).cross(c-a).sign();
+//returns 0 if a b and c lie on the same line
+Primitive3(Collinear, PTR<Point>, a, PTR<Point>, b, PTR<Point>, c)
+int Collinear::sign() {
+  PV3 s = (b->getP() - a->getP()).cross(c->getP() - a->getP());
+  return s.dot(s).sign();
 }
 
 class PathVertex {
@@ -218,6 +215,18 @@ class PathVertex {
   }
   PathVertex(PTR<Point> original, PTR<Object<PV2> > transformed2d) : original(original), transformed2d(transformed2d) {}
 };
+
+Primitive3(AreaABC, PathVertex * , pva, PathVertex * , pvb, PathVertex * , pvc);
+int AreaABC::sign() {
+  if (pva == pvb || pva == pvc || pvb == pvc)
+    return 0;
+  if (Collinear(pva->original, pvb->original, pvc->original) == 0)
+    return 0;
+  PV2 a = pva->transformed2d->get();
+  PV2 b = pvb->transformed2d->get();
+  PV2 c = pvc->transformed2d->get();
+  return (b-a).cross(c-a).sign();
+}
 
 //find the 3d equivalent of the 2d intersection between triangle edge p->q and line segment c->d
 class ABintersectCDto3D : public Point {
@@ -351,11 +360,12 @@ void path2Dto3D(std::vector<PathVertex*> &vertPath, std::vector<int> &vertPathIn
     assert(j < vertPath.size());
     if (vertPathIndices[j] == i) {
       path.push_back(vertPath[j]->original);
+      if (vertPath[j] == edges[edges.size()-1].right)
+        break;
       j++;
-    } else {
-      if (vertPath[j-1] != edges[i].left && vertPath[j-1] != edges[i].right)
-        path.push_back(new ABintersectCDto3D(edges[i].left, edges[i].right, vertPath[j-1], vertPath[j]));
-        path[path.size()-1]->getApprox();
+    } else if (vertPath[j-1] != edges[i].left && vertPath[j-1] != edges[i].right && vertPath[j] != edges[i].left && vertPath[j] != edges[i].right) {
+      path.push_back(new ABintersectCDto3D(edges[i].left, edges[i].right, vertPath[j-1], vertPath[j]));
+      path[path.size()-1]->getApprox();
     }
   }
 }
@@ -367,6 +377,8 @@ class State {
   std::vector<PathVertex*> right;
   int nPath;
   State(std::vector<PathEdge> & e, int nedges, std::vector<PathVertex*> & l, std::vector<PathVertex*> r, int n) {
+    if (nedges > e.size())
+      nedges = e.size();
     edges.insert(edges.begin(), e.begin(), e.begin()+nedges);
     right.insert(right.begin(), r.begin(), r.end());
     left.insert(left.begin(), l.begin(), l.end());
@@ -399,7 +411,7 @@ void shortestPath(std::vector<PathTriangle> & triangles, PathVertex * start, Pat
     for (int j=0; j<3; j++)
       if (triangles[i].p[j] != p && triangles[i].p[j] != q)
         from = triangles[i].p[j];
-    PathVertex * l = ((AreaABC(from->transformed2d, p->transformed2d, q->transformed2d) > 0)? q : p);
+    PathVertex * l = ((AreaABC(from, p, q) > 0)? q : p);
     PathVertex * r = ((l != p)? p : q);
     edges.push_back(PathEdge(l, r)); 
   }
@@ -418,18 +430,23 @@ void shortestPath(std::vector<PathTriangle> & triangles, PathVertex * start, Pat
   left.push_back(start); leftIndices.push_back(-1);
   right.push_back(start); rightIndices.push_back(-1);
 
-  left.push_back(edges[0].left); leftIndices.push_back(0);
-  right.push_back(edges[0].right); rightIndices.push_back(0);
+  if (edges[0].left != start) { left.push_back(edges[0].left); leftIndices.push_back(0); }
+  if (edges[0].right != start) { right.push_back(edges[0].right); rightIndices.push_back(0); }
   char s[50]; int state_num = 0;
+
+  if (DEBUG) {
+    sprintf(s, "state/%d.txt", state_num++);
+    State(edges, 2, left, right, 1).save(s);
+  }
 
   int nPath = 1; //left[0] and right[0] are the same, the rest of the path isn't
   for (int i=1; i<edges.size(); i++) {
     if (right[right.size()-1] != edges[i].right) {
-      while(right.size()>nPath && AreaABC(right[right.size()-2]->transformed2d, right[right.size()-1]->transformed2d, edges[i].right->transformed2d) > 0)
+      while(right.size()>nPath && AreaABC(right[right.size()-2], right[right.size()-1], edges[i].right) > 0)
       {  right.pop_back(); rightIndices.pop_back();  }
 
       if (right.size() == nPath) {
-        while (left.size()>nPath && AreaABC(right[right.size()-1]->transformed2d, edges[i].right->transformed2d, left[nPath]->transformed2d) < 0) {
+        while (left.size()>nPath && AreaABC(right[right.size()-1], edges[i].right, left[nPath]) < 0) {
           right.push_back(left[nPath]);
           rightIndices.push_back(leftIndices[nPath]);
           nPath++;
@@ -440,16 +457,16 @@ void shortestPath(std::vector<PathTriangle> & triangles, PathVertex * start, Pat
 
       if (DEBUG) {
         sprintf(s, "state/%d.txt", state_num++);
-        State(edges, i+1, left, right, nPath).save(s);
+        State(edges, i+2, left, right, nPath).save(s);
       }
     }
 
     if (left[left.size()-1] != edges[i].left) {
-      while(left.size()>nPath && AreaABC(left[left.size()-2]->transformed2d, left[left.size()-1]->transformed2d, edges[i].left->transformed2d) < 0)
+      while(left.size()>nPath && AreaABC(left[left.size()-2], left[left.size()-1], edges[i].left) < 0)
       {  left.pop_back(); leftIndices.pop_back();  }
 
       if (left.size() == nPath) {
-        while (right.size() > nPath && AreaABC(left[left.size()-1]->transformed2d, edges[i].left->transformed2d, right[nPath]->transformed2d) > 0) {
+        while (right.size() > nPath && AreaABC(left[left.size()-1], edges[i].left, right[nPath]) > 0) {
           left.push_back(right[nPath]);
           leftIndices.push_back(rightIndices[nPath]);
           nPath++;
@@ -460,7 +477,7 @@ void shortestPath(std::vector<PathTriangle> & triangles, PathVertex * start, Pat
 
       if (DEBUG) {
         sprintf(s, "state/%d.txt", state_num++);
-        State(edges, i+1, left, right, nPath).save(s);
+        State(edges, i+2, left, right, nPath).save(s);
       }
     }
   }
@@ -548,14 +565,14 @@ void localPath(PTR<Point> a, PTR<Point> b, HFaces & pathfaces, Points & path) {
 
   shortestPath(triangles, start, end, vertPath, vertPathIndices, edges);
 
-  //DEBUG
-  path2Dto3D(vertPath, vertPathIndices, edges, path);
-  save(path, "path0.vtk");
-  char s[50];  
-  //DEBUG
+  if (DEBUG) {
+    path2Dto3D(vertPath, vertPathIndices, edges, path);
+    save(path, "path0.vtk");
+  }  
 
   bool changedThisIteration;
   int iter_num  = 0;
+  char s[50];
   do {
     iter_num++;
     changedThisIteration = false;
@@ -689,6 +706,7 @@ void localPath(PTR<Point> a, PTR<Point> b, HFaces & pathfaces, Points & path) {
 }
 
 void bfs(HFace * fa, HFace * fb, HFaces & pathfaces) {
+  assert(fa->getS() == fb->getS());
   HFaces pathfaces_rev;
 
   std::map<HFace *, HFace *> parents;
@@ -723,6 +741,80 @@ void bfs(HFace * fa, HFace * fb, HFaces & pathfaces) {
 
   for (int i=pathfaces_rev.size()-1; i>=0; i--)
     pathfaces.push_back(pathfaces_rev[i]);
+}
+
+void testBoundaryCondition(Polyhedron * poly, int mode) {
+  int START_ON_VERTEX = 0;
+  int START_ON_EDGE = 1;
+  int END_ON_VERTEX = 2;
+  int END_ON_EDGE = 3;
+  poly->computeWindingNumbers();
+
+  PTR<FaceIntersectionPoint> start  = 0;
+  PTR<FaceIntersectionPoint> end  = 0;
+  while(start == 0) {
+    std::vector<PTR<FaceIntersectionPoint> > points;
+    //choose a random 2 points, they define a ray
+    PTR<Point> p = new InputPoint(random()/double(RAND_MAX), random()/double(RAND_MAX),random()/double(RAND_MAX));
+    PTR<Point> q = new InputPoint(random()/double(RAND_MAX), random()/double(RAND_MAX),random()/double(RAND_MAX));
+    PTR<Point> r =  new DiffPoint(p, q);
+    //choose a random and shell
+    int cell_index = floor(random()/double(RAND_MAX) * poly->cells.size());
+    Cell * cell = poly->cells[cell_index];
+    int shell_index = floor(random()/double(RAND_MAX) * cell->nShells());
+
+
+    //do ray casting
+    Shell * shell = cell->getShell(shell_index);
+    for (int j=0; j<shell->getHFaces().size(); j++) {
+      HFace * hface = shell->getHFaces()[j];
+      PTR<FaceIntersectionPoint> s = new FaceIntersectionPoint(p, q, hface);
+      bool onFace = hface->getF()->contains(s);
+      if (onFace)
+        points.push_back(s);
+    }
+
+    //sort all the intersections, set start and end to the first 2 if they exist
+    if (points.size() > 1) {
+      std::sort(points.begin(), points.end(), ComparePointOrder(r));
+      start = points[0];
+      end = points[1];
+    }
+  }
+
+  //get bfs path
+  HFaces bfsPath;
+  bfs(start->getHFace(), end->getHFace(), bfsPath);
+  assert(bfsPath.size() !=0);
+  Points path;
+
+  if (mode == START_ON_VERTEX) {
+    //replace start with one of its face's vertices
+    HFace * hface = start->getHFace();
+    PTR<Point> newStart = hface->getF()->getBoundary(0)->tail()->getP();
+    localPath(newStart, (PTR<Point>) end, bfsPath, path);
+  } else if (mode  == START_ON_EDGE) {
+    //replace start with a point on one of its face's edges
+    HFace * hface = start->getHFace();
+    PTR<Point> a = hface->getF()->getBoundary(0)->tail()->getP();
+    PTR<Point> b = hface->getF()->getBoundary(0)->head()->getP();
+    PTR<Point> newStart = new MidPoint(a,b);
+    assert(Collinear(a,b,newStart) == 0);
+    localPath(newStart, (PTR<Point>) end, bfsPath, path);
+  } else if (mode == END_ON_VERTEX) {
+    //replace end with one of its face's vertices
+    HFace * hface = end->getHFace();
+    PTR<Point> newEnd = hface->getF()->getBoundary(0)->tail()->getP();
+    localPath((PTR<Point>) start, newEnd, bfsPath, path);
+  } else if (mode  == END_ON_EDGE) {
+    //replace end with a point on one of its face's edges
+    HFace * hface = end->getHFace();
+    PTR<Point> a = hface->getF()->getBoundary(0)->tail()->getP();
+    PTR<Point> b = hface->getF()->getBoundary(0)->head()->getP();
+    PTR<Point> newEnd = new MidPoint(a,b);
+    assert(Collinear(a,b,newEnd) == 0);
+    localPath((PTR<Point>) start, newEnd, bfsPath, path);
+  }
 }
 
 void findPath(Polyhedron * blockspace, int cell_index, PTR<Point> start, PTR<Point> end, Points &path) {

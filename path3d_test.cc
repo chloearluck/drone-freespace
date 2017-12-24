@@ -39,6 +39,31 @@ void savePathVTK(Points path, const char * filename) {
   }
 }
 
+void testBoundary() {
+  Polyhedron * poly = loadPoly("two_rooms_graph/4-30");
+  cout<<"Start On Vertex"<<endl;
+  testBoundaryCondition(poly, 0);
+  testBoundaryCondition(poly, 0);
+  testBoundaryCondition(poly, 0);
+  testBoundaryCondition(poly, 0);
+  cout<<"Start On Edge"<<endl;
+  testBoundaryCondition(poly, 1);
+  testBoundaryCondition(poly, 1);
+  testBoundaryCondition(poly, 1);
+  testBoundaryCondition(poly, 1);
+  cout<<"End On Vertex"<<endl;
+  testBoundaryCondition(poly, 2);
+  testBoundaryCondition(poly, 2);
+  testBoundaryCondition(poly, 2);
+  testBoundaryCondition(poly, 2);
+  cout<<"End On Edge"<<endl;
+  testBoundaryCondition(poly, 3);
+  testBoundaryCondition(poly, 3);
+  testBoundaryCondition(poly, 3);
+  testBoundaryCondition(poly, 3);
+}
+
+
 int main (int argc, char *argv[]) {
   if (argc < 2) {
     cout<<"not enough arguments"<<endl;
