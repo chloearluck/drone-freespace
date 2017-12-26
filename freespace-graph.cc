@@ -132,6 +132,17 @@ PTR<Point> nearestPoint(Polyhedron * poly, int cell_index, PTR<Point> p) {
   return q;
 }
 
+PTR<Point> nearestPoint(Polyhedron * poly, std::vector<int> & cells, PTR<Point> p) {
+  PTR<Point> closest = 0;
+  for (int i=0; i<cells.size(); i++) {
+    PTR<Point> q = nearestPoint(poly, cells[i], p);
+    if (closest == NULL || CloserPair(q, p, closest, p) > 0)
+      closest = q;
+  }
+  assert(closest != NULL);
+  return closest;
+}
+
 void FreeSpaceGraph::deepestPath(FreeSpaceGraph::Node * n, PTR<Point> p, PTR<Point> q, std::vector<std::pair<FreeSpaceGraph::Node * , PTR<Point> > > & path) {
   // invariant: (n,p) is already on the path, (n,q) will be added after return
   if (n->children.size() == 0) {
@@ -249,12 +260,13 @@ void FreeSpaceGraph::nodePointPath(std::vector<FreeSpaceGraph::Node*> & nodes, P
     std::string s = std::string(dir) + "/" + std::to_string(to->level) + "-" + std::to_string(bi) + "-" + std::to_string(bj) + ".vtk";
     Polyhedron * intersection = loadPoly(s.c_str() );
     intersection->computeWindingNumbers();
+    int cell_index = intersection->containingCell(p);
     assert(intersection != NULL);
-    if (intersection->containingCell(p) == to->neighborIntersectionIndex[k]) {
+    if ( std::find(to->neighborIntersectionIndices[k].begin(), to->neighborIntersectionIndices[k].end(), cell_index) != to->neighborIntersectionIndices[k].end()) {
       rev.push_back(make_pair(to, p));
       assert(p != NULL);
     } else {
-      PTR<Point> q = nearestPoint(intersection, to->neighborIntersectionIndex[k], p);
+      PTR<Point> q = nearestPoint(intersection, to->neighborIntersectionIndices[k], p);
       assert(p != NULL);
       assert(q != NULL);
       deepestPath(from, p, q, rev);
@@ -503,10 +515,21 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, 
           PTR<Point> p = pointInCell(block_union, k);
           int ci = blockspaces[i]->containingCell(p);
           int cj = blockspaces[j]->containingCell(p);
-          graph[level][i]->get(ci)->neighbors.push_back(graph[level][j]->get(cj));
-          graph[level][j]->get(cj)->neighbors.push_back(graph[level][i]->get(ci));
-          graph[level][i]->get(ci)->neighborIntersectionIndex.push_back(k);
-          graph[level][j]->get(cj)->neighborIntersectionIndex.push_back(k);
+          Node * ni = graph[level][i]->get(ci);
+          Node * nj = graph[level][j]->get(cj);
+          assert(nj != NULL); assert(ni != NULL);
+          int pos_i = std::find(ni->neighbors.begin(), ni->neighbors.end(), nj) - ni->neighbors.begin();
+          if (pos_i == ni->neighbors.size()) {
+            ni->neighbors.push_back(nj);
+            ni->neighborIntersectionIndices.push_back(std::vector<int>());
+          }
+          int pos_j = std::find(nj->neighbors.begin(), nj->neighbors.end(), ni) - nj->neighbors.begin();
+          if (pos_j == nj->neighbors.size()) {
+            nj->neighbors.push_back(ni);
+            nj->neighborIntersectionIndices.push_back(std::vector<int>());
+          }
+          ni->neighborIntersectionIndices[pos_i].push_back(k);
+          nj->neighborIntersectionIndices[pos_j].push_back(k);
         }
       std::string s = std::string(dir) + "/" + std::to_string(level) + "-" + std::to_string(i) + "-" + std::to_string(j) + ".vtk";
       savePoly(block_union, s.c_str());
@@ -562,8 +585,12 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, 
           for (int l=0; l<node->children.size(); l++)
             out<< " " << node->children[l]->level << " " << node->children[l]->blockspace_index << " " << node->children[l]->cell_index;
           out<<",";
-          for (int l=0; l<node->neighbors.size(); l++)
-            out<< " " << node->neighbors[l]->level << " " << node->neighbors[l]->blockspace_index << " " << node->neighbors[l]->cell_index << " " << node->neighborIntersectionIndex[l];
+          for (int l=0; l<node->neighbors.size(); l++) {
+            out<< " " << node->neighbors[l]->level << " " << node->neighbors[l]->blockspace_index << " " << node->neighbors[l]->cell_index << " [";
+            for (int m=0; m<node->neighborIntersectionIndices[l].size(); m++)
+              out<<(m>0?" ":"")<<node->neighborIntersectionIndices[l][m];
+            out<<"]";
+          }
           if (node->siblings.size()>0) {
           out<<",";
             for (int l=0; l<node->siblings.size(); l++)
@@ -624,10 +651,20 @@ FreeSpaceGraph::FreeSpaceGraph(const char * dir) {
       }
       if (getline(ss, neighbors, ',')) {
         istringstream ss2(neighbors);
-        int i,j,k,l;
-        while (ss2 >> i >> j >> k >> l) {
-          n->neighbors.push_back(graph[i][j]->getOrCreate(k));
-          n->neighborIntersectionIndex.push_back(l);
+        std::string s1, s2;
+        while(getline(ss2, s1, '[')) {
+          getline(ss2, s2, ']');
+          istringstream ss3(s1);
+          int i, j, k;
+          ss3 >> i >> j >> k;
+          Node * neighbor = graph[i][j]->getOrCreate(k);
+          n->neighbors.push_back(neighbor);
+          n->neighborIntersectionIndices.push_back(std::vector<int>());
+          ss3 = istringstream(s2);
+          while (ss3 >> i) {
+            cout<<"intersection index: "<<i<<endl;
+            n->neighborIntersectionIndices[n->neighbors.size()-1].push_back(i);
+          }
         }
       }
       if (getline(ss, siblings, ',')) {

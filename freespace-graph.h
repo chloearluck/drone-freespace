@@ -22,7 +22,7 @@ class FreeSpaceGraph {
     Node * parent;  
     std::vector<Node*> children; 
     std::vector<Node*> neighbors;
-    std::vector<int> neighborIntersectionIndex; 
+    std::vector<std::vector<int> > neighborIntersectionIndices; 
     std::vector<Node*> siblings;
     std::vector< std::pair< PTR<Point>, PTR<Point> > > siblingPoints;
     Node(int level, int blockspace_index, int cell_index, Node * parent)
