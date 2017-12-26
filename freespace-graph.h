@@ -1,6 +1,7 @@
 #include "path3d.h"
 #include "mink.h"
 #include "io.h"
+#include "simplify.h"
 #include <sys/stat.h>
 #include <errno.h>
 #include <string>

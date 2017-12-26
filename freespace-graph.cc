@@ -16,6 +16,7 @@ Polyhedron * loadPoly(const char * filename) {
 }
 
 void savePoly(Polyhedron * p, const char * filename) {
+  simplify(p, 1e-6);
   ofstream out;
   out.open(filename);
   if (out.is_open()) {

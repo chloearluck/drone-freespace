@@ -28,14 +28,14 @@ freespace_test: freespace_test.o freespace.o hull.o polyhedron.o triangulate.o i
 freespace_test.o: freespace_test.cc freespace.h hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h
 	$(COMPILE) freespace_test.cc
 
-freespace-graph.o: freespace-graph.cc freespace-graph.h path3d.h polyhedron.h mink.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h 
+freespace-graph.o: freespace-graph.cc freespace-graph.h path3d.h polyhedron.h mink.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h simplify.h
 	$(COMPILE) -std=c++11 freespace-graph.cc
 
-freespace-graph_test.o: freespace-graph_test.cc freespace-graph.h path3d.h polyhedron.h mink.h io.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h
+freespace-graph_test.o: freespace-graph_test.cc freespace-graph.h path3d.h polyhedron.h mink.h io.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h simplify.h
 	$(COMPILE) -std=c++11 freespace-graph_test.cc
 
-freespace-graph_test: freespace-graph_test.o freespace-graph.o path3d.o polyhedron.o mink.o triangulate.o io.o object.o acp.o geometry3d.o
-	$(LINK) freespace-graph_test.o freespace-graph.o path3d.o polyhedron.o mink.o triangulate.o io.o object.o acp.o geometry3d.o $(LFLAGS) -o freespace-graph_test
+freespace-graph_test: freespace-graph_test.o freespace-graph.o path3d.o polyhedron.o mink.o triangulate.o io.o object.o acp.o geometry3d.o simplify.o expander2.o
+	$(LINK) freespace-graph_test.o freespace-graph.o path3d.o polyhedron.o mink.o triangulate.o io.o object.o acp.o geometry3d.o simplify.o expander2.o $(LFLAGS) -o freespace-graph_test
 
 geometry3d.o: geometry3d.cc geometry3d.h acp.h pv.h object.h polyhedron.h
 	$(COMPILE) geometry3d.cc
@@ -77,4 +77,4 @@ triangulate.o: triangulate.C triangulate.h polyhedron.h octree.h rbtree.h object
 	$(COMPILE) triangulate.C
 
 clean: 
-	rm -f *.o *~ hull test_mink freespace_test path3d_test freespace-graph_test
+	rm -f *.o *~ hull test_mink freespace_test path3d_test freespace-graph_test *.lp
