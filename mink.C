@@ -5,16 +5,16 @@ Polyhedron * minkowskiSum (Polyhedron *a, Polyhedron *b)
   Convolution *con = convolution(a, b);
   Octree<Face *> *octree = con->faceOctree();
   Polyhedron *c = new Polyhedron;
-  VVMap vvmap;
+  PVMap pvmap;
   FaceSet fdone, fs;
-  Face *f0 = con->minkowskiInit(fdone, octree, c, vvmap);
+  Face *f0 = con->minkowskiInit(fdone, octree, c, pvmap);
   Faces st;
   st.push_back(f0);
   while (!st.empty()) {
     Face *f = *st.rbegin();
     st.pop_back();
     if (fs.insert(f).second)
-      con->expand(fdone, octree, c, vvmap, f, st);
+      con->expand(fdone, octree, c, pvmap, f, st);
   }
   Polyhedron *d = triangulate(fs);
   delete octree;
@@ -24,12 +24,12 @@ Polyhedron * minkowskiSum (Polyhedron *a, Polyhedron *b)
 }
 
 Face * Convolution::minkowskiInit (FaceSet &fdone, Octree<Face *> *octree,
-				   Polyhedron *a, VVMap &vvmap)
+				   Polyhedron *a, PVMap &pvmap)
 {
   Vertex *v;
   Face *f = rmaxFace(v);
-  subdivide(f, fdone, octree, a, vvmap);
-  Vertex *w = a->getVertex(v, vvmap);
+  subdivide(f, fdone, octree, a, pvmap);
+  Vertex *w = a->getVertex(v, pvmap);
   for (Faces::iterator g = a->faces.begin(); g != a->faces.end(); ++g)
     if ((*g)->boundaryVertex(w))
       return *g;
@@ -54,7 +54,7 @@ Face * Convolution::rmaxFace (Vertex *&v)
 }
 
 void Convolution::subdivide (Face *f, FaceSet &fdone, Octree<Face *> *octree,
-			     Polyhedron *a, VVMap &vvmap)
+			     Polyhedron *a, PVMap &pvmap)
 {
   if (!fdone.insert(f).second)
     return;
@@ -64,7 +64,7 @@ void Convolution::subdivide (Face *f, FaceSet &fdone, Octree<Face *> *octree,
   for (EdgeSet::iterator e = iedges.begin(); e != iedges.end(); ++e)
     (*e)->sortVertices();
   int nf = a->faces.size();
-  subfaces(f, a, vvmap);
+  subfaces(f, a, pvmap);
   sortHEdges(a, nf);
 }
 
@@ -79,7 +79,7 @@ void Convolution::intersectFF (Face *f, const FaceSet &fdone,
 }
 
 void Convolution::expand (FaceSet &fdone, Octree<Face *> *octree,
-			  Polyhedron *a, VVMap &vvmap, Face *f, Faces &st)
+			  Polyhedron *a, PVMap &pvmap, Face *f, Faces &st)
 {
   HEdges he;
   f->boundaryHEdges(he);
@@ -87,7 +87,7 @@ void Convolution::expand (FaceSet &fdone, Octree<Face *> *octree,
     Faces fa;
     neighborFaces(*e, fa);
     for (Faces::iterator g = fa.begin(); g != fa.end(); ++g)
-      subdivide(*g, fdone, octree, a, vvmap);
+      subdivide(*g, fdone, octree, a, pvmap);
     (*e)->e->sortHEdges();
     Face *h = f->hfaces[0].neighbor(*e)->f;
     st.push_back(h);
@@ -501,13 +501,13 @@ bool convexOrder (const HEdges &hedges)
 Polyhedron * triangulate (const FaceSet &fs)
 {
   Polyhedron *a = new Polyhedron;
-  VVMap vvmap;
+  PVMap pvmap;
   for (FaceSet::const_iterator f = fs.begin(); f != fs.end(); ++f) {
     Triangles tr;
     (*f)->triangulate(tr);
     int pc = (*f)->getPC();
     for (Triangles::iterator t = tr.begin(); t != tr.end(); ++t)
-      a->getTriangle(t->a, t->b, t->c, vvmap, pc);
+      a->getTriangle(t->a, t->b, t->c, pvmap, pc);
   }
   return a;
 }
@@ -518,13 +518,13 @@ Polyhedron * minkowskiSumFull (Polyhedron *a, Polyhedron *b)
   Polyhedron *c = con->subdivide(), *d = new Polyhedron;
   Shells sh;
   c->formShells(sh);
-  VVMap vvmap;
+  PVMap pvmap;
   b->computeWindingNumbers();
   for (Shells::iterator s = sh.begin(); s != sh.end(); ++s)
     if (minkowskiShell(a, b, *s)) {
       const HFaces &hf = (*s)->getHFaces();
       for (HFaces::const_iterator f = hf.begin(); f != hf.end(); ++f)
-	d->getTriangle((*f)->getF(), vvmap);
+	d->getTriangle((*f)->getF(), pvmap);
     }
   delete c;
   delete con;

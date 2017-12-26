@@ -168,7 +168,7 @@ int projectionCoordinate (const Vertices &ve)
       v3 = vi;
   }
   TrianglePlane p(v1->getP(), v2->getP(), v3->getP());
-  int c = projectionCoordinate(&p);
+  int c = ProjectionCoordinate(&p);
   return outerLoop(ve, c) ? c : - c;
 }
 

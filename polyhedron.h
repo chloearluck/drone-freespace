@@ -61,25 +61,7 @@ typedef vector<Plane *> Planes;
 
 Primitive2(SamePlane, Plane *, p, Plane *, q);
 
-class ProjectionCoordinate : Object<Parameter> {
-  friend class Plane;
- protected:
-  Plane *p;
-  Parameter calculate () {
-    PV3 n = p->getN();
-    Parameter x = n.x.abs(), y = n.y.abs(), z = n.z.abs();
-    if ((x - y).sign() >= 0 && (x - z).sign() >= 0)
-      return Parameter::constant(n.x.sign());
-    if ((y - x).sign() >= 0 && (y - z).sign() >= 0)
-      return Parameter::constant(2*n.y.sign());
-    return Parameter::constant(3*n.z.sign());
-  }
- public:
-  ProjectionCoordinate (Plane *p) : p(p) {}
-  int getPC () { return getApprox(1e-6).lb(); }
-};
-
-int projectionCoordinate (Plane *p);
+Primitive1(ProjectionCoordinate, Plane *, p);
 
 class Point : public Object<PV3> {
   friend class Plane;
@@ -139,6 +121,8 @@ Primitive4(Orientation, Point *, a, Point *, b, Point *, c, Point *, d);
 
 Primitive4(CloserPair, Point *, a, Point *, b, Point *, c, Point *, d);
 
+Primitive2(PlaneRayAlignment, Plane *, p, Point *, u);
+
 void copyBBox (const double *bbf, double *bbt);
 
 void mergeBBox (const double *bbf, double *bbt);
@@ -175,21 +159,10 @@ class TrianglePlane : public Plane {
 
 class InputPoint : public Point {
  public:
-  //InputPoint (double x, double y, double z) { set(PV3::input(x, y, z)); }
-  InputPoint (const PV3 &p) { set(PV3::constant(p.x.mid(), p.y.mid(), p.z.mid())); }
   InputPoint (double x, double y, double z, bool perturb = true) {
     set(perturb ? PV3::input(x, y, z) : PV3::constant(x, y, z));
   }
-
 };
-/*
-class InputPoint : public Point {
- public:
-  InputPoint (double x, double y, double z, bool perturb = false) {
-    set(perturb ? PV3::input(x, y, z) : PV3::constant(x, y, z));
-  }
-};
-*/
 
 extern InputPoint Rdir;
 
@@ -209,14 +182,6 @@ class SumPoint : public Point {
   SumPoint (Point *a, Point *b) : a(a), b(b) {}
 };
 
-class ScalePoint : public Point {
-  PTR<Point> p;
-  double unit;
-  PV3 calculate () { return unit * p->getP(); }
- public:
-  ScalePoint(PTR<Point> p, double unit) : p(p), unit(unit) {}
-};
-
 class DiffPoint : public Point {
   friend class Point;
   PTR<Point> a, b;
@@ -233,6 +198,14 @@ class MidPoint : public Point {
   MidPoint (Point *a, Point *b) : a(a), b(b) {
     ps = intersection(a->ps, b->ps);
   }
+};
+
+class ScalePoint : public Point {
+  PTR<Point> p;
+  double unit;
+  PV3 calculate () { return unit * p->getP(); }
+ public:
+  ScalePoint(PTR<Point> p, double unit) : p(p), unit(unit) {}
 };
 
 class CentroidPoint : public Point {
@@ -282,7 +255,7 @@ class RayZPlanePoint : public Point {
   double z;
   PV3 calculate () {
     PV3 a = t->getP(), u = r->getP();
-    Parameter k = (z - a.z)/z;
+    Parameter k = (z - a.z)/u.z;
     return a + k*u;
   }
  public:
@@ -314,7 +287,6 @@ class Vertex {
   int EdgesN () const { return edges.size(); }
   Edge * getEdge (int i) const { return edges[i]; }
   double * getBBox () { return bbox; }
-  HEdge * getOutgoing (int i) const;
   void outgoingHEdges (vector<HEdge *> &ed) const;
   vector<Face *> incidentFaces () const;
   HEdge * connected (Vertex *a) const;
@@ -396,9 +368,9 @@ class Edge {
   void setBBox ();
   HEdge * addHEdge (bool forward);
   void removeHEdge (HEdge *e);
-  PV3 getU () { return h->p->getApprox(1e-6) - t->p->getApprox(1e-6); }
   Vertex * getT () const { return t; }
   Vertex * getH () const { return h; }
+  PV3 getU () { return h->p->getP() - t->p->getP(); }
   int HEdgesN () const { return hedges.size(); }
   HEdge * getHEdge (int i) const { return i < hedges.size() ? hedges[i] : 0; }
   double * getBBox () { return bbox; }
@@ -463,9 +435,9 @@ class Shell;
 
 class Polyhedron;
 
-typedef pair<Vertex *, Vertex*> VVPair;
+typedef pair<Point *, Vertex*> PVPair;
 
-typedef map<Vertex *, Vertex *> VVMap;
+typedef map<Point *, Vertex *> PVMap;
 
 class HFace {
   friend class Face;
@@ -535,7 +507,6 @@ class Face {
   bool sharedBoundaryEdge (Face *f) const;
   void edgeVertices (VertexSet &vs) const;
   bool coplanar (Face *f);
-  bool intersectRay (Point *a, Point *r);
   PTR<Point> rayIntersection (Point *a, Point *r);
   bool contains (Point *a, bool strict = true);
   bool triangle () const;
@@ -655,6 +626,8 @@ typedef pair<Face *, Face *> FFPair;
 FFPair ffpair (Face *f, Face *g);
 
 typedef map<Face *, Face *> FFMap;
+
+typedef pair<Vertex *, Vertex *> VVPair;
 
 typedef set<VVPair> VVPairSet;
 
@@ -796,7 +769,7 @@ class Polyhedron {
     Point *p = new InputPoint(x, y, z, perturb);
     return getVertex(p);
   }
-  Vertex * getVertex (Vertex *v, VVMap &vmap);
+  Vertex * getVertex (Vertex *v, PVMap &pvmap);
   HEdge * addHEdge (Vertex *a, Vertex *b);
   Edge * getEdge (Vertex *a, Vertex *b);
   HEdge * getHEdge (Vertex *a, Vertex *b);
@@ -815,8 +788,8 @@ class Polyhedron {
   Shell * formShell (HFace *f) const;
   Cell * enclosingCell (Shell *s, Octree<Cell *> *octreec) const;
   Polyhedron * triangulate () const;
-  Face * getTriangle (Vertex *ta, Vertex *tb, Vertex *tc, VVMap &vvmap, int pc);
-  Face * getTriangle (Face *f, VVMap &vvmap);
+  Face * getTriangle (Vertex *ta, Vertex *tb, Vertex *tc, PVMap &pvmap, int pc = 0);
+  Face * getTriangle (Face *f, PVMap &pvmap);
   Polyhedron * subdivide ();
   void intersectFF ();
   void intersectFF (Face *f, Face *g, EFVMap &efvmap);
@@ -831,8 +804,8 @@ class Polyhedron {
   void formFF (Face *f, Face *g, Vertices &vfg);
   Polyhedron * subdivideAux ();
   void intersectFFF (Face *f, FFFVMap &fffvmap);
-  void subfaces (Face *f, Polyhedron *a, VVMap &vvmap);
-  void subedges (Face *f, Polyhedron *a, VVMap &vvmap, HEdges &he);
+  void subfaces (Face *f, Polyhedron *a, PVMap &pvmap);
+  void subedges (Face *f, Polyhedron *a, PVMap &pvmap, HEdges &he);
   void subedges (HEdge *e, VVPairSet &vvps);
   void subedge (Edge *e, Vertex *t, Vertex *h, VVPairSet &vvps);
   void setNext (const HEdges &he, int c) const;
@@ -893,25 +866,5 @@ Polyhedron * lbox (double x1, double x2, double y1, double y2, double z1, double
 Polyhedron * room (double x1, double x2, double x3, double y1, double y2,
 		   double y3, double y4, double y5, double z1, double z2,
 		   bool perturb = true);
-
-void pp (PV3 p);
-void ppla (Plane *p);
-void pp (Point *p);
-void pv (Vertex *v);
-void pvs (const Vertices &ve);
-void ptr (const Triangle &t);
-void ptrs (const Triangles &tr);
-void pids (const IDSet &ids);
-void pe (Edge *e);
-void pes (const Edges &ed);
-void pes (const EdgeSet &ed);
-void pe (HEdge *e);
-void pes (const HEdges &ed);
-void pes (const HHEdges &ed);
-void pl (HEdge *e);
-void pf (Face *f);
-void pfs (const Faces &fa);
-void pfs (const HFaces &fa);
-bool firstFace (Vertex *v, Face *f);
 
 #endif

@@ -9,13 +9,13 @@ class Convolution : public Polyhedron {
  public:
   Convolution () { oneWayInt = true; }
   Face * minkowskiInit (FaceSet &fdone, Octree<Face *> *octree,
-			Polyhedron *a, VVMap &vvmap);
+			Polyhedron *a, PVMap &pvmap);
   Face * rmaxFace (Vertex *&v);
   void subdivide (Face *f, FaceSet &fdone, Octree<Face *> *octree,
-		  Polyhedron *a, VVMap &vvmap);
+		  Polyhedron *a, PVMap &pvmap);
   void intersectFF (Face *f, const FaceSet &fdone, Octree<Face *> *octree);
   void expand (FaceSet &fdone, Octree<Face *> *octree,
-	       Polyhedron *a, VVMap &vvmap, Face *f, Faces &st);
+	       Polyhedron *a, PVMap &pvmap, Face *f, Faces &st);
   void neighborFaces (HEdge *e, Faces &fa) const;
 };
 
