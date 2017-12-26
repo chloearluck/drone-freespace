@@ -686,10 +686,8 @@ FreeSpaceGraph::FreeSpaceGraph(const char * dir) {
           n->neighbors.push_back(neighbor);
           n->neighborIntersectionIndices.push_back(std::vector<int>());
           ss3 = istringstream(s2);
-          while (ss3 >> i) {
-            cout<<"intersection index: "<<i<<endl;
+          while (ss3 >> i)
             n->neighborIntersectionIndices[n->neighbors.size()-1].push_back(i);
-          }
         }
       }
       if (getline(ss, siblings, ',')) {
