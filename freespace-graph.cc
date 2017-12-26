@@ -380,6 +380,30 @@ void FreeSpaceGraph::getPath(Node * start, Node * end, PTR<Point> a, PTR<Point> 
     return;
   }
 
+  //deepen start and end as much as possible
+  for (int level= start->level+1; level <num_levels; level++) {
+    Polyhedron * space = loadPoly((dir + "/" + std::to_string(level) + "-" + std::to_string(start->blockspace_index) + ".vtk").c_str());
+    space->computeWindingNumbers();
+    int cell_index = space->containingCell(a);
+    bool inside = (space->cells[cell_index]->getWN() == 0);
+    delete space;
+    if (inside)
+      start = graph[level][start->blockspace_index]->get(cell_index);
+    else
+      break;
+  }
+  for (int level= end->level+1; level <num_levels; level++) {
+    Polyhedron * space = loadPoly((dir + "/" + std::to_string(level) + "-" + std::to_string(end->blockspace_index) + ".vtk").c_str());
+    space->computeWindingNumbers();
+    int cell_index = space->containingCell(b);
+    bool inside = (space->cells[cell_index]->getWN() == 0);
+    delete space;
+    if (inside)
+      end = graph[level][end->blockspace_index]->get(cell_index);
+    else
+      break;
+  }
+
   for (int i=0; i<num_levels; i++)
     for (int j=0; j<blockspaces_per_level; j++)
       for (int k=0; k<graph[i][j]->nodes.size(); k++) 
@@ -467,7 +491,7 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, 
     cout<<"level "<<level<<endl;
 
     if (level > 0) {
-      if (level > 1)
+      if (level > 2)
         for (int i=0; i<prev_blockspaces.size(); i++)
           delete prev_blockspaces[i];
       prev_blockspaces.clear();
