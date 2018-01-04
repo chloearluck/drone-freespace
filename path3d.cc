@@ -363,7 +363,8 @@ void path2Dto3D(std::vector<PathVertex*> &vertPath, std::vector<int> &vertPathIn
       if (vertPath[j] == edges[edges.size()-1].right)
         break;
       j++;
-    } else if (vertPath[j-1] != edges[i].left && vertPath[j-1] != edges[i].right && vertPath[j] != edges[i].left && vertPath[j] != edges[i].right) {
+    } else if (AreaABC(edges[i].left, edges[i].right, vertPath[j])   != 0
+            && AreaABC(edges[i].left, edges[i].right, vertPath[j-1]) != 0 ) {
       path.push_back(new ABintersectCDto3D(edges[i].left, edges[i].right, vertPath[j-1], vertPath[j]));
       path[path.size()-1]->getApprox();
     }
