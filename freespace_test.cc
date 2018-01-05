@@ -1,4 +1,5 @@
 #include "freespace.h"
+#include "io.h"
 #include <queue>
 
 Polyhedron * loadPoly(char * filename) {

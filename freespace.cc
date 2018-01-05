@@ -17,36 +17,6 @@ void savePolyTmp(Polyhedron * p, const char * filename) {
   }
 }
 
-void saveShell(HFaces hf,  char * filename) {
-  int n = strlen(filename);
-  char str[n+9];
-  strncpy(str, filename, n);
-  strncpy(str+n, "-out.vtk", 9);
-
-  ofstream out;
-  out.open(str);
-  if (out.is_open()) {
-    writePolyhedronVTK (hf, out);
-    out.close();
-  } else {
-    cout<<"could not write to file"<<endl;
-  }
-}
-
-void saveWithShells(Polyhedron * poly, char * filename) {
-  savePolyTmp(poly, filename);
-  for (int i=0; i<poly->cells.size(); i++) {
-    Cell * c = poly->cells[i];
-    for (int j=0; j<c->nShells(); j++) {
-      Shell * s = c->getShell(j);
-      char str[50];
-      sprintf(str, "%s-%d-%d", filename, i, j);
-      saveShell(s->getHFaces(), str);
-    }
-  }
-}
-
-
 PTR<Point> sin_cos_alpha;
 
 class InputParameter : public Object<Parameter> {
