@@ -73,6 +73,12 @@ test_mink:  test_mink.o hull.o mink.o polyhedron.o triangulate.o io.o object.o a
 test_mink.o: test_mink.cc mink.h hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h
 	$(COMPILE) test_mink.cc
 
+test_new_simplify: test_new_simplify.o simplify.o expander2.o io.o polyhedron.o triangulate.o object.o acp.o
+	$(LINK) test_new_simplify.o simplify.o expander2.o io.o polyhedron.o triangulate.o object.o acp.o $(LFLAGS) -o test_new_simplify
+
+test_new_simplify.o: test_new_simplify.cc simplify.h expander2.h io.h polyhedron.h triangulate.h octree.h rbtree.h object.h pv.h acp.h
+	$(COMPILE) test_new_simplify.cc
+
 triangulate.o: triangulate.C triangulate.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h
 	$(COMPILE) triangulate.C
 
