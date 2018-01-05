@@ -178,20 +178,20 @@ enum FeatureType {VV, VE, VF, EE};
 
 class Feature {
  public:
-  Feature () : v(0), e(0), f(0), fa(0), p(0), q(0) {}
+  Feature () : v(0), e(0), f(0), fa(0) {}
   
   Feature (Vertex *vi, Vertex *wi, bool flag = true) : type(VV),
     v(vi < wi ? vi : wi), w(vi < wi ? wi : vi), e(0), f(0), fa(0),
-    flag(flag), p(0), q(0) {}
+    flag(flag) {}
   
   Feature (Vertex *v, Edge *e, bool flag = true)
-    : type(VE), v(v), w(0), e(e), f(0), fa(0), flag(flag), p(0), q(0) {}
+    : type(VE), v(v), w(0), e(e), f(0), fa(0), flag(flag) {}
   
   Feature (Vertex *v, Face *fa, bool flag = true)
-    : type(VF), v(v), w(0), e(0), f(0), fa(fa), flag(flag), p(0), q(0) {}
+    : type(VF), v(v), w(0), e(0), f(0), fa(fa), flag(flag) {}
   
   Feature (Edge *ei, Edge *fi, bool flag = true) : type(EE), v(0), w(0),
-    e(ei < fi ? ei : fi), f(ei < fi ? fi : ei), fa(0), flag(flag), p(0), q(0) {}
+    e(ei < fi ? ei : fi), f(ei < fi ? fi : ei), fa(0), flag(flag) {}
   
   bool operator< (const Feature &x) const {
     if (type != x.type)
@@ -213,7 +213,7 @@ class Feature {
     }
   }
   
-  void closestPoints (PV3 &pp, PV3 &qp) {
+  void closestPoints (PTR<Point> &p, PTR<Point> &q) const {
     if (type == EE) {
       Point *et = e->getT()->getP(), *eh = e->getH()->getP(),
 	*ft = f->getT()->getP(), *fh = f->getH()->getP();
@@ -229,8 +229,6 @@ class Feature {
       else
 	q = new PlanePoint(fa->getP(), v->getP());
     }
-    pp = p->getP();
-    qp = q->getP();
   }
 
   bool point (Point *a) const {
@@ -270,7 +268,6 @@ class Feature {
   Edge *e, *f;
   Face *fa;
   bool flag;
-  PTR<Point> p, q;
 };
 
 typedef set<Feature> FeatureSet;
@@ -355,11 +352,10 @@ class SeparatorData {
 class Separator : public Object<SeparatorData> {
   Feature f;
   double d;
-  
+  PTR<Point> ac, bc;
+
   SeparatorData calculate () {
-    PV3 p, q;
-    f.closestPoints(p, q);
-    PV3 u = f.flag ? q - p : p - q,
+    PV3 p = ac->get(), q = bc->get(), u = f.flag ? q - p : p - q,
       v = f.type == VE ? f.e->getU() : orthogonal(u),
       w = u.cross(v);
 #ifdef UNIT_U
@@ -371,7 +367,7 @@ class Separator : public Object<SeparatorData> {
 #endif
   }
  public:
-  Separator (const Feature &f, double d) : f(f), d(d) {}
+  Separator (const Feature &fin, double d) : f(fin), d(d) { f.closestPoints(ac, bc); }
   
   PV3 getU () { return getApprox(1e-7).u; }
   
@@ -384,11 +380,11 @@ class Separator : public Object<SeparatorData> {
     bool flag;
     VWR (Separator *s, Point *a, bool flag) : s(s), a(a), flag(flag) {}
     PV3 calculate () {
-      if (a == s->f.p || a == s->f.q)
+      if (a == s->ac || a == s->bc)
 	return PV3::constant(0, 0, 0);
       PV3 p = a->getP() - (flag ? s->get().p : s->get().q);
       double d = s->d;
-      Parameter zero = Parameter::constant(0);
+      Parameter zero(0.0);
       PV3 vwr(s->get().v.dot(p)/d, 
               s->f.type == VE && s->f.point(a) ? zero : s->get().w.dot(p)/d,
 	      s->f.point(a) ? zero : s->get().u.dot(p)/d);

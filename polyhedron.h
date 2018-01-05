@@ -14,8 +14,6 @@
 using namespace std;
 using namespace acp;
 
-extern bool inputPerturbed;
-
 double getTime ();
 
 typedef vector<PV3> PV3s;
@@ -282,7 +280,7 @@ class Vertex {
   double rint[2], bbox[6];
   RBTree<Vertex*>::Node *node;
  public:
-  Vertex (Point *p);
+  Vertex (Point *p, bool perturbed);
   Point * getP () { return p; }
   int EdgesN () const { return edges.size(); }
   Edge * getEdge (int i) const { return edges[i]; }
@@ -555,6 +553,7 @@ class Shell {
  public:
   Shell () : octreef(0) {};
   ~Shell ();
+  Shell (const HFaces &hf);
   HFaces & getHFaces () { return hfaces; }
   double * getBBox () { return bbox; }
   Cell * getC() const { return c; }
@@ -750,7 +749,7 @@ typedef set<FaceDesc> FaceDescSet;
 
 class Polyhedron {
  public:
-  bool oneWayInt;
+  bool perturbed, oneWayInt;
   RBTree<Vertex *> vtree;
   Vertices vertices;
   Edges edges;
@@ -762,11 +761,11 @@ class Polyhedron {
   EdgeSet iedges;
   PPEMap ppemap;
 
-  Polyhedron () : oneWayInt(false) {} 
+  Polyhedron (bool perturbed = true) : perturbed(perturbed), oneWayInt(false) {} 
   ~Polyhedron ();
   Vertex * getVertex (Point *p);
-  Vertex * getVertex (double x, double y, double z, bool perturb = true) {
-    Point *p = new InputPoint(x, y, z, perturb);
+  Vertex * getVertex (double x, double y, double z) {
+    Point *p = new InputPoint(x, y, z, perturbed);
     return getVertex(p);
   }
   Vertex * getVertex (Vertex *v, PVMap &pvmap);
@@ -820,11 +819,16 @@ class Polyhedron {
   int containingCell (Point *p) const;
   bool intersectsEdges (const Polyhedron *a) const;
   Polyhedron * boolean (Polyhedron *a, SetOp op);
+  Polyhedron * cellPolyhedron (int i) const;
+  void addHFaces (const HFaces &hf, PVMap &pvmap);
   void replaceVertex (Face *f, Vertex *v, Vertex *w);
   void removeLoop (HEdge *e);
   void removeHEdge (HEdge *e);
   void moveVertex (Vertex *v, Point *p);
   void removeNullFaces ();
+  void updateCells ();
+  Cell * updateCell (Cell *c) const;
+  Shell * updateShell (Shell *s) const;
   FOctree * faceOctree (double s = 0.0) const;
   Octree<Cell *> * cellOctree () const;
   Polyhedron * round (double d);

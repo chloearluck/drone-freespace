@@ -4,6 +4,7 @@ void simplify (Polyhedron *a, double d, bool perturb, bool opt2)
 {
   simplify1(a, d, perturb);
   simplify2(a, d, opt2);
+  a->updateCells();
   a->removeNullFaces();
 }
 
@@ -687,22 +688,23 @@ PV3 orthogonal (const PV3 &u)
 {
   Parameter ux = u.x.abs(), uy = u.y.abs(), uz = u.z.abs();
   if ((uy - ux).sign() > -1 && (uz - ux).sign() > -1)
-    return PV3(Parameter::constant(0.0), - u.z, u.y);
+    return PV3(Parameter(0.0), - u.z, u.y);
   if ((ux - uy).sign() > -1 && (uz - uy).sign() > -1)
-    return PV3(- u.z, Parameter::constant(0.0), u.x);
-  return PV3(- u.y, u.x, Parameter::constant(0.0));
+    return PV3(- u.z, Parameter(0.0), u.x);
+  return PV3(- u.y, u.x, Parameter(0.0));
 }
 
 double separation (const FeatureSet &fs)
 {
   double d = 1e10;
-  for (FeatureSet::const_iterator f = fs.begin(); f != fs.end(); ++f)
-#ifdef UNIT_U
-    d = min(d, Separator(*f, 0.0).getApprox(1e-6).pq.ub());
-#else
-    d = min(d, Separator(*f, 0.0).getApprox(1e-6).pq.sqrt().ub());
-#endif
-  return d;
+  for (FeatureSet::const_iterator f = fs.begin(); f != fs.end(); ++f) {
+    PTR<Point> p, q;
+    f->closestPoints(p, q);
+    PV3 u = p->getApprox(1e-8) - q->getApprox(1e-8);
+    Parameter k = u.dot(u);
+    d = min(d, k.ub());
+  }
+  return sqrt(d);
 }
 
 void simplify2s (Polyhedron *a, double d, FeatureSet &fs, VPMap &vpmap,

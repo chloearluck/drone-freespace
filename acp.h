@@ -360,6 +360,8 @@ class Parameter {
   friend class Encasement;
   friend class PInt;
 
+ public:
+
   // Construct from double.  Will be perturbed.
   Parameter (double x) {
     l = u.r = x + delta*(1.0 + fabs(x))*randomNumber(-1.0, 1.0);
@@ -368,7 +370,6 @@ class Parameter {
   // static double force_rounding (double x) { volatile double x_ = x; return x_; }
   static double no_optimize (volatile double x) { return x; }
 
- public:
 
   static unsigned long int identityCount;
 

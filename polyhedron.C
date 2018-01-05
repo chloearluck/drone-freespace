@@ -1,7 +1,5 @@
 #include "polyhedron.h"
 
-bool inputPerturbed = true;
-
 double getTime ()
 {
   timeval tv;
@@ -39,7 +37,7 @@ int SamePlane::sign ()
   int kps = kp.sign(), kqs = kq.sign();
   if (kps == 0 || kqs == 0)
     return kps == 0 && kqs == 0 && Rdir.getP().tripleProduct(np, nq).sign() ? 1 : -1;
-  return Rdir.getP().dot(kp*nq - kq*np).sign() == 0 ? 1 : -1;
+  return Rdir.getP().dot(kp*nq - kq*np).sign();
 }
 
 int ProjectionCoordinate::sign ()
@@ -201,10 +199,10 @@ bool bboxOverlap (Point *a, const double *bbox)
   return bboxOverlap(abox, bbox);
 }
 
-Vertex::Vertex (Point *p) : p(p), node(0)
+Vertex::Vertex (Point *p, bool perturbed) : p(p), node(0)
 {
   p->getBBox(bbox);
-  if (!inputPerturbed) {
+  if (!perturbed) {
     Parameter k = Rdir.getApprox(1.0).dot(p->getApprox(1.0));
     rint[0] = k.lb();
     rint[1] = k.ub();
@@ -602,7 +600,7 @@ bool Face::coplanar (Face *f)
 {
   if (p.id == f->p.id)
     return true;
-  return SamePlane(&p, &f->p) == 1;
+  return SamePlane(&p, &f->p) == 0;
 };
 
 PTR<Point> Face::rayIntersection (Point *a, Point *r)
@@ -778,6 +776,14 @@ Shell::~Shell ()
 {
   if (octreef)
     delete octreef;
+}
+
+Shell::Shell (const HFaces &hf) : hfaces(hf)
+{
+  for (HFaces::iterator h = hfaces.begin(); h != hfaces.end(); ++h)
+    (*h)->s = this;
+  setBBox();
+  setOctree();
 }
 
 void Shell::setBBox ()
@@ -991,8 +997,8 @@ Polyhedron::~Polyhedron ()
 
 Vertex * Polyhedron::getVertex (Point *p)
 {
-  Vertex *v = new Vertex(p);
-  if (!inputPerturbed) {
+  Vertex *v = new Vertex(p, perturbed);
+  if (!perturbed) {
     RBTree<Vertex *>::Node *n = vtree.insert(v);
     if (n->v != v) {
       delete v;
@@ -1206,7 +1212,7 @@ Cell * Polyhedron::enclosingCell (Shell *s, Octree<Cell *> *octreec) const
 
 Polyhedron * Polyhedron::triangulate () const
 {
-  Polyhedron *a = new Polyhedron;
+  Polyhedron *a = new Polyhedron(perturbed);
   PVMap pvmap;
   for (Faces::const_iterator f = faces.begin(); f != faces.end(); ++f) {
     Triangles tr;
@@ -1509,7 +1515,7 @@ Polyhedron * Polyhedron::subdivideAux ()
     intersectFFF(*f, fffvmap);
   for (Edges::const_iterator e = edges.begin(); e != edges.end(); ++e)
     (*e)->sortVertices();
-  Polyhedron *a = new Polyhedron;
+  Polyhedron *a = new Polyhedron(perturbed);
   PVMap pvmap;
   for (Faces::iterator f = faces.begin(); f != faces.end(); ++f)
     subfaces(*f, a, pvmap);
@@ -1686,7 +1692,7 @@ void Polyhedron::removeLoops (const HEdges &ed)
 
 Polyhedron * Polyhedron::negative () const
 {
-  Polyhedron *a = new Polyhedron;
+  Polyhedron *a = new Polyhedron(perturbed);
   PVMap pvmap;
   for (Vertices::const_iterator v = vertices.begin(); v != vertices.end(); ++v)
     pvmap.insert(PVPair((*v)->p, a->getVertex(new NegPoint((*v)->p))));
@@ -1700,7 +1706,7 @@ Polyhedron * Polyhedron::negative () const
 
 Polyhedron * Polyhedron::translate (Point *t) const
 {
-  Polyhedron *a = new Polyhedron;
+  Polyhedron *a = new Polyhedron(perturbed);
   PVMap pvmap;
   for (Vertices::const_iterator v = vertices.begin(); v != vertices.end(); ++v)
     pvmap.insert(PVPair((*v)->p, a->getVertex(new SumPoint(t, (*v)->p))));
@@ -1711,7 +1717,7 @@ Polyhedron * Polyhedron::translate (Point *t) const
 
 Polyhedron * Polyhedron::negativeTranslate (Point *t) const
 {
-  Polyhedron *a = new Polyhedron;
+  Polyhedron *a = new Polyhedron(perturbed);
   PVMap pvmap;
   for (Vertices::const_iterator v = vertices.begin(); v != vertices.end(); ++v)
     pvmap.insert(PVPair((*v)->p, a->getVertex(new DiffPoint(t, (*v)->p))));
@@ -1775,7 +1781,8 @@ bool Polyhedron::intersectsEdges (const Polyhedron *a) const
 
 Polyhedron * Polyhedron::boolean (Polyhedron *a, SetOp op)
 {
-  Polyhedron *poly[] = {this, a}, *c = overlay(poly, 2), *d = new Polyhedron;
+  Polyhedron *poly[] = {this, a},
+    *c = overlay(poly, 2), *d = new Polyhedron(perturbed);
   PVMap pvmap;
   computeWindingNumbers();
   a->computeWindingNumbers();
@@ -1803,6 +1810,28 @@ Polyhedron * Polyhedron::boolean (Polyhedron *a, SetOp op)
   }
   delete c;
   return d;
+}
+
+Polyhedron * Polyhedron::cellPolyhedron (int i) const
+{
+  Cell *c = cells[i];
+  Polyhedron *a = new Polyhedron(perturbed);
+  PVMap pvmap;
+  if (c->outer)
+    a->addHFaces(c->outer->hfaces, pvmap);
+  for (Shells::const_iterator s = c->inner.begin(); s != c->inner.end(); ++s)
+    a->addHFaces((*s)->hfaces, pvmap);
+  a->formCells();
+  return a;  
+}
+
+void Polyhedron::addHFaces (const HFaces &hf, PVMap &pvmap)
+{
+  for (HFaces::const_iterator h = hf.begin(); h != hf.end(); ++h) {
+    Vertices ve;
+    (*h)->f->boundaryVertices(ve);
+    getTriangle(ve[0], ve[1], ve[2], pvmap);
+  }
 }
 
 // used in simplify from here on
@@ -1853,7 +1882,7 @@ void Polyhedron::removeHEdge (HEdge *h)
 void Polyhedron::moveVertex (Vertex *v, Point *p)
 {
   v->p = p;
-  if (!inputPerturbed) {
+  if (!perturbed) {
     vtree.remove(v->node);
     v->node = vtree.insert(v);
   }
@@ -1903,6 +1932,38 @@ void Polyhedron::removeNullFaces ()
       ++i;
 }
 
+void Polyhedron::updateCells ()
+{
+  for (Faces::iterator f = faces.begin(); f != faces.end(); ++f)
+    (*f)->hfaces[0].s = (*f)->hfaces[1].s = 0;
+  Cells ncells;
+  for (Cells::iterator c = cells.begin(); c != cells.end(); ++c) {
+    ncells.push_back(updateCell(*c));
+    delete *c;
+  }
+  cells = ncells;
+}
+
+Cell * Polyhedron::updateCell (Cell *c) const
+{
+  Cell *nc = new Cell(c->outer ? updateShell(c->outer) : 0);
+  for (Shells::iterator s = c->inner.begin(); s != c->inner.end(); ++s)
+    nc->inner.push_back(updateShell(*s));
+  return nc;
+}
+
+Shell * Polyhedron::updateShell (Shell *s) const
+{
+  for (HFaces::iterator h = s->hfaces.begin(); h != s->hfaces.end(); ++h)
+    if (!(*h)->f->boundary.empty()) {
+      Shell *ns = formShell(*h);
+      ns->setBBox();
+      ns->setOctree();
+      return ns;
+    }
+  return 0;
+}
+
 Octree<Face *> * Polyhedron::faceOctree (double s) const
 {
   return Octree<Face *>::octree(faces, bbox, s);
@@ -1933,7 +1994,7 @@ Polyhedron * Polyhedron::removeIntersections ()
 {
   Polyhedron *a = subdivide();
   a->computeWindingNumbers();
-  Polyhedron *b = new Polyhedron;
+  Polyhedron *b = new Polyhedron(perturbed);
   PVMap pvmap;
   for (Faces::iterator f = a->faces.begin(); f != a->faces.end(); ++f)
     if ((*f)->hfaces[0].s->c->wn == 0 && (*f)->hfaces[1].s->c->wn == 1)
@@ -1971,7 +2032,7 @@ void Polyhedron::updateWN (Cell *c, HFaces &st) const
 Polyhedron * Polyhedron::encaseNonManifold (double d)
 {
   formCells();
-  Polyhedron *a = new Polyhedron;
+  Polyhedron *a = new Polyhedron(perturbed);
   for (Vertices::const_iterator v = vertices.begin(); v != vertices.end(); ++v)
     if (!manifold(*v))
       a->addTetrahedron((*v)->p, d);
@@ -2045,7 +2106,7 @@ bool inSet (bool ina, bool inb, SetOp op)
 
 Polyhedron * overlay (Polyhedron **poly, int n)
 {
-  Polyhedron *c = new Polyhedron;
+  Polyhedron *c = new Polyhedron(poly[0]->perturbed);
   PVMap pvmap;
   for (int i = 0; i < n; ++i) {
     const Faces &fa = poly[i]->faces;
@@ -2059,7 +2120,7 @@ Polyhedron * overlay (Polyhedron **poly, int n)
 
 Polyhedron * multiUnion (Polyhedron **poly, int n)
 {
-  Polyhedron *c = overlay(poly, n), *d = new Polyhedron;
+  Polyhedron *c = overlay(poly, n), *d = new Polyhedron(poly[0]->perturbed);
   for (int i = 0; i < n; ++i)
     poly[i]->computeWindingNumbers();
   c->formCells();
@@ -2093,15 +2154,15 @@ Polyhedron * multiUnion (Polyhedron **poly, int n)
 
 Polyhedron * box (double *b, bool perturb)
 {
-  Polyhedron *p = new Polyhedron;
-  p->getVertex(b[0], b[2], b[4], perturb);
-  p->getVertex(b[1], b[2], b[4], perturb);
-  p->getVertex(b[1], b[3], b[4], perturb);
-  p->getVertex(b[0], b[3], b[4], perturb);
-  p->getVertex(b[0], b[2], b[5], perturb);
-  p->getVertex(b[1], b[2], b[5], perturb);
-  p->getVertex(b[1], b[3], b[5], perturb);
-  p->getVertex(b[0], b[3], b[5], perturb);
+  Polyhedron *p = new Polyhedron(perturb);
+  p->getVertex(b[0], b[2], b[4]);
+  p->getVertex(b[1], b[2], b[4]);
+  p->getVertex(b[1], b[3], b[4]);
+  p->getVertex(b[0], b[3], b[4]);
+  p->getVertex(b[0], b[2], b[5]);
+  p->getVertex(b[1], b[2], b[5]);
+  p->getVertex(b[1], b[3], b[5]);
+  p->getVertex(b[0], b[3], b[5]);
   p->addTriangle(p->vertices[0], p->vertices[2], p->vertices[1]);
   p->addTriangle(p->vertices[0], p->vertices[3], p->vertices[2]);
   p->addTriangle(p->vertices[0], p->vertices[1], p->vertices[5]);
@@ -2238,19 +2299,19 @@ Polyhedron * room (double x1, double x2, double x3, double y1, double y2,
 		   double y3, double y4, double y5, double z1, double z2,
 		   bool perturb)
 {
-  Polyhedron *a = new Polyhedron;
-  Vertex *p[] = {a->getVertex(0, 0, z1, perturb), a->getVertex(x3, 0, z1, perturb),
-		 a->getVertex(x3, y2, z1, perturb), a->getVertex(x2, y2, z1, perturb),
-		 a->getVertex(x2, y1, z1, perturb), a->getVertex(x1, y1, z1, perturb),
-		 a->getVertex(x1, y4, z1, perturb), a->getVertex(x2, y4, z1, perturb),
-		 a->getVertex(x2, y3, z1, perturb), a->getVertex(x3, y3, z1, perturb),
-		 a->getVertex(x3, y5, z1, perturb), a->getVertex(0, y5, z1, perturb)};
-  Vertex *q[] = {a->getVertex(0, 0, z2, perturb), a->getVertex(x3, 0, z2, perturb),
-		 a->getVertex(x3, y2, z2, perturb), a->getVertex(x2, y2, z2, perturb),
-		 a->getVertex(x2, y1, z2, perturb), a->getVertex(x1, y1, z2, perturb),
-		 a->getVertex(x1, y4, z2, perturb), a->getVertex(x2, y4, z2, perturb),
-		 a->getVertex(x2, y3, z2, perturb), a->getVertex(x3, y3, z2, perturb),
-		 a->getVertex(x3, y5, z2, perturb), a->getVertex(0, y5, z2, perturb)};
+  Polyhedron *a = new Polyhedron(perturb);
+  Vertex *p[] = {a->getVertex(0, 0, z1), a->getVertex(x3, 0, z1),
+		 a->getVertex(x3, y2, z1), a->getVertex(x2, y2, z1),
+		 a->getVertex(x2, y1, z1), a->getVertex(x1, y1, z1),
+		 a->getVertex(x1, y4, z1), a->getVertex(x2, y4, z1),
+		 a->getVertex(x2, y3, z1), a->getVertex(x3, y3, z1),
+		 a->getVertex(x3, y5, z1), a->getVertex(0, y5, z1)};
+  Vertex *q[] = {a->getVertex(0, 0, z2), a->getVertex(x3, 0, z2),
+		 a->getVertex(x3, y2, z2), a->getVertex(x2, y2, z2),
+		 a->getVertex(x2, y1, z2), a->getVertex(x1, y1, z2),
+		 a->getVertex(x1, y4, z2), a->getVertex(x2, y4, z2),
+		 a->getVertex(x2, y3, z2), a->getVertex(x3, y3, z2),
+		 a->getVertex(x3, y5, z2), a->getVertex(0, y5, z2)};
   a->addTriangle(p[5], p[1], p[0]);
   a->addTriangle(p[5], p[4], p[1]);
   a->addTriangle(p[4], p[2], p[1]);

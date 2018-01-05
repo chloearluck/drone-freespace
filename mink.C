@@ -601,7 +601,7 @@ void sumVF (Vertex *v, Face *f, bool avflag, FaceDescSet &fds,
   f->getBoundary(0)->loop(ve);
   for (Vertices::iterator w = ve.begin(); w != ve.end(); ++w)
     vo.push_back(sumVV(v, *w, avflag, vmap, con));
-  if (!inputPerturbed && !fds.insert(vo).second)
+  if (!con->perturbed && !fds.insert(vo).second)
     return;
   con->addTriangle(vo[0], vo[1], vo[2]);
 }
@@ -684,7 +684,7 @@ void sumEE (Edge *e, Edge *f, bool aflag, FaceDescSet &fds,
     *b = sumVV(ee->getH(), ff->getT(), aflag, vmap, con),
     *c = sumVV(ee->getH(), ff->getH(), aflag, vmap, con),
     *d = sumVV( ee->getT(), ff->getH(), aflag, vmap, con);
-  if (inputPerturbed)
+  if (con->perturbed)
     con->addRectangle(a, b, c, d);
   else if (!(a->getP()->onLine(b->getP(), c->getP()))) {
     Vertex *vo[] = {a, b, c, d};
