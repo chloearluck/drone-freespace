@@ -814,6 +814,7 @@ class Polyhedron {
   Polyhedron * translate (Point *t) const;
   Polyhedron * negativeTranslate (Point *t) const;
   Polyhedron * scale (double unit) const;
+  Polyhedron * copy () const;
   bool intersects (Polyhedron *a) const;
   bool contains (Point *p) const;
   int containingCell (Point *p) const;
