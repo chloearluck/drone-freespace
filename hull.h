@@ -5,13 +5,13 @@
 
 Polyhedron * convexHull (Polyhedron *a);
 
-Polyhedron * convexHull (Points &pts);
+Polyhedron * convexHull (Points &pts, bool perturbed);
 
 int * randomPermutation (int n);
 
 int randomInteger (int lb, int ub);
 
-Polyhedron * hullInit (Points &pts);
+Polyhedron * hullInit (Points &pts, bool perturbed);
 
 class ConflictGraph {
   map<Vertex *, FaceSet *> vcon;

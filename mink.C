@@ -4,7 +4,7 @@ Polyhedron * minkowskiSum (Polyhedron *a, Polyhedron *b)
 {
   Convolution *con = convolution(a, b);
   Octree<Face *> *octree = con->faceOctree();
-  Polyhedron *c = new Polyhedron;
+  Polyhedron *c = new Polyhedron(a->perturbed);
   PVMap pvmap;
   FaceSet fdone, fs;
   Face *f0 = con->minkowskiInit(fdone, octree, c, pvmap);
@@ -16,7 +16,7 @@ Polyhedron * minkowskiSum (Polyhedron *a, Polyhedron *b)
     if (fs.insert(f).second)
       con->expand(fdone, octree, c, pvmap, f, st);
   }
-  Polyhedron *d = triangulate(fs);
+  Polyhedron *d = triangulate(fs, a->perturbed);
   delete octree;
   delete c;
   delete con;
@@ -498,9 +498,9 @@ bool convexOrder (const HEdges &hedges)
   return false;
 }
 
-Polyhedron * triangulate (const FaceSet &fs)
+Polyhedron * triangulate (const FaceSet &fs, bool perturbed)
 {
-  Polyhedron *a = new Polyhedron;
+  Polyhedron *a = new Polyhedron(perturbed);
   PVMap pvmap;
   for (FaceSet::const_iterator f = fs.begin(); f != fs.end(); ++f) {
     Triangles tr;
@@ -515,7 +515,7 @@ Polyhedron * triangulate (const FaceSet &fs)
 Polyhedron * minkowskiSumFull (Polyhedron *a, Polyhedron *b)
 {
   Polyhedron *con = convolution(a, b);
-  Polyhedron *c = con->subdivide(), *d = new Polyhedron;
+  Polyhedron *c = con->subdivide(), *d = new Polyhedron(a->perturbed);
   Shells sh;
   c->formShells(sh);
   PVMap pvmap;
@@ -548,7 +548,7 @@ bool minkowskiShell (Polyhedron *a, Polyhedron *b, Shell *s)
 
 Convolution * convolution (Polyhedron *a, Polyhedron *b)
 {
-  Convolution *c = new Convolution;
+  Convolution *c = new Convolution(a->perturbed);
   VVPairVMap vmap;
   FaceDescSet fds;
   sumVF(a, b, true, fds, vmap, c);
@@ -691,20 +691,4 @@ void sumEE (Edge *e, Edge *f, bool aflag, FaceDescSet &fds,
     if (fds.insert(FaceDesc(vo, 4)).second)
       con->addRectangle(a, b, c, d);
   }
-}
-
-// debug
-
-
-void neighborFaces (HEdge *e, Octree<Face *> *octree, Faces &fa)
-{
-  Vertex *t = e->tail(), *h = e->head();
-  Faces fcand;
-  octree->find(t->getBBox(), fcand);
-    for (Faces::iterator f = fcand.begin(); f != fcand.end(); ++f) {
-      Plane *p = (*f)->getP();
-      if (bboxOverlap((*f)->getBBox(), h->getBBox()) &&
-	  t->getP()->side(p) == 0 && h->getP()->side(p) == 0)
-	fa.push_back(*f);
-    }
 }

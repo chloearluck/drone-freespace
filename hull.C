@@ -5,17 +5,17 @@ Polyhedron * convexHull (Polyhedron *a)
   Points pts;
   for (Vertices::iterator v = a->vertices.begin(); v != a->vertices.end(); ++v)
     pts.push_back((*v)->getP());
-  return convexHull(pts);
+  return convexHull(pts, a->perturbed);
 }
 
-Polyhedron * convexHull (Points &pts)
+Polyhedron * convexHull (Points &pts, bool perturbed)
 {
   int n = pts.size(), *p = randomPermutation(n);
   Points ppts;
   for (int i = 0; i < n; ++i)
     ppts.push_back(pts[p[i]]);
   delete [] p;
-  Polyhedron *a = hullInit(ppts);
+  Polyhedron *a = hullInit(ppts, perturbed);
   if (!a)
     return 0;
   ConflictGraph cg = conflictGraphInit(a);
@@ -45,7 +45,7 @@ int randomInteger (int lb, int ub)
   return lb + d;
 }
 
-Polyhedron * hullInit (Points &pts)
+Polyhedron * hullInit (Points &pts, bool perturbed)
 {
   int n = pts.size();
   if (n < 4)
@@ -77,7 +77,7 @@ Polyhedron * hullInit (Points &pts)
   }
   if (s == -1)
     reverse(pts.begin(), pts.begin() + 2);
-  Polyhedron *a = new Polyhedron;
+  Polyhedron *a = new Polyhedron(perturbed);
   for (Points::iterator p = pts.begin(); p != pts.end(); ++p)
     a->getVertex(*p);
   a->addTriangle(a->vertices[0], a->vertices[1], a->vertices[3]);
@@ -193,7 +193,6 @@ void expandHull (Polyhedron *a, Vertex *v, ConflictGraph &cg, HEdge *h)
   cg.update(v, f, vs2);  
 }
 
-/*
 #include "io.h"
 
 int main (int argc, char *argv[])
@@ -203,9 +202,9 @@ int main (int argc, char *argv[])
   ifstream astr(argv[1]);
   if (!astr.good())
     return 0;
-  inputPerturbed = argc == 2 ? true : *argv[2] != 't';
+  bool perturbed = argc == 2 ? true : *argv[2] != 't';
   Parameter::enable();
-  Polyhedron *a = readPolyhedronVTK(astr, inputPerturbed),
+  Polyhedron *a = readPolyhedronVTK(astr, perturbed),
     *b = convexHull(a);
   b->formCells();
   b->describe();
@@ -214,4 +213,3 @@ int main (int argc, char *argv[])
   delete a;
   Parameter::disable();
 }
-*/

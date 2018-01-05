@@ -7,7 +7,7 @@ class Convolution : public Polyhedron {
   EFVMap efvmap;
   FFFVMap fffvmap;
  public:
-  Convolution () { oneWayInt = true; }
+  Convolution (bool perturbed) : Polyhedron(perturbed) { oneWayInt = true; }
   Face * minkowskiInit (FaceSet &fdone, Octree<Face *> *octree,
 			Polyhedron *a, PVMap &pvmap);
   Face * rmaxFace (Vertex *&v);
@@ -153,7 +153,7 @@ void deleteHull (MinkHullFace *hull);
 
 bool convexOrder (const HEdges &hedges);
 
-Polyhedron * triangulate (const FaceSet &fs);
+Polyhedron * triangulate (const FaceSet &fs, bool perturbed);
 
 Polyhedron * minkowskiSumFull (Polyhedron *a, Polyhedron *b);
 
