@@ -333,7 +333,7 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta) {
   Polyhedron * tmp = outerApprox->boolean(robot, Union);
   delete outerApprox;
   outerApprox = tmp;
-  simplify(outerApprox, 1e-6, true);
+  simplify(outerApprox, 1e-6, false);
   savePoly(outerApprox, "outerApprox");
 
   for (int i=0; i<polyList.size(); i++)
@@ -347,65 +347,15 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta) {
     allRotations.push_back(rotate(allRotations[i]));
   cout<<"found all rotations"<<endl;
 
-
-  const char *mSumName[] = { "sum00",
-		       "sum01",
-		       "sum02",
-		       "sum03",
-		       "sum04",
-		       "sum05",
-		       "sum06",
-		       "sum07",
-		       "sum08",
-		       "sum09",
-		       "sum10",
-		       "sum11",
-		       "sum12",
-		       "sum13",
-		       "sum14",
-		       "sum15",
-		       "sum16",
-		       "sum17",
-		       "sum18",
-		       "sum19",
-		       "sum20",
-		       "sum21",
-		       "sum22",
-		       "sum23",
-		       "sum24",
-		       "sum25",
-		       "sum26",
-		       "sum27",
-		       "sum28",
-		       "sum29",
-		       "sum30",
-		       "sum31",
-		       "sum32",
-		       "sum33",
-		       "sum34",
-		       "sum35",
-		       "sum36",
-		       "sum37",
-		       "sum38",
-		       "sum39",
-		       "sum40",
-		       "sum41",
-		       "sum42",
-		       "sum43",
-		       "sum44",
-		       "sum45",
-		       "sum46",
-		       "sum47",
-		       "sum48",
-		       "sum49" };
-
   for (int i=0; i< allRotations.size(); i++) {
     cout<<"minkowskiSum "<<i<<" of "<<allRotations.size()-1<<endl;
     Polyhedron * mSum = minkowskiSumFull(allRotations[i], obstacle);
-    simplify(mSum, 1e-6, true);
+    simplify(mSum, 1e-6, false);
     bool selfInt = mSum->intersectsEdges(mSum);
     cout << "selfInt " << selfInt << endl;
-    savePoly(mSum, mSumName[i]);
+    char s[25];
+    sprintf(s, "sum%02d", i);
+    savePoly(mSum, s);
     blockspaces.push_back(mSum);
   }
 
