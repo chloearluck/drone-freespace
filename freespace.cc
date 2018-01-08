@@ -333,7 +333,7 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta) {
   Polyhedron * tmp = outerApprox->boolean(robot, Union);
   delete outerApprox;
   outerApprox = tmp;
-  simplify(outerApprox, 1e-6);
+  simplify(outerApprox, 1e-6, true);
   savePoly(outerApprox, "outerApprox");
 
   for (int i=0; i<polyList.size(); i++)
@@ -402,7 +402,7 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta) {
   for (int i=0; i< allRotations.size(); i++) {
     cout<<"minkowskiSum "<<i<<" of "<<allRotations.size()-1<<endl;
     Polyhedron * mSum = minkowskiSumFull(allRotations[i], obstacle);
-    simplify(mSum, 1e-6);
+    simplify(mSum, 1e-6, true);
     bool selfInt = mSum->intersectsEdges(mSum);
     cout << "selfInt " << selfInt << endl;
     savePoly(mSum, mSumName[i]);
