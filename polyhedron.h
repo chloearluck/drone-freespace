@@ -102,8 +102,6 @@ Primitive3(PointOrder, Point *, a, Point *, b, Point *, r);
 
 Primitive2(PointOrderR, Point *, a, Point *, b);
 
-Primitive3(TripleProductR, Point *, a, Point *, t, Point *, h);
-
 class LeftTurn : public Primitive {
   Point *a, *b, *c;
   int pc;
@@ -198,14 +196,6 @@ class MidPoint : public Point {
   }
 };
 
-class ScalePoint : public Point {
-  PTR<Point> p;
-  double unit;
-  PV3 calculate () { return unit * p->getP(); }
- public:
-  ScalePoint(PTR<Point> p, double unit) : p(p), unit(unit) {}
-};
-
 class CentroidPoint : public Point {
   friend class Point;
   PTR<Point> a, b, c;
@@ -215,6 +205,14 @@ class CentroidPoint : public Point {
     ps = intersection(a->ps, b->ps);
     ps = intersection(ps, c->ps);
   }
+};
+
+class ScalePoint : public Point {
+  PTR<Point> p;
+  double unit;
+  PV3 calculate () { return unit * p->getP(); }
+ public:
+  ScalePoint(PTR<Point> p, double unit) : p(p), unit(unit) {}
 };
 
 class EPPoint : public Point {
@@ -810,11 +808,11 @@ class Polyhedron {
   void setNext (const HEdges &he, int c) const;
   Face * enclosingFace (const Faces &fa, Point *p) const;
   void removeLoops (const HEdges &ed);
+  Polyhedron * copy () const;
+  Polyhedron * scale (double unit) const;
   Polyhedron * negative () const;
   Polyhedron * translate (Point *t) const;
   Polyhedron * negativeTranslate (Point *t) const;
-  Polyhedron * scale (double unit) const;
-  Polyhedron * copy () const;
   bool intersects (Polyhedron *a) const;
   bool contains (Point *p) const;
   int containingCell (Point *p) const;

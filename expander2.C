@@ -459,7 +459,7 @@ bool Expander2::expandV (double e, bool velocityObjective, double velocityBound)
 double minSep1;
 
 double Expander2::expandV2 (double e, bool velocityObjective, double velocityBound, double uscale) {
-  bool verbose = true;
+  bool verbose = false;
 
   minSep1 = 1e9;
 
@@ -859,7 +859,7 @@ double Expander2::expandV2 (double e, bool velocityObjective, double velocityBou
   if (verbose)
     cout << endl;
 
-  if (maxT < 0.5)
+  if (maxT < 1.0)
     return 1234567890;
 
   // maxT = 1;

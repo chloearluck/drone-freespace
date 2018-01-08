@@ -6,9 +6,9 @@
 #include "io.h"
 #include "expander2.h"
 
-void simplify (Polyhedron *a, double d, bool perturb = true, bool opt2 = false);
+void simplify (Polyhedron *a, double d, bool opt2 = false);
 
-void simplify1 (Polyhedron *a, double d, bool perturb);
+void simplify1 (Polyhedron *a, double d);
 
 FOctree * faceOctree (Polyhedron *a, double s = 0.0);
 
@@ -16,8 +16,7 @@ typedef pair<Vertex *, PTR<Point> > VPPair;
 
 typedef map<Vertex *, PTR<Point> > VPMap;
 
-bool simplify1 (Polyhedron *a, double d, bool perturb, FOctree *octree,
-		VPMap &vpmap, int &n1, int &n2);
+bool simplify1 (Polyhedron *a, double d, FOctree *octree, VPMap &vpmap, int &n1, int &n2);
 
 class DistancePP : public Primitive {
   Point *a, *b;
@@ -82,14 +81,12 @@ void addCollapseFlips (Edge *e, double d, IFeatureQ &fq);
 
 void addFlips (Edge *e, double d, IFeatureQ &fq);
 
-bool collapse (Polyhedron *a, double d, bool perturb, Edge *e, IFeatureQ &fq,
-	       FOctree *octree, VPMap &vpmap, bool &bad);
+bool collapse (Polyhedron *a, double d, Edge *e, IFeatureQ &fq, FOctree *octree,
+	       VPMap &vpmap, bool &bad);
 
 bool collapsible (Edge *e);
 
 double distanceUB (Point *t, Point *h);
-
-PTR<Point> collapsePoint (Point *t, Point *h, bool perturb);
 
 bool badCollapse (Vertex *v, FOctree *octree, double dc);
 
@@ -108,8 +105,8 @@ bool intersectsEE (Edge *e, Edge *f, int pc);
 
 void addStar (Vertex *v, double d, IFeatureQ &fq);
 
-bool flip (Polyhedron *a, double d, bool perturb, HEdge *e, IFeatureQ &fq,
-	   FOctree *octree, VPMap &vpmap, bool &bad);
+bool flip (Polyhedron *a, double d, HEdge *e, IFeatureQ &fq, FOctree *octree,
+	   VPMap &vpmap, bool &bad);
 
 bool flippable (HEdge *e, double d);
 

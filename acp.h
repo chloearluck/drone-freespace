@@ -25,6 +25,8 @@ pages 37-52, 2012
 #ifndef ACP_H
 #define ACP_H
 
+//#define NO_MODE
+
 #include <gmp.h>
 #include <mpfr.h>
 #include <assert.h>
@@ -360,16 +362,10 @@ class Parameter {
   friend class Encasement;
   friend class PInt;
 
- public:
-
-  // Construct from double.  Will be perturbed.
-  Parameter (double x) {
-    l = u.r = x + delta*(1.0 + fabs(x))*randomNumber(-1.0, 1.0);
-  }
-
   // static double force_rounding (double x) { volatile double x_ = x; return x_; }
   static double no_optimize (volatile double x) { return x; }
 
+ public:
 
   static unsigned long int identityCount;
 
@@ -414,7 +410,8 @@ class Parameter {
   bool uninitialized () const { return l == 0.0 && u.r == -1.0; }
   
   static Parameter input (double x) { 
-    Parameter p(x);
+    double y = x + delta*(1.0 + fabs(x))*randomNumber(-1.0, 1.0);
+    Parameter p(y, y);
     if (highPrecision > 53u)
       p.increasePrecision();
     return p;
@@ -432,6 +429,13 @@ class Parameter {
     if (highPrecision > 53u)
       p.increasePrecision();
     return p;
+  }
+
+  // x is not perturbed
+  Parameter (double x) {
+    l = u.r = x;
+    if (highPrecision > 53u)
+      increasePrecision();
   }
 
   Parameter (const Parameter &p) : l(p.l) {
@@ -535,7 +539,7 @@ class Parameter {
     return Parameter(u.m->plus(b.u.m));
   }
 
-  Parameter operator+ (double b) const { return *this + constant(b); }
+  Parameter operator+ (double b) const { return *this + Parameter(b); }
   
   Parameter operator- (const Parameter &b) const {
     if (l != sentinel && b.l != sentinel)
@@ -548,7 +552,7 @@ class Parameter {
     return Parameter(u.m->minus(b.u.m));
   }
   
-  Parameter operator- (double b) const { return *this - constant(b); }
+  Parameter operator- (double b) const { return *this - Parameter(b); }
 
   Parameter operator- () const {
     if (l != sentinel)
@@ -602,7 +606,7 @@ class Parameter {
     return Parameter(u.m->times(b.u.m));
   }
   
-  Parameter operator* (double b) const { return *this * constant(b); }
+  Parameter operator* (double b) const { return *this * Parameter(b); }
 
   Parameter operator/ (const Parameter &b) const {
     int bs = b.sign();
@@ -642,7 +646,7 @@ class Parameter {
     return Parameter(u.m->divide(b.u.m));
   }
 
-  Parameter operator/ (double b) const { return *this / constant(b);}
+  Parameter operator/ (double b) const { return *this / Parameter(b);}
     
   bool operator< (const Parameter &b) const { return (b - *this).sign() == 1; }
   bool operator< (double b) const { return (*this - b).sign() == -1; }
@@ -661,9 +665,9 @@ class Parameter {
 
   Parameter pow (long int n) const {
     if (n == 0)
-      return constant(1);
+      return Parameter(1.0);
     if (n < 0)
-      return constant(1) / Parameter::pow(*this, -n);
+      return Parameter(1.0)/Parameter::pow(*this, -n);
     return Parameter::pow(*this, n);
   }
 
@@ -879,7 +883,7 @@ inline Parameter operator* (double a, const Parameter &b)
 
 inline Parameter operator/ (double a, const Parameter &b)
 {
-  return Parameter::constant(a) / b;
+  return Parameter(a)/b;
 }
 
 inline bool operator< (double a, const Parameter &b)

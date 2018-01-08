@@ -146,12 +146,6 @@ int PointOrderR::sign ()
   return Rdir.getP().dot(b->getP() - a->getP()).sign();
 }
 
-int TripleProductR::sign ()
-{
-  return Rdir.getP().tripleProduct(a->getP() - t->getP(),
-				   h->getP() - t->getP()).sign();
-}
-
 int Orientation::sign ()
 {
   PV3 u = d->getP() - a->getP(), v = b->getP() - a->getP(), 
@@ -1359,15 +1353,8 @@ Vertex * Polyhedron::intersectEE (Edge *e, Edge *f, int pc)
     eevmap.insert(EEVPair(ef, 0));
     return 0;
   }
-  int tp1 = TripleProductR(e->t->p, f->t->p, f->h->p),
-    tp2 = TripleProductR(e->h->p, f->t->p, f->h->p);
-  if (tp1 == 0 || tp2 == 0 || tp1 == tp2) {
-    eevmap.insert(EEVPair(ef, 0));
-    return 0;
-  }
-  int tp3 = TripleProductR(f->t->p, e->t->p, e->h->p),
-    tp4 = TripleProductR(f->h->p, e->t->p, e->h->p);
-  if (tp3 == 0 || tp4 == 0 || tp3 == tp4) {
+  if (LeftTurn(e->t->p, f->t->p, f->h->p, pc)*LeftTurn(e->h->p, f->t->p, f->h->p, pc) > -1 ||
+      LeftTurn(f->t->p, e->t->p, e->h->p, pc)*LeftTurn(f->h->p, e->t->p, e->h->p, pc) > -1) {
     eevmap.insert(EEVPair(ef, 0));
     return 0;
   }
@@ -1690,6 +1677,29 @@ void Polyhedron::removeLoops (const HEdges &ed)
 
 // used in pack and MinkowskiSumFull from here on
 
+
+Polyhedron * Polyhedron::copy () const
+{
+  Polyhedron *a = new Polyhedron;
+  PVMap pvmap;
+  for (Vertices::const_iterator v = vertices.begin(); v != vertices.end(); ++v)
+    pvmap.insert(PVPair((*v)->p, a->getVertex((*v)->p )));
+  for (Faces::const_iterator f = faces.begin(); f != faces.end(); ++f)
+    a->getTriangle(*f, pvmap);
+  return a;
+}
+
+Polyhedron * Polyhedron::scale (double unit) const
+{
+  Polyhedron *a = new Polyhedron;
+  PVMap pvmap;
+  for (Vertices::const_iterator v = vertices.begin(); v != vertices.end(); ++v)
+    pvmap.insert(PVPair((*v)->p, a->getVertex(new ScalePoint((*v)->p, unit))));
+  for (Faces::const_iterator f = faces.begin(); f != faces.end(); ++f)
+    a->getTriangle(*f, pvmap);
+  return a;
+}
+
 Polyhedron * Polyhedron::negative () const
 {
   Polyhedron *a = new Polyhedron(perturbed);
@@ -1726,28 +1736,6 @@ Polyhedron * Polyhedron::negativeTranslate (Point *t) const
     Vertex *u = e->tail(), *v = e->head(), *w = e->next->head();
     a->getTriangle(w, v, u, pvmap);
   }
-  return a;
-}
-
-Polyhedron * Polyhedron::scale (double unit) const
-{
-  Polyhedron *a = new Polyhedron;
-  PVMap pvmap;
-  for (Vertices::const_iterator v = vertices.begin(); v != vertices.end(); ++v)
-    pvmap.insert(PVPair((*v)->p, a->getVertex(new ScalePoint((*v)->p, unit))));
-  for (Faces::const_iterator f = faces.begin(); f != faces.end(); ++f)
-    a->getTriangle(*f, pvmap);
-  return a;
-}
-
-Polyhedron * Polyhedron::copy () const
-{
-  Polyhedron *a = new Polyhedron;
-  PVMap pvmap;
-  for (Vertices::const_iterator v = vertices.begin(); v != vertices.end(); ++v)
-    pvmap.insert(PVPair((*v)->p, a->getVertex((*v)->p )));
-  for (Faces::const_iterator f = faces.begin(); f != faces.end(); ++f)
-    a->getTriangle(*f, pvmap);
   return a;
 }
 
@@ -1793,7 +1781,7 @@ bool Polyhedron::intersectsEdges (const Polyhedron *a) const
 Polyhedron * Polyhedron::boolean (Polyhedron *a, SetOp op)
 {
   Polyhedron *poly[] = {this, a},
-    *c = overlay(poly, 2), *d = new Polyhedron(perturbed);
+    *c = overlay(poly, 2), *d = new Polyhedron(false);
   PVMap pvmap;
   computeWindingNumbers();
   a->computeWindingNumbers();
@@ -2117,7 +2105,7 @@ bool inSet (bool ina, bool inb, SetOp op)
 
 Polyhedron * overlay (Polyhedron **poly, int n)
 {
-  Polyhedron *c = new Polyhedron(poly[0]->perturbed);
+  Polyhedron *c = new Polyhedron(false);
   PVMap pvmap;
   for (int i = 0; i < n; ++i) {
     const Faces &fa = poly[i]->faces;
@@ -2131,7 +2119,7 @@ Polyhedron * overlay (Polyhedron **poly, int n)
 
 Polyhedron * multiUnion (Polyhedron **poly, int n)
 {
-  Polyhedron *c = overlay(poly, n), *d = new Polyhedron(poly[0]->perturbed);
+  Polyhedron *c = overlay(poly, n), *d = new Polyhedron(false);
   for (int i = 0; i < n; ++i)
     poly[i]->computeWindingNumbers();
   c->formCells();

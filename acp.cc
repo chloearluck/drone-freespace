@@ -173,14 +173,14 @@ Parameter Parameter::root (double a, unsigned int n) {
 
   do {
     x_old = x;
-    Parameter xx = constant(x);
+    Parameter xx(x);
     // x = o - f(o) / f'(o)
     // x = o - (o^n - a) / (n o^(n-1))
     // x = o - (o - a / o^(n-1)) / n
     x = (xx - (xx - a / xx.pow(n-1)) / n).u.r;
   } while (x < x_old);
 
-  Parameter xx = constant(x);
+  Parameter xx(x);
   Parameter l = a / xx.pow(n-1);
   return Parameter(l.l, x);
 }

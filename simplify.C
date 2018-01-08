@@ -1,20 +1,20 @@
 #include "simplify.h"
 
-void simplify (Polyhedron *a, double d, bool perturb, bool opt2)
+void simplify (Polyhedron *a, double d, bool opt2)
 {
-  simplify1(a, d, perturb);
+  simplify1(a, d);
   simplify2(a, d, opt2);
   a->updateCells();
   a->removeNullFaces();
 }
 
-void simplify1 (Polyhedron *a, double d, bool perturb)
+void simplify1 (Polyhedron *a, double d)
 {
   double t = getTime();
   FOctree *octree = faceOctree(a);
   VPMap vpmap;
   int n1 = 0, n2 = 0;
-  while (!simplify1(a, d, perturb, octree, vpmap, n1, n2))
+  while (!simplify1(a, d, octree, vpmap, n1, n2))
     ;
   delete octree;
   t = getTime() - t;
@@ -30,8 +30,7 @@ FOctree * faceOctree (Polyhedron *a, double s)
   return Octree<Face *>::octree(fa, a->bbox, s);
 }
 
-bool simplify1 (Polyhedron *a, double d, bool perturb, FOctree *octree,
-		VPMap &vpmap, int &n1, int &n2)
+bool simplify1 (Polyhedron *a, double d, FOctree *octree, VPMap &vpmap, int &n1, int &n2)
 {
   bool bad = false;
   int n = n1 + n2;
@@ -43,10 +42,10 @@ bool simplify1 (Polyhedron *a, double d, bool perturb, FOctree *octree,
     fq.pop();
     if (f.valid())
       if (!f.v) {
-	if (collapse(a, d, perturb, f.e, fq, octree, vpmap, bad))
+	if (collapse(a, d, f.e, fq, octree, vpmap, bad))
 	  ++n1;
       }
-      else if (flip(a, d, perturb, f.getH(), fq, octree, vpmap, bad))
+      else if (flip(a, d, f.getH(), fq, octree, vpmap, bad))
 	++n2;
   }
   return n1 + n2 == n || !bad;
@@ -77,8 +76,8 @@ void addFlips (Edge *e, double d, IFeatureQ &fq)
 	fq.push(IFeature(e->getHEdge(i)));
 }
 
-bool collapse (Polyhedron *a, double d, bool perturb, Edge *e, IFeatureQ &fq,
-	       FOctree *octree, VPMap &vpmap, bool &bad)
+bool collapse (Polyhedron *a, double d, Edge *e, IFeatureQ &fq, FOctree *octree,
+	       VPMap &vpmap, bool &bad)
 {
   if (!collapsible(e))
     return false;
@@ -86,7 +85,7 @@ bool collapse (Polyhedron *a, double d, bool perturb, Edge *e, IFeatureQ &fq,
   Vertex *t = e1->tail(), *h = e1->head(), *v = e1->getNext()->head(),
     *w = e2->getNext()->head();
   PTR<Point> tp = t->getP(), hp = h->getP();
-  PTR<Point> cp = collapsePoint(tp, hp, perturb);
+  PTR<Point> cp = new MidPoint(tp, hp);
   a->removeLoop(e1);
   a->removeLoop(e2);
   vpmap.insert(VPPair(h, h->getP()));
@@ -140,23 +139,6 @@ double distanceUB (Point *t, Point *h)
   PV3 u = h->getApprox(1.0) - t->getApprox(1.0);
   Parameter k = u.dot(u);
   return 0.5*sqrt(k.ub());
-}
-
-PTR<Point> collapsePoint (Point *t, Point *h, bool perturb)
-{
-  if (!perturb)
-    return new MidPoint(t, h);
-  double d = Parameter::delta, l = distanceUB(t, h);
-  if (d < l) {
-    PV3 p = 0.5*(t->getApprox(d) + h->getApprox(d));
-    return new InputPoint(p.x.mid(), p.y.mid(), p.z.mid());
-  }
-  double k = 0.144*l;
-  PV3 p = 0.5*(t->getApprox() + h->getApprox());
-  return new InputPoint(p.x.mid() + randomNumber(- k, k),
-			p.y.mid() + randomNumber(- k, k),
-			p.z.mid() + randomNumber(- k, k),
-			false);
 }
 
 bool badCollapse (Vertex *v, FOctree *octree, double dc)
@@ -278,14 +260,14 @@ bool intersectsEE (Edge *e, Edge *f, int pc)
     return false;
   Point *et = e->getT()->getP(), *eh = e->getH()->getP(), *ft = f->getT()->getP(),
     *fh = f->getH()->getP();
-  int tp1 = TripleProductR(et, ft, fh), tp2 = TripleProductR(eh, ft, fh);
+  int tp1 = LeftTurn(et, ft, fh, pc), tp2 = LeftTurn(eh, ft, fh, pc);
   if (tp1*tp2 > -1)
     return false;
   if (tp1 == 0)
     return onEdge(et, ft, fh, true);
   if (tp2 == 0)
     return onEdge(eh, ft, fh, true);
-  int tp3 = TripleProductR(ft, et, eh), tp4 = TripleProductR(fh, et, eh);
+  int tp3 = LeftTurn(ft, et, eh, pc), tp4 = LeftTurn(fh, et, eh, pc);
   return 
     tp3 == 0 && onEdge(ft, et, eh, true) || tp4 == 0 && onEdge(fh, et, eh, true) ||
     tp3*tp4 == -1;
@@ -306,14 +288,14 @@ void addStar (Vertex *v, double d, IFeatureQ &fq)
   }
 }
 
-bool flip (Polyhedron *a, double d, bool perturb, HEdge *e, IFeatureQ &fq,
-	   FOctree *octree, VPMap &vpmap, bool &bad)
+bool flip (Polyhedron *a, double d, HEdge *e, IFeatureQ &fq, FOctree *octree,
+	   VPMap &vpmap, bool &bad)
 {
   Vertex *t = e->tail(), *h = e->head(), *v = e->getNext()->head();
   if (CloserPair(t->getP(), h->getP(), v->getP(), t->getP()) == 1)
-    return collapse(a, d, perturb, e->getNext()->getE(), fq, octree, vpmap, bad);
+    return collapse(a, d, e->getNext()->getE(), fq, octree, vpmap, bad);
   if (CloserPair(t->getP(), h->getP(), h->getP(), v->getP()) == 1)
-    return collapse(a, d, perturb, e->getNext()->getNext()->getE(), fq, octree,
+    return collapse(a, d, e->getNext()->getNext()->getE(), fq, octree,
 		    vpmap, bad);
   if (!flippable(e, d))
     return false;
