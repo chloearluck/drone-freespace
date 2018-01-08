@@ -29,6 +29,8 @@ void savePoly(Polyhedron * p, const char * filename) {
 }
 
 int main (int argc, char *argv[]) {
+  Parameter::enable();
+
   double d1[6] = {-5, 5, -5, 5, -5, 5};
   Polyhedron * big_box = box(d1);
 

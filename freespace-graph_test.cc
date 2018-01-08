@@ -41,6 +41,8 @@ void testSearchGraph(const char * graph_dir, PTR<Point> start, PTR<Point> end, i
 }
 
 int main (int argc, char *argv[]) {
+  Parameter::enable();
+
   if (argc == 2) { 
     unsigned seed = atoi(argv[1]);
     srandom(seed);

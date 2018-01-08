@@ -2,6 +2,7 @@
 #include "geometry3d.h"
 #include "mink.h"
 #include <cstring>
+#include "io.h"
 
 Polyhedron * loadPoly(const char * str) {
   Polyhedron * poly;
@@ -36,6 +37,8 @@ void savePoly(Polyhedron * p, const char * filename) {
 }
 
 int main (int argc, char *argv[]) {
+  Parameter::enable();
+
   if (argc == 2) { 
     unsigned seed = atoi(argv[1]);
     srandom(seed);

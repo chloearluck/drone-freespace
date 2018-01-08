@@ -65,6 +65,8 @@ void testBoundary() {
 
 
 int main (int argc, char *argv[]) {
+  Parameter::enable();
+
   if (argc < 2) {
     cout<<"not enough arguments"<<endl;
     return 1;
