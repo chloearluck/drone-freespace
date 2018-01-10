@@ -548,7 +548,7 @@ bool minkowskiShell (Polyhedron *a, Polyhedron *b, Shell *s)
 
 Convolution * convolution (Polyhedron *a, Polyhedron *b)
 {
-  Convolution *c = new Convolution(a->perturbed);
+  Convolution *c = new Convolution(a->perturbed && b->perturbed);
   VVPairVMap vmap;
   FaceDescSet fds;
   sumVF(a, b, true, fds, vmap, c);
@@ -657,15 +657,17 @@ int ConvexEdge::sign ()
 
 bool compatibleEE (Edge *e, Edge *f, bool &aflag)
 {
-  int s1 = CompatibleEdge(f, e->getHEdge(0)->getF()), 
-    s2 = CompatibleEdge(f, e->getHEdge(1)->getF());
+  HEdge *e1 = e->getHEdge(0)->getForward() ? e->getHEdge(0) : e->getHEdge(1),
+    *f1 = f->getHEdge(0)->getForward() ? f->getHEdge(0) : f->getHEdge(1),
+    *e2 = e1->ccw(), *f2 = f1->ccw();
+  int s1 = CompatibleEdge(f, e1->getF()), s2 = CompatibleEdge(f, e2->getF());
   aflag = s1 == 1 || s1 == 0 && s2 == -1;
   if (s1 == s2)
     return false;
-  int s3 = CompatibleEdge(e, f->getHEdge(0)->getF());
+  int s3 = CompatibleEdge(e, f1->getF());
   if (s1 != 0 && s1 == s3 || s2 != 0 && s2 == - s3)
     return false;
-  int s4 = CompatibleEdge(e, f->getHEdge(1)->getF());
+  int s4 = CompatibleEdge(e, f2->getF());
   if (s3 == s4)
     return false;
   return s4 == 0 || (s1 == 0 ? s2 == - s4 : s1 == s4);

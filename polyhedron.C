@@ -1682,8 +1682,6 @@ Polyhedron * Polyhedron::copy () const
 {
   Polyhedron *a = new Polyhedron;
   PVMap pvmap;
-  for (Vertices::const_iterator v = vertices.begin(); v != vertices.end(); ++v)
-    pvmap.insert(PVPair((*v)->p, a->getVertex((*v)->p )));
   for (Faces::const_iterator f = faces.begin(); f != faces.end(); ++f)
     a->getTriangle(*f, pvmap);
   return a;
