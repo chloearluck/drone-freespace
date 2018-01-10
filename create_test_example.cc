@@ -40,10 +40,10 @@ int main (int argc, char *argv[]) {
   double d3[6] = {-4, -1, -4, 4, -4, 4};
   Polyhedron * room2 = box(d3);
 
-  double d4[6] = {-2, 2, -.45, .45, -.9, 0};
+  double d4[6] = {-2, 2, -.75, .75, -1.5, 0};
   Polyhedron * hall1 = box(d4);
 
-  double d5[6] = {-2.95, -2.05, 3, 6, 1, 1.9};
+  double d5[6] = {-3.25, -1.75, 3, 6, 1, 2.5};
   Polyhedron * hall2 = box(d5);
 
   Polyhedron * out = big_box;
@@ -51,9 +51,9 @@ int main (int argc, char *argv[]) {
   out = out->boolean(room2, Complement);
   out = out->boolean(hall1, Complement);
   out = out->boolean(hall2, Complement);
-  savePoly(out, "tworooms.vtk");
+  // savePoly(out, "tworooms.vtk");
   simplify(out, 1e-6);
-  savePoly(out, "tworooms2.vtk");
+  savePoly(out, "tworooms.vtk");
 
 
 }
