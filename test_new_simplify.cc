@@ -2,6 +2,7 @@
 #include "io.h"
 #include <cstring>
 #include "simplify.h"
+#include "mink.h"
 
 Polyhedron * loadPoly(const char * filename) {
   Polyhedron * poly;
@@ -30,8 +31,26 @@ void savePoly(Polyhedron * p, const char * filename) {
 
 int main (int argc, char *argv[]) {
   Parameter::enable();
-  Polyhedron * test = loadPoly(argv[1]);
-  Polyhedron * test2 = loadPoly(argv[2]);
-  Polyhedron * test3 = test->boolean(test2, Union);
-  simplify(test3, 1e-6);
+
+  Polyhedron * ball = loadPoly("sphere.vtk");
+  Polyhedron * unit_ball = ball->scale(0.05);
+  Polyhedron * poly = loadPoly("sum00-out.vtk");
+  
+  cout<<"without simplify: "<<endl;
+  poly->formCells();
+  cout<<"poly has "<<poly->cells.size()<<" cells"<<endl;
+  Polyhedron * sum = minkowskiSumFull(poly, unit_ball);
+  sum->formCells();
+  cout<<"sum has "<<sum->cells.size()<<" cells"<<endl;
+  savePoly(sum, "nosimplify.vtk");
+
+  cout<<"with simplify"<<endl;
+  simplify(poly, 1e-6);
+
+  poly->formCells();
+  cout<<"poly has "<<poly->cells.size()<<" cells"<<endl;
+  sum = minkowskiSumFull(poly, unit_ball);
+  sum->formCells();
+  cout<<"sum has "<<sum->cells.size()<<" cells"<<endl;
+  savePoly(sum, "simplify.vtk");  
 }
