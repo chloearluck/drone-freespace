@@ -31,26 +31,14 @@ void savePoly(Polyhedron * p, const char * filename) {
 
 int main (int argc, char *argv[]) {
   Parameter::enable();
-
-  Polyhedron * ball = loadPoly("sphere.vtk");
-  Polyhedron * unit_ball = ball->scale(0.05);
-  Polyhedron * poly = loadPoly("sum00-out.vtk");
   
-  cout<<"without simplify: "<<endl;
-  poly->formCells();
-  cout<<"poly has "<<poly->cells.size()<<" cells"<<endl;
-  Polyhedron * sum = minkowskiSumFull(poly, unit_ball);
-  sum->formCells();
-  cout<<"sum has "<<sum->cells.size()<<" cells"<<endl;
-  savePoly(sum, "nosimplify.vtk");
+  unsigned i = atoi(argv[1]);
+  srandom(i);
 
-  cout<<"with simplify"<<endl;
-  simplify(poly, 1e-6);
-
-  poly->formCells();
-  cout<<"poly has "<<poly->cells.size()<<" cells"<<endl;
-  sum = minkowskiSumFull(poly, unit_ball);
-  sum->formCells();
-  cout<<"sum has "<<sum->cells.size()<<" cells"<<endl;
-  savePoly(sum, "simplify.vtk");  
+  Polyhedron * p1 = loadPoly("two_room_output/sum18-out.vtk");
+  simplify(p1, 1e-6);
+  Polyhedron * p2 = loadPoly("two_room_output/sum19-out.vtk");
+  simplify(p2, 1e-6);
+  Polyhedron * p3 = p1->boolean(p2, Union);
+  simplify(p3, 1e-6);
 }
