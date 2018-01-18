@@ -665,9 +665,22 @@ bool Face::boundaryContains (Point *a, int i)
 
 bool Face::intersects (Edge *e)
 {
-  if (!bboxOverlap(bbox, e->bbox) ||
-      boundaryVertex(e->t) || boundaryVertex(e->h) ||
-      e->t->p->side(&p)*e->h->p->side(&p) != -1)
+  if (!bboxOverlap(bbox, e->bbox))
+    return false;
+  int st = e->t->p->side(&p), sh = e->h->p->side(&p);
+  if (st == 0 && sh == 0) {
+    HEdges ed;
+    boundaryHEdges(ed);
+    for (HEdges::iterator h = ed.begin(); h != ed.end(); ++h)
+      if (intersectsEE(e, (*h)->e))
+	return true;
+    return false;
+  }
+  if (st == 0)
+    return contains(e->t->p, false);
+  if (sh == 0)
+    return contains(e->h->p, false);
+  if (st == sh)
     return false;
   PTR<Point> a = new EPPoint(e->t->p, e->h->p, &p);
   if (!bboxOverlap(a, bbox))
@@ -683,21 +696,26 @@ bool Face::intersects (Edge *e)
   return true;
 }
 
-bool Face::intersects (Face *f)
+bool Face::intersectsEE (Edge *e, Edge *f)
 {
-  if (!bboxOverlap(bbox, f->bbox))
+  if (!bboxOverlap(e->getBBox(), f->getBBox()))
     return false;
-  HEdges ed;
-  boundaryHEdges(ed);
-  for (HEdges::iterator e = ed.begin(); e != ed.end(); ++e)
-    if (f->intersects((*e)->e))
-      return true;
-  HEdges fed;
-  f->boundaryHEdges(fed);
-  for (HEdges::iterator e = fed.begin(); e != fed.end(); ++e)
-    if (intersects((*e)->e))
-      return true;
-  return false;
+  Point *et = e->getT()->getP(), *eh = e->getH()->getP(), *ft = f->getT()->getP(),
+    *fh = f->getH()->getP();
+  int c = getPC(), tp1 = LeftTurn(et, ft, fh, c);
+  if (tp1 == 0 && onEdge(et, ft, fh, true))
+    return true;
+  int tp2 = LeftTurn(eh, ft, fh, c);
+  if (tp2 == 0 && onEdge(eh, ft, fh, true))
+    return true;
+  if (tp1*tp2 > -1)
+    return false;
+  int tp3 = LeftTurn(ft, et, eh, c);
+  if (tp3 == 0 && onEdge(ft, et, eh, true))
+    return true;
+  int tp4 = LeftTurn(fh, et, eh, c);
+  return tp4 == 0 && onEdge(fh, et, eh, true) ||
+    tp3*tp4 == -1;
 }
 
 PTR<Point> Face::centroid () const

@@ -101,8 +101,6 @@ bool intersectsPE (Face *f, bool *evf, Face *g, bool *evg, Edges &iedges,
 
 bool intersectsFEP (Face *f, bool *ef, Edge *e, bool ee);
 
-bool intersectsEE (Edge *e, Edge *f, int pc);
-
 void addStar (Vertex *v, double d, IFeatureQ &fq);
 
 bool flip (Polyhedron *a, double d, HEdge *e, IFeatureQ &fq, FOctree *octree,

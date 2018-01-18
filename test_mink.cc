@@ -18,8 +18,6 @@ Polyhedron * loadPoly(const char * str) {
   return poly;
 }
 
-//now try point in cell...
-
 void savePoly(Polyhedron * p, const char * filename) {
   int n = strlen(filename);
   char str[n+9];
@@ -44,10 +42,10 @@ int main (int argc, char *argv[]) {
     srandom(seed);
   }
 
-  Polyhedron * robot = loadPoly("frustum.vtk");
-  Polyhedron * room = loadPoly("tworooms.vtk");
-  Polyhedron * msum = minkowskiSumFull(robot, room);
-  savePoly(msum, "msum");
+  Polyhedron * p1 = loadPoly("frustum.vtk");
+  Polyhedron * p2 = loadPoly("sphere.vtk");
+  Polyhedron * p3 = minkowskiSumFull(p1, p2);
+  cout<<p3->vertices.size()<<" vertices"<<endl;
 
   return 0;
 }

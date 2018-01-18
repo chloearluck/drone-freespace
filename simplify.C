@@ -160,10 +160,10 @@ bool badCollapse (Vertex *v, FOctree *octree, double dc)
 
 void newEdges (Face *f, Vertex *v, bool *ef)
 {
-  Vertices ve;
-  f->boundaryVertices(ve);
+  HEdges ed;
+  f->boundaryHEdges(ed);
   for (int i = 0; i < 3; ++i)
-    ef[i] = ve[i] == v;
+    ef[i] = ed[i]->tail() == v || ed[i]->head() == v;
 }
 
 bool intersects (Face *f, bool *ef, Face *g)
@@ -218,7 +218,7 @@ bool intersectsPE (Face *f, bool *ef, Face *g, bool *eg, Edges &iedges,
 	return true;
       }
     }
-    else if (si == 0) {
+    if (si == 0) {
       Vertex *vi = ed[i]->tail();
       if (!f->boundaryVertex(vi)) {
 	pflag = f->containsConvex(vi->getP(), false);
@@ -247,30 +247,10 @@ bool intersectsFEP (Face *f, bool *ef, Edge *e, bool ee)
     return false;
   HEdges ed;
   f->boundaryHEdges(ed);
-  int pc = f->getPC();
   for (int i = 0; i < 3; ++i)
-    if ((ef[i] || ee) && intersectsEE(ed[i]->getE(), e, pc))
+    if ((ef[i] || ee) && f->intersectsEE(ed[i]->getE(), e))
       return true;
   return false;
-}
-
-bool intersectsEE (Edge *e, Edge *f, int pc)
-{
-  if (!bboxOverlap(e->getBBox(), f->getBBox()))
-    return false;
-  Point *et = e->getT()->getP(), *eh = e->getH()->getP(), *ft = f->getT()->getP(),
-    *fh = f->getH()->getP();
-  int tp1 = LeftTurn(et, ft, fh, pc), tp2 = LeftTurn(eh, ft, fh, pc);
-  if (tp1*tp2 > -1)
-    return false;
-  if (tp1 == 0)
-    return onEdge(et, ft, fh, true);
-  if (tp2 == 0)
-    return onEdge(eh, ft, fh, true);
-  int tp3 = LeftTurn(ft, et, eh, pc), tp4 = LeftTurn(fh, et, eh, pc);
-  return 
-    tp3 == 0 && onEdge(ft, et, eh, true) || tp4 == 0 && onEdge(fh, et, eh, true) ||
-    tp3*tp4 == -1;
 }
 
 void addStar (Vertex *v, double d, IFeatureQ &fq)

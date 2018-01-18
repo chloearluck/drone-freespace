@@ -509,7 +509,7 @@ class Face {
   bool containsConvex (Point *a, bool strict = true);
   bool boundaryContains (Point *a, int i);
   bool intersects (Edge *e);
-  bool intersects (Face *f);
+  bool intersectsEE (Edge *e, Edge *f);
   PTR<Point> centroid () const;
   void triangulate (Triangles &tr);
 };
