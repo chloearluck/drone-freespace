@@ -770,7 +770,7 @@ void testBoundaryCondition(Polyhedron * poly, int mode) {
     for (int j=0; j<shell->getHFaces().size(); j++) {
       HFace * hface = shell->getHFaces()[j];
       PTR<FaceIntersectionPoint> s = new FaceIntersectionPoint(p, q, hface);
-      bool onFace = hface->getF()->contains(s);
+      bool onFace = hface->getF()->contains(s, false);
       if (onFace)
         points.push_back(s);
     }
@@ -861,12 +861,12 @@ void findPath(Polyhedron * blockspace, int cell_index, PTR<Point> start, PTR<Poi
     Shell * shell = cell->getShell(i);
     for (int j=0; j<shell->getHFaces().size(); j++) {
       HFace * hface = shell->getHFaces()[j];
-      if (hface->getF()->contains(start) || hface->getF()->contains(end))
+      if (hface->getF()->contains(start, false) || hface->getF()->contains(end, false))
         continue;
       if (hface == hf_start || hface == hf_end)
         continue;
       PTR<FaceIntersectionPoint> q = new FaceIntersectionPoint(start, end, hface);
-      bool onFace = hface->getF()->contains(q);
+      bool onFace = hface->getF()->contains(q, false);
       bool afterStart = (PointOrder(start, q, r) == 1);
       bool beforeEnd = (PointOrder(q, end, r) == 1);
       if (onFace && afterStart && beforeEnd)
@@ -949,7 +949,7 @@ void findPath(Polyhedron * blockspace, PTR<Point> start, PTR<Point> end, Points 
     for (int j=0; j<shell->getHFaces().size(); j++) {
       HFace * hface = shell->getHFaces()[j];
       PTR<FaceIntersectionPoint> q = new FaceIntersectionPoint(start, end, hface);
-      bool onFace = hface->getF()->contains(q);
+      bool onFace = hface->getF()->contains(q, false);
       bool afterStart = (PointOrder(start, q, r) == 1);
       bool beforeEnd = (PointOrder(q, end, r) == 1);
       if (onFace && afterStart && beforeEnd)

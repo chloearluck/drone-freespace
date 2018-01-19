@@ -90,25 +90,6 @@ public:
   ZIntercectPoint(PTR<Point> a, PTR<Point> b, PTR<Point> c) : a(a), b(b), c(c) {}
 };
 
-class FacePoint : public Point {
-  Cell * cell;
-  double unit;
-  PV3 calculate ();
-
-public:
-  FacePoint(Cell * cell, double unit) : cell(cell), unit(unit) {}
-};
-
-class CellInternalPoint : public Point {
-  Cell * cell;
-  PTR<Point> facePoint;
-  double unit;
-  PV3 calculate ();
-
-public:
-  CellInternalPoint(Cell * cell, PTR<Point> facePoint, double unit) : cell(cell), facePoint(facePoint), unit(unit) {}
-};
-
 class SplitPlane : public Plane {
   PTR<Point> v0, v1, v2;
   PlaneData calculate ();

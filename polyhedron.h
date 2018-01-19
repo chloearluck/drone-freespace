@@ -504,9 +504,9 @@ class Face {
   void edgeVertices (VertexSet &vs) const;
   bool coplanar (Face *f);
   PTR<Point> rayIntersection (Point *a, Point *r);
-  bool contains (Point *a, bool strict = true);
+  bool contains (Point *a, bool strict);
   bool triangle () const;
-  bool containsConvex (Point *a, bool strict = true);
+  bool containsConvex (Point *a, bool strict);
   bool boundaryContains (Point *a, int i);
   bool intersects (Edge *e);
   bool intersectsEE (Edge *e, Edge *f);

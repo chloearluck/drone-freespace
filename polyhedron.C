@@ -562,7 +562,7 @@ void Face::containedBoundaryVertices1 (const Face *f, Vertices &vfg)
   Vertices vf;
   f->boundaryVertices(vf);
   for (Vertices::iterator v = vf.begin(); v != vf.end(); ++v)
-    if ((*v)->p->side(&p) == 0 && contains((*v)->p) &&
+    if ((*v)->p->side(&p) == 0 && contains((*v)->p, true) &&
 	find(vfg.begin(), vfg.end(), *v) == vfg.end())
       vfg.push_back(*v);
 }
@@ -611,7 +611,7 @@ PTR<Point> Face::rayIntersection (Point *a, Point *r)
 
 bool Face::contains (Point *a, bool strict)
 {
-  if (!bboxOverlap(a, bbox))
+  if (!bboxOverlap(a, bbox) || boundaryVertex(a))
     return false;
   if (triangle())
     return containsConvex(a, strict);
@@ -683,17 +683,7 @@ bool Face::intersects (Edge *e)
   if (st == sh)
     return false;
   PTR<Point> a = new EPPoint(e->t->p, e->h->p, &p);
-  if (!bboxOverlap(a, bbox))
-    return false;
-  HEdges ed;
-  boundaryHEdges(ed);
-  int pc = getPC();
-  for (HEdges::iterator f = ed.begin(); f != ed.end(); ++f) {
-    Point *t = (*f)->tail()->p, *h = (*f)->head()->p;
-    if (LeftTurn(a, t, h, pc) < 1)
-      return false;
-  }
-  return true;
+  return contains(a, false);
 }
 
 bool Face::intersectsEE (Edge *e, Edge *f)
@@ -1323,9 +1313,9 @@ void Polyhedron::intersectFEP (Face *f, Edge *e, EFVMap &efvmap)
     if (v)
       vs.insert(v);
   }
-  if (f->contains(e->t->p))
+  if (f->contains(e->t->p, true))
     vs.insert(e->t);
-  if (f->contains(e->h->p))
+  if (f->contains(e->h->p, true))
     vs.insert(e->h);
   Vertices ve;
   e->edgeVertices(ve);

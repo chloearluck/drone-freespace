@@ -442,7 +442,7 @@ bool closeVF (Vertex *v, Face *f, double d)
   Point *p = v->getP();
   Plane *pl = f->getP();
   PTR<Point> q = new PlanePoint(pl, p);
-  return DistancePP(p, q, d) == 1 && f->contains(q);
+  return DistancePP(p, q, d) == 1 && f->contains(q, false);
 }
 
 bool closeEE (Edge *e, Edge *f, double d)
