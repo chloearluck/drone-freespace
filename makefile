@@ -67,10 +67,10 @@ polyhedron.o: polyhedron.C polyhedron.h octree.h rbtree.h object.h pv.h acp.h
 simplify.o: simplify.C simplify.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h expander2.h
 	$(COMPILE) simplify.C
 
-test_mink:  test_mink.o hull.o mink.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o
-	$(LINK) test_mink.o hull.o mink.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o -lmpfr -o test_mink
+test_mink:  test_mink.o hull.o mink.o simplify.o expander2.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o
+	$(LINK) test_mink.o hull.o mink.o simplify.o expander2.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o $(LFLAGS) -o test_mink
 
-test_mink.o: test_mink.cc mink.h hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h
+test_mink.o: test_mink.cc mink.h simplify.h expander2.h io.h hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h
 	$(COMPILE) test_mink.cc
 
 test_new_simplify: test_new_simplify.o simplify.o expander2.o mink.o io.o polyhedron.o triangulate.o object.o acp.o

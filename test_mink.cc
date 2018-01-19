@@ -3,6 +3,7 @@
 #include "mink.h"
 #include <cstring>
 #include "io.h"
+#include "simplify.h"
 
 Polyhedron * loadPoly(const char * str) {
   Polyhedron * poly;
@@ -42,10 +43,14 @@ int main (int argc, char *argv[]) {
     srandom(seed);
   }
 
-  Polyhedron * p1 = loadPoly("frustum.vtk");
-  Polyhedron * p2 = loadPoly("sphere.vtk");
-  Polyhedron * p3 = minkowskiSumFull(p1, p2);
-  cout<<p3->vertices.size()<<" vertices"<<endl;
-
-  return 0;
+  Polyhedron * space = loadPoly("sum37-out.vtk");
+  simplify(space, 1e-6);
+  Polyhedron * ball = loadPoly("sphere.vtk");
+  simplify(ball, 1e-6);
+  Polyhedron * unit_ball = ball->scale(0.05);
+  simplify(unit_ball, 1e-6);
+  Polyhedron * msum = minkowskiSumFull(space, unit_ball);
+  msum->formCells();
+  cout<<msum->cells.size()<<" cells"<<endl;
+  savePoly(msum, "test");
 }
