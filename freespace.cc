@@ -111,7 +111,7 @@ struct CompareZ {
 };
 
 //returns a point in the ith cell of polyhedron poly
-PTR<Point> pointInCell(Polyhedron * poly, int i) {
+/*PTR<Point> pointInCell(Polyhedron * poly, int i) {
   Cell * cell =  poly->cells[i];
   Face * face = cell->getShell(0)->getHFaces()[0]->getF();
 
@@ -132,7 +132,7 @@ PTR<Point> pointInCell(Polyhedron * poly, int i) {
   } while (!cell->contains(p));
   
   return p;
-}
+}*/
 
 //generate 3 outer approximation points from rotate point p around the origin, add them to pList
 void pointOuterApprox(Points &pList, OuterApproxVertex * p) {
@@ -351,8 +351,8 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta) {
     cout<<"minkowskiSum "<<i<<" of "<<allRotations.size()-1<<endl;
     Polyhedron * mSum = minkowskiSumFull(allRotations[i], obstacle);
     simplify(mSum, 1e-6, false);
-    bool selfInt = mSum->intersectsEdges(mSum);
-    cout << "selfInt " << selfInt << endl;
+    // bool selfInt = mSum->intersectsEdges(mSum);
+    // cout << "selfInt " << selfInt << endl;
     char s[25];
     sprintf(s, "sum%02d", i);
     savePoly(mSum, s);
