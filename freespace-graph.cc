@@ -699,8 +699,8 @@ FreeSpaceGraph::FreeSpaceGraph(const char * dir) {
           Node * neighbor = graph[i][j]->getOrCreate(k);
           n->neighbors.push_back(neighbor);
           n->neighborIntersectionIndices.push_back(std::vector<int>());
-          ss3 = istringstream(s2);
-          while (ss3 >> i)
+          istringstream ss4(s2);
+          while (ss4 >> i)
             n->neighborIntersectionIndices[n->neighbors.size()-1].push_back(i);
         }
       }
