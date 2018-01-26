@@ -663,11 +663,13 @@ bool Face::boundaryContains (Point *a, int i)
   return res;
 }
 
-bool Face::intersects (Edge *e)
+bool Face::intersects (Edge *e, bool strict)
 {
   if (!bboxOverlap(bbox, e->bbox))
     return false;
   int st = e->t->p->side(&p), sh = e->h->p->side(&p);
+  if (strict && (st == 0 || sh == 0))
+    return false;
   if (st == 0 && sh == 0) {
     HEdges ed;
     boundaryHEdges(ed);
@@ -677,13 +679,13 @@ bool Face::intersects (Edge *e)
     return false;
   }
   if (st == 0)
-    return contains(e->t->p, false);
+    return contains(e->t->p, strict);
   if (sh == 0)
-    return contains(e->h->p, false);
+    return contains(e->h->p, strict);
   if (st == sh)
     return false;
   PTR<Point> a = new EPPoint(e->t->p, e->h->p, &p);
-  return contains(a, false);
+  return contains(a, strict);
 }
 
 bool Face::intersectsEE (Edge *e, Edge *f)
@@ -1745,10 +1747,10 @@ Polyhedron * Polyhedron::negativeTranslate (Point *t) const
   return a;
 }
 
-bool Polyhedron::intersects (Polyhedron *a) const
+bool Polyhedron::intersects (Polyhedron *a, bool strict) const
 {
   return contains(a->vertices[0]->p) || a->contains(vertices[0]->p) ||
-    intersectsEdges(a) || a->intersectsEdges(this);
+    intersectsEdges(a, strict) || a->intersectsEdges(this, strict);
 }
 
 bool Polyhedron::contains (Point *p) const
@@ -1767,7 +1769,7 @@ int Polyhedron::containingCell (Point *p) const
   return -1;
 }
 
-bool Polyhedron::intersectsEdges (const Polyhedron *a) const
+bool Polyhedron::intersectsEdges (const Polyhedron *a, bool strict) const
 {
   Octree<Face *> *octree = a->faceOctree();
   for (Edges::const_iterator e = edges.begin(); e != edges.end(); ++e)
@@ -1775,7 +1777,7 @@ bool Polyhedron::intersectsEdges (const Polyhedron *a) const
       Faces fa;
       octree->find((*e)->bbox, fa);
       for (Faces::iterator f = fa.begin(); f != fa.end(); ++f)
-	if (!(*f)->boundary.empty() && (*f)->intersects(*e)) {
+	if (!(*f)->boundary.empty() && (*f)->intersects(*e, strict)) {
 	  delete octree;
 	  return true;
 	}

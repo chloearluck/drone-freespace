@@ -541,7 +541,7 @@ bool minkowskiShell (Polyhedron *a, Polyhedron *b, Shell *s)
   Point *p = hf[0]->getF()->getBoundary(0)->tail()->getP();
   Polyhedron *c = a->negativeTranslate(p);
   c->computeWindingNumbers();
-  bool res = !c->intersects(b);
+  bool res = !c->intersects(b, true);
   delete c;
   return res;
 }

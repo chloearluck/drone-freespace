@@ -186,7 +186,7 @@ bool intersects (Face *f, bool *ef, Face *g)
   if (!flag)
     return false;
   for (int i = 0; i < iedges.size(); ++i)
-    if (ifaces[i]->intersects(iedges[i]))
+    if (ifaces[i]->intersects(iedges[i], false))
       return true;
   return false;
 }

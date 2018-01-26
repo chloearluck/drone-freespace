@@ -130,6 +130,7 @@ bool bboxOverlap (Point *a, const double *bbox);
 class TrianglePlane : public Plane {
   friend class EPPoint;
   friend class RayPlanePoint;
+ protected:
   Point *a, *b, *c;
   PlaneData calculate () {
     PV3 ap = a->getP(), bp = b->getP(), cp = c->getP(),
@@ -138,6 +139,7 @@ class TrianglePlane : public Plane {
     return PlaneData(n, k);
   }  
  public:
+  TrianglePlane () : a(0), b(0), c(0) {}
   TrianglePlane (Point *a, Point *b, Point *c) : a(a), b(b), c(c) {
     IDSet ps = intersection(a->ps, intersection(b->ps, c->ps));
     if (ps.empty()) {
@@ -508,7 +510,7 @@ class Face {
   bool triangle () const;
   bool containsConvex (Point *a, bool strict);
   bool boundaryContains (Point *a, int i);
-  bool intersects (Edge *e);
+  bool intersects (Edge *e, bool strict);
   bool intersectsEE (Edge *e, Edge *f);
   PTR<Point> centroid () const;
   void triangulate (Triangles &tr);
@@ -813,10 +815,10 @@ class Polyhedron {
   Polyhedron * negative () const;
   Polyhedron * translate (Point *t) const;
   Polyhedron * negativeTranslate (Point *t) const;
-  bool intersects (Polyhedron *a) const;
+  bool intersects (Polyhedron *a, bool strict) const;
   bool contains (Point *p) const;
   int containingCell (Point *p) const;
-  bool intersectsEdges (const Polyhedron *a) const;
+  bool intersectsEdges (const Polyhedron *a, bool strict) const;
   Polyhedron * boolean (Polyhedron *a, SetOp op);
   Polyhedron * cellPolyhedron (int i) const;
   void addHFaces (const HFaces &hf, PVMap &pvmap);
