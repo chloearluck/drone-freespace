@@ -54,8 +54,8 @@ int main (int argc, char *argv[]) {
   // Test creating a freespace-graph
   const char * blockspace_dir = "two_room_output";
   double theta = M_PI / 20;
-  double clearance_unit = 0.1;
-  int num_levels = 4;
+  double clearance_unit = 0.05;
+  int num_levels = 5;
   
   testCreateGraph(blockspace_dir, graph_dir, theta, clearance_unit, num_levels);
   //--------------------------------
