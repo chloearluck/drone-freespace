@@ -819,6 +819,7 @@ double Expander2::expandV2 (double e, bool velocityObjective, double velocityBou
   if ( !cplex.solve() ) {
     env.error() << "Failed to optimize LP" << endl;
     // exit(-1);
+    env.end();
     return 1;
   }
   
@@ -859,8 +860,10 @@ double Expander2::expandV2 (double e, bool velocityObjective, double velocityBou
   if (verbose)
     cout << endl;
 
-  if (maxT < 1.0)
+  if (maxT < 1.0) {
+    env.end();
     return 1234567890;
+  }
 
   // maxT = 1;
 
