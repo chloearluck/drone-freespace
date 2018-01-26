@@ -33,7 +33,7 @@ public:
   InputParameter (double x) { set(Parameter::input(x)); }
 };
 
-PTR<Point> pointInCell(Polyhedron * poly, int i) {
+/*PTR<Point> pointInCell(Polyhedron * poly, int i) {
   Cell * cell =  poly->cells[i];
   Face * face = cell->getShell(0)->getHFaces()[0]->getF();
   PTR<Point> fp;
@@ -49,7 +49,7 @@ PTR<Point> pointInCell(Polyhedron * poly, int i) {
     unit /= 2;
   } while (!cell->contains(p));
   return p;
-}
+}*/
 
 pair <PTR<Point>, PTR<Point> > nearestPointPair(Polyhedron * poly, int i, int j) {
   PTR<Point> a = NULL;
@@ -517,9 +517,17 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, 
         if (blockspaces[i]->cells[j]->getWN() == 0) {
           if (level > 0) {
             //find the parent of this cell
-            PTR<Point> p = pointInCell(blockspaces[i], j);
-            int comp = prev_blockspaces[i]->containingCell(p);
+            // PTR<Point> p = pointInCell(blockspaces[i], j);
+            cout<<i<<" "<<j<<endl;
+            int comp;
+            if (j == 0)
+              comp = 0;
+            else {
+              PTR<Point> p = blockspaces[i]->cells[j]->interiorPoint();
+              comp = prev_blockspaces[i]->containingCell(p);
+            }
             FreeSpaceGraph::Node * parent = graph[level-1][i]->get(comp);
+            assert(parent != NULL);
             FreeSpaceGraph::Node * newNode = new FreeSpaceGraph::Node(level, i, j, parent);
             graph[level][i]->nodes.push_back(newNode);
             parent->children.push_back(newNode);
@@ -537,9 +545,15 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, 
       for (int k=0; k< block_union->cells.size(); k++)
         if (block_union->cells[k]->getWN() == 0) {
           cout<<i<<" "<<j<<" "<<k<<endl;
-          PTR<Point> p = pointInCell(block_union, k);
-          int ci = blockspaces[i]->containingCell(p);
-          int cj = blockspaces[j]->containingCell(p);
+          // PTR<Point> p = pointInCell(block_union, k);
+          int ci, cj;
+          if (k == 0) {
+            ci = 0; cj = 0;
+          } else {
+            PTR<Point> p = block_union->cells[k]->interiorPoint();
+            ci = blockspaces[i]->containingCell(p);
+            cj = blockspaces[j]->containingCell(p); 
+          }
           Node * ni = graph[level][i]->get(ci);
           Node * nj = graph[level][j]->get(cj);
           assert(nj != NULL); assert(ni != NULL);
