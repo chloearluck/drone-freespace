@@ -7,7 +7,7 @@ void testCreateGraph(const char * blockspace_dir, const char * graph_dir, double
   char s[50];
   for (int i=0; i<=40; i++) {
     sprintf(s, "%s/sum%02d-out.vtk", blockspace_dir, i);
-    Polyhedron * p = loadPoly(s);
+    Polyhedron * p = loadPolyVTK(s);
     blockspaces.push_back(p);
   }
 
@@ -18,14 +18,14 @@ void testSearchGraph(const char * graph_dir, PTR<Point> start, PTR<Point> end, i
   FreeSpaceGraph test(graph_dir);
   std::vector<std::pair<PTR<Point>, double > > path;
 
-  Polyhedron * p = loadPoly((std::string(graph_dir) + "/0-" + std::to_string(startRotationIndex) + ".vtk").c_str());
+  Polyhedron * p = loadPoly((std::string(graph_dir) + "/0-" + std::to_string(startRotationIndex) + ".tri").c_str());
   p->computeWindingNumbers();
   assert(!p->contains(start));
   int cell_index = p->containingCell(start);
   FreeSpaceGraph::Node * startNode = test.graph[0][startRotationIndex]->get(cell_index);
   delete p;
 
-  p = loadPoly((std::string(graph_dir) + "/0-" + std::to_string(endRotationIndex) + ".vtk").c_str());
+  p = loadPoly((std::string(graph_dir) + "/0-" + std::to_string(endRotationIndex) + ".tri").c_str());
   p->computeWindingNumbers();
   assert(!p->contains(end));
   cell_index = p->containingCell(end);
