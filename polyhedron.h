@@ -131,7 +131,7 @@ class TrianglePlane : public Plane {
   friend class EPPoint;
   friend class RayPlanePoint;
  protected:
-  Point *a, *b, *c;
+  PTR<Point> a, b, c;
   PlaneData calculate () {
     PV3 ap = a->getP(), bp = b->getP(), cp = c->getP(),
       n = (cp - bp).cross(ap - bp);

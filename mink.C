@@ -426,7 +426,7 @@ MinkHullFace * initHull (HEdges &hedges)
 int circulationEEE (HEdge *e, HEdge *f, HEdge *g)
 {
   return Orientation(e->tail()->getP(), e->head()->getP(), 
-		     f->head()->getP(), g->head()->getP());
+		     g->head()->getP(), f->head()->getP());
 }
 
 MinkHullFace * updateHull (MinkHullFace *hull, HEdge *e, bool &flag)

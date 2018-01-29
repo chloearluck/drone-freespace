@@ -150,7 +150,7 @@ int Orientation::sign ()
 {
   PV3 u = d->getP() - a->getP(), v = b->getP() - a->getP(), 
     w = c->getP() - a->getP();
-  return u.tripleProduct(v, w).sign();
+  return u.tripleProduct(w, v).sign();
 }
 
 int CloserPair::sign ()
@@ -679,9 +679,9 @@ bool Face::intersects (Edge *e, bool strict)
     return false;
   }
   if (st == 0)
-    return contains(e->t->p, strict);
+    return contains(e->t->p, false);
   if (sh == 0)
-    return contains(e->h->p, strict);
+    return contains(e->h->p, false);
   if (st == sh)
     return false;
   PTR<Point> a = new EPPoint(e->t->p, e->h->p, &p);
@@ -877,6 +877,8 @@ bool Shell::contains (Shell *s) const
 
 int Shell::contains (Point *a) const
 {
+  if (!bboxOverlap(a, bbox))
+    return -1;
   PTR<Point> r = new InputPoint(0.0, 0.0, 1.0);
   double rb[6];
   rayBBox(a, r, rb);
@@ -1144,14 +1146,8 @@ Face * Polyhedron::addRectangle (Vertex *a, Vertex *b, Vertex *c, Vertex *d)
 }
 
 void Polyhedron::formCells () {
-  if (!cells.empty()) {
-    for (Faces::iterator f = faces.begin(); f != faces.end(); ++f)
-      for (int i = 0; i < 2; ++i)
-	(*f)->hfaces[i].s = 0;
-    for (Cells::iterator c = cells.begin(); c != cells.end(); ++c)
-      delete *c;
-    cells.clear();
-  }
+  if (!cells.empty())
+    return;
   Shells shells;
   formShells(shells);
   formCellsAux(shells);
@@ -1755,6 +1751,8 @@ bool Polyhedron::intersects (Polyhedron *a, bool strict) const
 
 bool Polyhedron::contains (Point *p) const
 {
+  if (!bboxOverlap(p, bbox))
+    return false;
   for (int i = 1; i < cells.size(); ++i)
     if (cells[i]->wn == 1 && cells[i]->contains(p))
       return true;
