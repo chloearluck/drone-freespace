@@ -47,24 +47,6 @@ public:
   InputParameter (double x) { set(Parameter::input(x)); }
 };
 
-/*PTR<Point> pointInCell(Polyhedron * poly, int i) {
-  Cell * cell =  poly->cells[i];
-  Face * face = cell->getShell(0)->getHFaces()[0]->getF();
-  PTR<Point> fp;
-  double unit = 1;
-  do {
-    fp = new FacePoint(cell, unit);
-    unit /= 2;
-  } while (!face->contains(fp));
-  PTR<Point> p;
-  unit = 1;
-  do {
-    p = new CellInternalPoint(cell, fp, unit);
-    unit /= 2;
-  } while (!cell->contains(p));
-  return p;
-}*/
-
 pair <PTR<Point>, PTR<Point> > nearestPointPair(Polyhedron * poly, int i, int j) {
   PTR<Point> a = NULL;
   PTR<Point> b = NULL;
