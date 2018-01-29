@@ -5,6 +5,20 @@ Polyhedron * loadPoly(const char * filename) {
   Polyhedron * poly;
   ifstream infile (filename);
   if (infile.is_open()) {
+    poly = readPolyhedron (infile);
+    infile.close();
+  } else {
+    cout<<"could not read from file"<<endl;
+    return NULL;
+  }
+
+  return poly;
+}
+
+Polyhedron * loadPolyVTK(const char * filename) {
+  Polyhedron * poly;
+  ifstream infile (filename);
+  if (infile.is_open()) {
     poly = readPolyhedronVTK (infile);
     infile.close();
   } else {
@@ -15,12 +29,12 @@ Polyhedron * loadPoly(const char * filename) {
   return poly;
 }
 
+
 void savePoly(Polyhedron * p, const char * filename) {
-  simplify(p, 1e-6);
   ofstream out;
   out.open(filename);
   if (out.is_open()) {
-    writePolyhedronVTK (p->faces, out);
+    writePolyhedron (p, out);
     out.close();
   } else {
     cout<<"could not write to file"<<endl;
@@ -153,9 +167,10 @@ void FreeSpaceGraph::deepestPath(FreeSpaceGraph::Node * n, PTR<Point> p, PTR<Poi
   FreeSpaceGraph::Node * P, * Q;
   PTR<Point> p1=0;
   PTR<Point> q1=0;
-  std::string s = string(dir) + "/" + std::to_string(n->level+1) + "-" + std::to_string(n->blockspace_index) + ".vtk";
+  std::string s = string(dir) + "/" + std::to_string(n->level+1) + "-" + std::to_string(n->blockspace_index) + ".tri";
   Polyhedron * childspace = loadPoly(s.c_str());
   assert(childspace != NULL);
+  assert(childspace->cells.size() != 0);
   childspace->computeWindingNumbers();
   for (int i=0; i<childspace->cells.size(); i++)
     if (childspace->cells[i]->getWN() == 0) {
@@ -235,7 +250,7 @@ void FreeSpaceGraph::nodePointPath(std::vector<FreeSpaceGraph::Node*> & nodes, P
     }
 
     if (to->parent == from) {
-      Polyhedron * to_blockspace = loadPoly((dir + "/" + std::to_string(to->level) + "-" + std::to_string(to->blockspace_index) + ".vtk").c_str());
+      Polyhedron * to_blockspace = loadPoly((dir + "/" + std::to_string(to->level) + "-" + std::to_string(to->blockspace_index) + ".tri").c_str());
       to_blockspace->computeWindingNumbers();
       assert(to_blockspace != NULL);
       if (to_blockspace->containingCell(p) == to->cell_index) {
@@ -258,7 +273,7 @@ void FreeSpaceGraph::nodePointPath(std::vector<FreeSpaceGraph::Node*> & nodes, P
     assert(from->level == to->level);
     int bi = (to->blockspace_index == (from->blockspace_index+1)%blockspaces_per_level)? from->blockspace_index : to->blockspace_index;
     int bj = (bi == to->blockspace_index)? from->blockspace_index : to->blockspace_index;
-    std::string s = std::string(dir) + "/" + std::to_string(to->level) + "-" + std::to_string(bi) + "-" + std::to_string(bj) + ".vtk";
+    std::string s = std::string(dir) + "/" + std::to_string(to->level) + "-" + std::to_string(bi) + "-" + std::to_string(bj) + ".tri";
     Polyhedron * intersection = loadPoly(s.c_str() );
     intersection->computeWindingNumbers();
     int cell_index = intersection->containingCell(p);
@@ -383,7 +398,7 @@ void FreeSpaceGraph::getPath(Node * start, Node * end, PTR<Point> a, PTR<Point> 
 
   //deepen start and end as much as possible
   for (int level= start->level+1; level <num_levels; level++) {
-    Polyhedron * space = loadPoly((dir + "/" + std::to_string(level) + "-" + std::to_string(start->blockspace_index) + ".vtk").c_str());
+    Polyhedron * space = loadPoly((dir + "/" + std::to_string(level) + "-" + std::to_string(start->blockspace_index) + ".tri").c_str());
     space->computeWindingNumbers();
     int cell_index = space->containingCell(a);
     bool inside = (space->cells[cell_index]->getWN() == 0);
@@ -394,7 +409,7 @@ void FreeSpaceGraph::getPath(Node * start, Node * end, PTR<Point> a, PTR<Point> 
       break;
   }
   for (int level= end->level+1; level <num_levels; level++) {
-    Polyhedron * space = loadPoly((dir + "/" + std::to_string(level) + "-" + std::to_string(end->blockspace_index) + ".vtk").c_str());
+    Polyhedron * space = loadPoly((dir + "/" + std::to_string(level) + "-" + std::to_string(end->blockspace_index) + ".tri").c_str());
     space->computeWindingNumbers();
     int cell_index = space->containingCell(b);
     bool inside = (space->cells[cell_index]->getWN() == 0);
@@ -446,7 +461,7 @@ void FreeSpaceGraph::getPath(Node * start, Node * end, PTR<Point> a, PTR<Point> 
       continue;
     if (n1 == n2) {
       //load blockspace associated with n1
-      std::string s = std::string(dir) + "/" + std::to_string(n1->level) + "-" + std::to_string(n1->blockspace_index) + ".vtk";
+      std::string s = std::string(dir) + "/" + std::to_string(n1->level) + "-" + std::to_string(n1->blockspace_index) + ".tri";
       Polyhedron * poly = loadPoly(s.c_str());
       //use path3d to find a path from p1 to p2
       Points subPath;
@@ -476,6 +491,9 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, 
   std::vector<Polyhedron*> blockspaces;
   blockspaces.insert(blockspaces.begin(), original_blockspaces.begin(), original_blockspaces.end());
 
+  for (int i = 0; i<blockspaces.size(); i++)
+    simplify(blockspaces[i], 1e-6);
+
   //create directory
   if (mkdir(dir, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) == -1 && errno != EEXIST)
     cout<<"could not create directry"<<endl;
@@ -500,11 +518,13 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, 
       prev_blockspaces.insert(prev_blockspaces.begin(), blockspaces.begin(), blockspaces.end());
       blockspaces.clear();
 
-      Polyhedron * ball = loadPoly("sphere.vtk");
+      Polyhedron * ball = loadPolyVTK("sphere.vtk");
       Polyhedron * unit_ball = ball->scale(unit);
       unit = unit * 2;
-      for (int i=0; i<prev_blockspaces.size(); i++)
+      for (int i=0; i<prev_blockspaces.size(); i++) {
         blockspaces.push_back(minkowskiSumFull(original_blockspaces[i], unit_ball));
+        simplify(blockspaces[i], 1e-6);
+      }
       
       delete unit_ball;
     }
@@ -570,7 +590,8 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, 
           ni->neighborIntersectionIndices[pos_i].push_back(k);
           nj->neighborIntersectionIndices[pos_j].push_back(k);
         }
-      std::string s = std::string(dir) + "/" + std::to_string(level) + "-" + std::to_string(i) + "-" + std::to_string(j) + ".vtk";
+      simplify(block_union, 1e-6);
+      std::string s = std::string(dir) + "/" + std::to_string(level) + "-" + std::to_string(i) + "-" + std::to_string(j) + ".tri";
       savePoly(block_union, s.c_str());
       delete block_union;  
     }
@@ -592,7 +613,8 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, 
     }
 
     for (int i=0; i<blockspaces.size(); i++) {
-      std::string s = std::string(dir) + "/" + std::to_string(level) + "-" + std::to_string(i) + ".vtk"; 
+      std::string s = std::string(dir) + "/" + std::to_string(level) + "-" + std::to_string(i) + ".tri";
+      cout<<"saving blockspace "<<i<<endl;
       savePoly(blockspaces[i], s.c_str());
     }
   }
