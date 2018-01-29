@@ -8,6 +8,7 @@
 #include <iostream>
 
 Polyhedron * loadPoly(const char * filename);
+Polyhedron * loadPolyVTK(const char * filename);
 void savePoly(Polyhedron * p, char * filename);
 
 class FreeSpaceGraph {
