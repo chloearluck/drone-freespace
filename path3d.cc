@@ -854,6 +854,10 @@ void findPath(Polyhedron * blockspace, int cell_index, PTR<Point> start, PTR<Poi
     }
   }
 
+  if (startOutside)
+    start = p_start;
+  if (endOutside)
+    end = p_end;
   
   std::vector<PTR<FaceIntersectionPoint> > points;
   PTR<Point> r =  new DiffPoint(end, start);
@@ -874,12 +878,6 @@ void findPath(Polyhedron * blockspace, int cell_index, PTR<Point> start, PTR<Poi
     }
   }
 
-  if (startOutside)
-    start = p_start;
-  if (endOutside)
-    end = p_end;
-
-  
   std::sort(points.begin(), points.end(), ComparePointOrder(r));
   if (VERBOSE) cout<<"intersections: "<<points.size()<<endl;
   
