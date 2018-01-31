@@ -170,7 +170,7 @@ PV3 FaceNearestPoint::calculate () {
   bool sidebc = vol(q, b, c, c+n).sign() == vol(a, b, c, c+n).sign();
 
   //does q lie on hf?
-  if (sideac && sideab && sideac) 
+  if (sideac && sideab && sidebc) 
     return q;
 
   //q is on a's side of bc and b's side of ac, then our point is on bc (if <0 or >1, return an endpoint)
