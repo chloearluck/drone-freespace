@@ -80,10 +80,10 @@ Polyhedron * hullInit (Points &pts, bool perturbed)
   Polyhedron *a = new Polyhedron(perturbed);
   for (Points::iterator p = pts.begin(); p != pts.end(); ++p)
     a->getVertex(*p);
-  a->addTriangle(a->vertices[0], a->vertices[1], a->vertices[3]);
-  a->addTriangle(a->vertices[1], a->vertices[2], a->vertices[3]);
-  a->addTriangle(a->vertices[2], a->vertices[0], a->vertices[3]);
-  a->addTriangle(a->vertices[2], a->vertices[1], a->vertices[0]);
+  a->addTriangle(a->vertices[0], a->vertices[2], a->vertices[3]);
+  a->addTriangle(a->vertices[2], a->vertices[1], a->vertices[3]);
+  a->addTriangle(a->vertices[1], a->vertices[0], a->vertices[3]);
+  a->addTriangle(a->vertices[0], a->vertices[1], a->vertices[2]);
   return a;
 }
 
@@ -154,7 +154,8 @@ ConflictGraph conflictGraphInit (Polyhedron *a)
 
 bool visible (Vertex *v, Face *f)
 {
-  return v->getP()->side(f->getP()) == 1;
+  int s = v->getP()->side(f->getP());
+  return s == 1 || s == 0 && !f->contains(v->getP(), false);
 }
 
 void expandHull (Polyhedron *a, Vertex *v, ConflictGraph &cg)
