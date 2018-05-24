@@ -380,7 +380,7 @@ bool Expander2::expand (double e) {
 
   static int iCall = 100;
   string base = "expand";
-  cplex.exportModel((base + std::to_string(iCall++) + ".lp").c_str());
+  // cplex.exportModel((base + std::to_string(iCall++) + ".lp").c_str());
 
   cplex.setOut(env.getNullStream());
   if ( !cplex.solve() ) {
