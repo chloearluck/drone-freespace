@@ -2,13 +2,8 @@
 #include "io.h"
 
 Polyhedron * loadPoly(const char * filename) {
-  int n = strlen(filename);
-  char str[n+5];
-  strncpy(str, filename, n);
-  strncpy(str+n, ".vtk", 5);
-
   Polyhedron * poly;
-  ifstream infile (str);
+  ifstream infile (filename);
   if (infile.is_open()) {
     poly = readPolyhedronVTK (infile);
     infile.close();

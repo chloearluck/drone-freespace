@@ -216,6 +216,26 @@ class PathVertex {
   PathVertex(PTR<Point> original, PTR<Object<PV2> > transformed2d) : original(original), transformed2d(transformed2d) {}
 };
 
+void save(std::vector<PathVertex*> & vertPath, const char * filename) {
+  ofstream ostr;
+  ostr.open(filename);
+  if (ostr.is_open()) { 
+    ostr << setprecision(20) << "# vtk DataFile Version 3.0" << endl
+         << "vtk output" << endl << "ASCII" << endl
+         << "DATASET POLYDATA" << endl 
+         << "POINTS " << vertPath.size() << " double" << endl;
+    for (int i=0; i<vertPath.size(); i++) {
+      ostr << vertPath[i]->transformed2d->getApprox(1e-6).getX().mid()<<" "<<vertPath[i]->transformed2d->getApprox(1e-6).getY().mid()<<" 0"<<endl;
+    }
+    ostr<<endl<<"LINES 1 "<<vertPath.size()+1<<endl<<vertPath.size()<<" ";
+    for (int i=0; i<vertPath.size(); i++)
+      ostr<<i<<" ";
+    ostr.close();
+  } else {
+    cout<<"could not write to file"<<endl;
+  }
+}
+
 Primitive3(AreaABC, PathVertex * , pva, PathVertex * , pvb, PathVertex * , pvc);
 int AreaABC::sign() {
   if (pva == pvb || pva == pvc || pvb == pvc)
@@ -569,6 +589,9 @@ void localPath(PTR<Point> a, PTR<Point> b, HFaces & pathfaces, Points & path) {
   if (DEBUG) {
     path2Dto3D(vertPath, vertPathIndices, edges, path);
     save(path, "path0.vtk");
+    save(vertPath, "path0-2d.vtk");
+    savePathTriangles(triangles, "triangles.vtk", false);
+    savePathTriangles(triangles, "triangles-2d.vtk", true);
   }  
 
   bool changedThisIteration;
@@ -578,7 +601,7 @@ void localPath(PTR<Point> a, PTR<Point> b, HFaces & pathfaces, Points & path) {
     iter_num++;
     changedThisIteration = false;
     if (VERBOSE) cout<<"new iteration------------------ "<<iter_num<<endl;
-    for (int i=1; i<triangles.size(); i++) {
+    for (int i=0; i<triangles.size(); i++) {
       
       if (vertPathIndices[vertPathIndices.size()-2] < i)
         continue;
@@ -673,6 +696,15 @@ void localPath(PTR<Point> a, PTR<Point> b, HFaces & pathfaces, Points & path) {
 
       shortestPath(triangles, start, end, vertPath, vertPathIndices, edges);
 
+      if (DEBUG) {
+        sprintf(s, "triangles%d-%02d-2d.vtk", iter_num, i);
+        savePathTriangles(triangles, s, true);
+        sprintf(s, "triangles%d-%02d.vtk", iter_num, i);
+        savePathTriangles(triangles, s, false);
+        sprintf(s, "path%d-%02d-2d.vtk", iter_num, i);
+        save(vertPath, s);
+      }
+
       //to do: simplify this
       bool pathChanged = false;
       if (oldPath.size() != vertPath.size())
@@ -727,7 +759,7 @@ void bfs(HFace * fa, HFace * fb, HFaces & pathfaces) {
 
     HFaces hfaces;
     current->neighbors(hfaces);
-    for (int i=0; i<hfaces.size(); i++) {
+    for (int i=(hfaces.size()-1); i>=0; i--) {
       HFace * hf = hfaces[i];
       if (parents.find(hf) == parents.end()) {
         parents[hf] = current;
