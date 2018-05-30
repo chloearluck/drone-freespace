@@ -48,22 +48,22 @@ int main (int argc, char *argv[]) {
     srandom(seed);
   }
 
-  const char * graph_dir = "two_rooms_graph";
+  const char * graph_dir = "plus-graph";
 
   //--------------------------------
   // Test creating a freespace-graph
-  const char * blockspace_dir = "two_room_output";
+  const char * blockspace_dir = "plus-output";
   double theta = M_PI / 20;
   double clearance_unit = 0.05;
-  int num_levels = 5;
+  int num_levels = 3;
   
   testCreateGraph(blockspace_dir, graph_dir, theta, clearance_unit, num_levels);
   //--------------------------------
 
   //--------------------------------
   // Test searching a freespace-graph
-  PTR<Point> start = new InputPoint(2.5,-1,0);
-  PTR<Point> end = new InputPoint(2.5,8,0);
+  PTR<Point> start = new InputPoint(-2.5,0.0, -1.0);
+  PTR<Point> end = new InputPoint(6.0,0.0,0.0);
   int startRotationIndex = 0;
   int endRotationIndex = 0;
   

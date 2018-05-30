@@ -46,6 +46,12 @@ hull.o: hull.C hull.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h
 io.o:	io.C io.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h
 	$(COMPILE) io.C
 
+lattice: lattice.o mink.o simplify.o expander2.o io.o polyhedron.o triangulate.o object.o acp.o hull.o
+	$(LINK) lattice.o mink.o simplify.o expander2.o io.o polyhedron.o triangulate.o object.o acp.o hull.o $(LFLAGS) -o lattice
+
+lattice.o: lattice.cc mink.h simplify.h expander2.h io.h polyhedron.h triangulate.h octree.h rbtree.h object.h pv.h acp.h hull.h
+	$(COMPILE) lattice.cc
+
 mink.o: mink.C mink.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h
 	$(COMPILE) mink.C
 
