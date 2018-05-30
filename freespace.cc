@@ -288,7 +288,7 @@ Polyhedron * rotate(Polyhedron * p) {
   return a;
 }
 
-FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, PTR<Object<Parameter> > tan_half_angle, int numRotations) {
+FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, PTR<Object<Parameter> > tan_half_angle, int numRotations, bool inner_approximation) {
   this->robot = robot->triangulate();
   this->obstacle = obstacle;
 
@@ -319,21 +319,23 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, PTR<Object<Param
   }
   cout<<"found triangle polyhedrons"<<endl;
 
-  Polyhedron * outerApprox = multiUnion(&polyList[0], polyList.size());
-  cout<<"found outerApprox"<<endl;
-  Polyhedron * tmp = outerApprox->boolean(robot, Union);
-  delete outerApprox;
-  outerApprox = tmp;
-  simplify(outerApprox, 1e-6, false);
-  savePoly(outerApprox, "outerApprox");
+  Polyhedron * outerApproxShell = multiUnion(&polyList[0], polyList.size());
+  Polyhedron * robotApprox;
+  if (inner_approximation)
+    robotApprox = robot->boolean(outerApproxShell, Union);
+  else
+    robotApprox = robot->boolean(outerApproxShell, Complement);
+  delete outerApproxShell;
+  simplify(robotApprox, 1e-6, false);
+  savePoly(robotApprox, "outerApprox");
 
   for (int i=0; i<polyList.size(); i++)
     delete polyList[i];
   polyList.clear();
 
-  Polyhedron * reflectedOuterApprox = outerApprox->negative();
+  Polyhedron * reflectedRobotApprox = robotApprox->negative();
   vector<Polyhedron *> allRotations;
-  allRotations.push_back(reflectedOuterApprox);
+  allRotations.push_back(reflectedRobotApprox);
   for (int i=0; i< numRotations; i++)
     allRotations.push_back(rotate(allRotations[i]));
   cout<<"found all rotations"<<endl;

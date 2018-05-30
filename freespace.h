@@ -17,6 +17,6 @@ public:
   Polyhedron * robot, * obstacle;
   std::vector<Polyhedron*> blockspaces;
   int numRotations;
-  FreeSpace(Polyhedron * robot, Polyhedron * obstacle, PTR<Object<Parameter> > tan_half_angle, int numRotations);
+  FreeSpace(Polyhedron * robot, Polyhedron * obstacle, PTR<Object<Parameter> > tan_half_angle, int numRotations, bool inner_approximation = true);
 };
 
