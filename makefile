@@ -80,7 +80,13 @@ test_new_simplify.o: test_new_simplify.cc simplify.h expander2.h mink.h io.h pol
 	$(COMPILE) test_new_simplify.cc
 
 triangulate.o: triangulate.C triangulate.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h
-	$(COMPILE) triangulate.C
+	$(COMPILE) triangulate.C 
+
+voxelize: voxelize.o polyhedron.o triangulate.o io.o object.o acp.o
+	$(LINK) voxelize.o polyhedron.o triangulate.o io.o object.o acp.o $(LFLAGS) -o voxelize
+
+voxelize.o: voxelize.cc polyhedron.h triangulate.h io.h octree.h rbtree.h object.h pv.h acp.h
+	$(COMPILE) voxelize.cc
 
 clean: 
 	rm -f *.o *~ hull test_mink freespace_test path3d_test freespace-graph_test *.lp
