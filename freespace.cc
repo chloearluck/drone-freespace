@@ -39,11 +39,6 @@ void savePoly(Polyhedron * p, const char * filename) {
 
 PTR<Point> sin_cos_alpha;
 
-class InputParameter : public Object<Parameter> {
-public:
-  InputParameter (double x) { set(Parameter::input(x)); }
-};
-
 class SinCosAlpha : public Point {
   Object<Parameter> *tan_theta;
   PV3 calculate () {
@@ -53,7 +48,6 @@ class SinCosAlpha : public Point {
     Parameter alpha = (1-cost)/sint;
     return PV3(sint, cost, alpha);
   }
-
 public:
   SinCosAlpha (Object<Parameter> *t) : tan_theta(t) {}
 };
@@ -294,14 +288,11 @@ Polyhedron * rotate(Polyhedron * p) {
   return a;
 }
 
-FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, double theta) {
+FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, PTR<Object<Parameter> > tan_half_angle, int numRotations) {
   this->robot = robot->triangulate();
   this->obstacle = obstacle;
-  numRotations = floor(2*M_PI/theta);
 
-  const double TAN_THETA = tan(theta/2);
-  InputParameter * t = new InputParameter(TAN_THETA);
-  sin_cos_alpha = new SinCosAlpha(t);
+  sin_cos_alpha = new SinCosAlpha(tan_half_angle);
 
   std::vector<SimpleTriangle> tList;
   for (int i=0; i<this->robot->faces.size(); i++) {

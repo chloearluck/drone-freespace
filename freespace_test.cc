@@ -2,7 +2,14 @@
 #include "io.h"
 #include <queue>
 
+double tanHalfAngle (int n) {
+  return tan((1.0 + 1.0e-8) * M_PI / n);
+}
+
 int main (int argc, char *argv[]) {
+  int numRotations = 40;
+  PTR<Object<Parameter> > tan_half_angle = new InputParameter(tanHalfAngle(numRotations));
+  
   Parameter::enable();
 
   if (argc < 2) {
@@ -29,7 +36,5 @@ int main (int argc, char *argv[]) {
     obstacle = box(bounds);
   }
   
-  double theta = M_PI / 20;
-
-  FreeSpace * fs  = new FreeSpace(poly, obstacle, theta);
+  FreeSpace * fs  = new FreeSpace(poly, obstacle, tan_half_angle, numRotations);
 }
