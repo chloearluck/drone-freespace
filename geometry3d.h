@@ -58,6 +58,7 @@ Primitive4(SegmentIntersect, Point*, pa, Point*, pb, Point*, pc, Point*, pd);
 // Insphere test.
 Primitive5(InSphere, Point*, a, Point*, b, Point*, c, Point*, d, Point*, e);
 
+#define vol(a,b,c,d) (a-d).cross(b-d).dot(c-d)
 
 // CONCRETE GEOMETRIC OBJECTS
 

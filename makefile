@@ -73,6 +73,15 @@ polyhedron.o: polyhedron.C polyhedron.h octree.h rbtree.h object.h pv.h acp.h
 simplify.o: simplify.C simplify.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h expander2.h
 	$(COMPILE) simplify.C
 
+sumfaces.o: sumfaces.cc sumfaces.h polyhedron.h triangulate.h io.h mink.h freespace.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h hull.h geometry3d.h simplify.h
+	$(COMPILE) sumfaces.cc
+
+sumfaces_test.o: sumfaces_test.cc sumfaces.h polyhedron.h triangulate.h io.h mink.h freespace.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h hull.h geometry3d.h simplify.h
+	$(COMPILE) sumfaces_test.cc
+
+sumfaces_test: sumfaces_test.o sumfaces.o polyhedron.o triangulate.o io.o mink.o expander2.o freespace.o object.o acp.o geometry3d.o hull.o simplify.o
+	$(LINK) sumfaces_test.o sumfaces.o polyhedron.o triangulate.o io.o mink.o expander2.o freespace.o object.o acp.o geometry3d.o hull.o simplify.o  $(LFLAGS) -o sumfaces_test
+
 test_mink:  test_mink.o hull.o mink.o simplify.o expander2.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o
 	$(LINK) test_mink.o hull.o mink.o simplify.o expander2.o polyhedron.o triangulate.o io.o object.o acp.o geometry3d.o $(LFLAGS) -o test_mink
 

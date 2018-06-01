@@ -56,8 +56,6 @@ int Orient3D::sign () {
 #endif
 }
 
-#define vol(a,b,c,d) (a-d).cross(b-d).dot(c-d)
-
 int SegmentIntersect::sign() {
   PV3 a = pa->getP();
   PV3 b = pb->getP();
