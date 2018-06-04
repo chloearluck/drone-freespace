@@ -81,17 +81,17 @@ public:
   double value (IloCplex &cplex, IloNumVarArray& ccols) {
     double v = -b;
     for (int i = 0; i < cols.size(); i++) {
-      // cout << "extracting " << cols[i] << " " << ccols[cols[i]].getName() << endl;
+      // cerr << "extracting " << cols[i] << " " << ccols[cols[i]].getName() << endl;
       v += cplex.getValue(ccols[cols[i]]) * coefs[i];
     }
-    // cout << endl;
+    // cerr << endl;
     return gt ? -v : v;
   }
 };
 
 bool Expander2::expand () {
-  vector<int> verts;
-  map<int, int> index;
+  vector<Vertex*> verts;
+  map<Vertex*, int> index;
 
   int npairs = pairs.size();
 
@@ -99,7 +99,7 @@ bool Expander2::expand () {
     for (int ifeat = 0; ifeat < 2; ifeat++) {
       vector<Constraint> &constraints = pairs[ipair].constraints[ifeat];
       for (int ivert = 0; ivert < constraints.size(); ivert++) {
-        int vert = constraints[ivert].i;
+        Vertex* vert = constraints[ivert].i;
         if (index.find(vert) == index.end()) {
           index[vert] = verts.size();
           verts.push_back(vert);
@@ -116,10 +116,10 @@ bool Expander2::expand () {
   string xyzpm[] = { "xp", "xm", "yp", "ym", "zp", "zm" };
   for (int i = 0; i < nverts; i++) {
     string base = "v";
-    base += std::to_string(verts[i]);
+    base += std::to_string(i);
     for (int j = 0; j < 6; j++) {
       cols.add(IloNumVar(env));
-      // cout << "cols.size() " << cols.length << " = " << 6*i+j << endl;
+      // cerr << "cols.size() " << cols.length << " = " << 6*i+j << endl;
       cols[6*i+j].setName((base + xyzpm[j]).c_str());
     }
   }
@@ -168,11 +168,11 @@ bool Expander2::expand () {
         int vCol = 6 * index[con.i];
         if (ifeat == 0) {
           rows.add(IloRange(env, -IloInfinity, -con.r));
-          rows[nrows].setName((base + "a" + std::to_string(con.i)).c_str());
+          rows[nrows].setName((base + "a" + std::to_string(index[con.i])).c_str());
         }
         else {
           rows.add(IloRange(env, 1 - con.r, IloInfinity));
-          rows[nrows].setName((base + "b" + std::to_string(con.i)).c_str());
+          rows[nrows].setName((base + "b" + std::to_string(index[con.i])).c_str());
         }
         
         IloRange row = rows[nrows];
@@ -231,7 +231,7 @@ bool Expander2::expand () {
     values[verts[i]] = Point(x);
 
     if (verbose)
-      cout << verts[i] << " "
+      cerr << verts[i] << " "
 	   << values[verts[i]].x[0] << " "
 	   << values[verts[i]].x[1] << " "
 	   << values[verts[i]].x[2] << endl;
@@ -243,8 +243,8 @@ bool Expander2::expand () {
 }
 
 bool Expander2::expand (double e) {
-  vector<int> verts;
-  map<int, int> index;
+  vector<Vertex*> verts;
+  map<Vertex*, int> index;
 
   int npairs = pairs.size();
 
@@ -252,7 +252,7 @@ bool Expander2::expand (double e) {
     for (int ifeat = 0; ifeat < 2; ifeat++) {
       vector<Constraint> &constraints = pairs[ipair].constraints[ifeat];
       for (int ivert = 0; ivert < constraints.size(); ivert++) {
-        int vert = constraints[ivert].i;
+        Vertex* vert = constraints[ivert].i;
         if (index.find(vert) == index.end()) {
           index[vert] = verts.size();
           verts.push_back(vert);
@@ -270,10 +270,10 @@ bool Expander2::expand (double e) {
   string xyzpm[] = { "xp", "xm", "yp", "ym", "zp", "zm" };
   for (int i = 0; i < nverts; i++) {
     string base = "v";
-    base += std::to_string(verts[i]);
+    base += std::to_string(i);
     for (int j = 0; j < 6; j++) {
       cols.add(IloNumVar(env, 0, 1));
-      // cout << "cols.size() " << cols.length << " = " << 6*i+j << endl;
+      // cerr << "cols.size() " << cols.length << " = " << 6*i+j << endl;
       cols[6*i+j].setName((base + xyzpm[j]).c_str());
       coefs.add(IloNum(1));
     }
@@ -302,27 +302,27 @@ bool Expander2::expand (double e) {
   IloObjective obj = IloMinimize(env);
 
   if (false) {
-    cout << "setting objective coefficients of vertices" << endl;
+    cerr << "setting objective coefficients of vertices" << endl;
     for (int i = 0; i < nverts; i++)
       for (int j = 0; j < 6; j++)
 	obj.setLinearCoef(cols[6*i+j], 1.0);
-    cout << "done" << endl;
+    cerr << "done" << endl;
     
-    cout << "setting objective coefficients of pairs" << endl;
+    cerr << "setting objective coefficients of pairs" << endl;
     bool uObj = true;
     if (uObj) {
       for (int i = 0; i < npairs; i++)
 	for (int j = 0; j < 6; j++)
 	  obj.setLinearCoef(cols[6*nverts+6*i+j], 1.0);
     }
-    cout << "done" << endl;
+    cerr << "done" << endl;
     
     obj.setLinearCoef(cols[dCol], -6 * nverts);
   }
   else {
-    //cout << "setting objective" << endl;
+    //cerr << "setting objective" << endl;
     obj.setLinearCoefs(cols, coefs);
-    //cout << "done" << endl;
+    //cerr << "done" << endl;
   }
     
   IloRangeArray rows(env);
@@ -341,11 +341,11 @@ bool Expander2::expand (double e) {
         int vCol = 6 * index[con.i];
         if (ifeat == 0) {
           rows.add(IloRange(env, -IloInfinity, -con.r));
-          rows[nrows].setName((base + "a" + std::to_string(con.i)).c_str());
+          rows[nrows].setName((base + "a" + std::to_string(index[con.i])).c_str());
         }
         else {
           rows.add(IloRange(env, - con.r, IloInfinity));
-          rows[nrows].setName((base + "b" + std::to_string(con.i)).c_str());
+          rows[nrows].setName((base + "b" + std::to_string(index[con.i])).c_str());
         }
         
         IloRange row = rows[nrows];
@@ -380,7 +380,7 @@ bool Expander2::expand (double e) {
 
   static int iCall = 100;
   string base = "expand";
-  // cplex.exportModel((base + std::to_string(iCall++) + ".lp").c_str());
+  cplex.exportModel((base + std::to_string(iCall++) + ".lp").c_str());
 
   cplex.setOut(env.getNullStream());
   if ( !cplex.solve() ) {
@@ -406,7 +406,7 @@ bool Expander2::expand (double e) {
     values[verts[i]] = Point(x);
 
     if (verbose)
-      cout << verts[i] << " "
+      cerr << verts[i] << " "
 	   << values[verts[i]].x[0] << " "
 	   << values[verts[i]].x[1] << " "
 	   << values[verts[i]].x[2] << endl;
@@ -429,11 +429,13 @@ bool Expander2::expandV (double e, bool velocityObjective, double velocityBound)
     while ((violation = expandV2(e, velocityObjective, velocityBound, uscale)) > 1e-6) {
       if (violation == 1234567890) {
 	velocityBound /= 2;
-	cout << "Feature intersection.  Restarting with velocityBound " << velocityBound << endl;
+	// cerr << "Feature intersection.  Restarting with velocityBound " << velocityBound << endl;
+	uscale *= 10;
+	cerr << "Feature intersection. Restarting with uscale " << uscale << endl;
       }
       else {
 	uscale *= 10;
-	cout << "row violation " << violation << " restarting with uscale " << uscale << endl;
+	cerr << "row violation " << violation << " restarting with uscale " << uscale << endl;
       }
     }
     return true;
@@ -452,7 +454,7 @@ bool Expander2::expandV (double e, bool velocityObjective, double velocityBound)
     }
     for (int i = 0; i < skipPair.size(); i++)
       if (!skipPair[i])
-	cout << "pair " << i << " " << pairs[i].d << endl;
+	cerr << "pair " << i << " " << pairs[i].d << endl;
   }
 }
 
@@ -469,13 +471,13 @@ double Expander2::expandV2 (double e, bool velocityObjective, double velocityBou
 
   static int iCall = 100;
 
-  vector<int> verts;
-  map<int, int> index;
+  vector<Vertex*> verts;
+  map<Vertex*, int> index;
 
   int npairs = pairs.size();
 
   if (verbose)
-    cout << "vobj " << velocityObjective << " vbnd " << velocityBound << endl;
+    cerr << "vobj " << velocityObjective << " vbnd " << velocityBound << endl;
 
   int isep = -1;
   double minsep = 100;
@@ -486,26 +488,26 @@ double Expander2::expandV2 (double e, bool velocityObjective, double velocityBou
     }
   }
   if (verbose) {
-    cout << iCall << " minimum separation " << isep << " " << minsep << endl;
+    cerr << iCall << " minimum separation " << isep << " " << minsep << endl;
     for (int ifeat = 0; ifeat < 2; ifeat++) {
       vector<Constraint> &constraints = pairs[isep].constraints[ifeat];
       for (int ivert = 0; ivert < constraints.size(); ivert++) {
-	cout << constraints[ivert].i << " ";
+	cerr << constraints[ivert].i << " ";
       }
-      cout << endl;
+      cerr << endl;
     }
   }
 
   /*
-  cout << "476 pairs:" << endl;
+  cerr << "476 pairs:" << endl;
   for (int ipair = 0; ipair < npairs; ipair++)
     if (pairs[ipair].constraints[0][0].i == 476) {
       for (int ifeat = 0; ifeat < 2; ifeat++) {
 	vector<Constraint> &constraints = pairs[ipair].constraints[ifeat];
 	for (int ivert = 0; ivert < constraints.size(); ivert++) {
-	  cout << constraints[ivert].i << " ";
+	  cerr << constraints[ivert].i << " ";
 	}
-	cout << endl;
+	cerr << endl;
       }
     }
   */
@@ -516,7 +518,7 @@ double Expander2::expandV2 (double e, bool velocityObjective, double velocityBou
     for (int ifeat = 0; ifeat < 2; ifeat++) {
       vector<Constraint> &constraints = pairs[ipair].constraints[ifeat];
       for (int ivert = 0; ivert < constraints.size(); ivert++) {
-        int vert = constraints[ivert].i;
+        Vertex* vert = constraints[ivert].i;
         if (index.find(vert) == index.end()) {
           index[vert] = verts.size();
           verts.push_back(vert);
@@ -530,7 +532,7 @@ double Expander2::expandV2 (double e, bool velocityObjective, double velocityBou
   int nverts = verts.size();
 
   if (verbose)
-    cout << "npairs " << npairs << " nverts " << nverts << " displacement " << totalDisp << endl;
+    cerr << "npairs " << npairs << " nverts " << nverts << " displacement " << totalDisp << endl;
 
 #ifdef BLEEN
   static double saveDisp = 1e6;
@@ -573,7 +575,7 @@ double Expander2::expandV2 (double e, bool velocityObjective, double velocityBou
 
     saveDisp = totalDisp;
     // expanderT = minimizeT;
-    //cout << "ratio " << ratio << " minimize t " << minimizeT << endl;
+    //cerr << "ratio " << ratio << " minimize t " << minimizeT << endl;
   }
   else {
     expanderT = 1;
@@ -590,7 +592,7 @@ double Expander2::expandV2 (double e, bool velocityObjective, double velocityBou
   string xyzll[] = { "x", "lxl", "y", "lyl", "z", "lzl" };
   for (int i = 0; i < nverts; i++) {
     string base = "v";
-    base += std::to_string(verts[i]);
+    base += std::to_string(i);
     for (int j = 0; j < 6; j++) {
       if (j % 2 == 0)
         // cols.add(IloNumVar(env, -1, 1));
@@ -608,13 +610,16 @@ double Expander2::expandV2 (double e, bool velocityObjective, double velocityBou
   // p'*u, q'*u, and u' = v' v + w' w
   string pvw[] = { "p", "q", "v", "w" };
   for (int i = 0; i < npairs; i++) {
+    Pair &pair = pairs[i];
     string base = "p";
     base += std::to_string(i);
     for (int j = 0; j < 4; j++) {
       if (j < 2)
 	cols.add(IloNumVar(env, -sqrt(3.0), sqrt(3.0)));
-      else
-	cols.add(IloNumVar(env, -1, 1));
+      else if (j == 2)
+	cols.add(IloNumVar(env, pair.lMin, pair.lMax));
+      else if (j == 3)
+	cols.add(IloNumVar(env, pair.mMin, pair.mMax));
       cols[6*nverts + 4*i + j].setName((base + pvw[j]).c_str());
       coefs.add(IloNum(0));
     }
@@ -686,12 +691,12 @@ double Expander2::expandV2 (double e, bool velocityObjective, double velocityBou
         if (ifeat == 0) {
           rows.add(IloRange(env, -IloInfinity, -con.r));
           ineqs.push_back(Ineq(false, -con.r));
-          rows[nrows].setName((base + "a" + std::to_string(con.i)).c_str());
+          rows[nrows].setName((base + "a" + std::to_string(index[con.i])).c_str());
         }
         else {
           rows.add(IloRange(env, -con.r, IloInfinity));
           ineqs.push_back(Ineq(true, -con.r));
-          rows[nrows].setName((base + "b" + std::to_string(con.i)).c_str());
+          rows[nrows].setName((base + "b" + std::to_string(index[con.i])).c_str());
         }
         
         IloRange row = rows[nrows];
@@ -725,6 +730,19 @@ double Expander2::expandV2 (double e, bool velocityObjective, double velocityBou
       }
     }
 
+    // number of vertices on separating planes (r=0)
+    int numOnSep = 0;
+    for (int ivertA = 0; ivertA < pair.constraints[0].size(); ivertA++) {
+      Constraint conA = pair.constraints[0][ivertA];
+      if (conA.r == 0)
+        numOnSep++;
+    }
+    for (int ivertB = 0; ivertB < pair.constraints[1].size(); ivertB++) {
+      Constraint conB = pair.constraints[1][ivertB];
+      if (conB.r == 0)
+        numOnSep++;
+    }
+
     for (int ivertA = 0; ivertA < pair.constraints[0].size(); ivertA++) {
       Constraint conA = pair.constraints[0][ivertA];
       for (int ivertB = 0; ivertB < pair.constraints[1].size(); ivertB++) {
@@ -736,8 +754,8 @@ double Expander2::expandV2 (double e, bool velocityObjective, double velocityBou
         rows.add(IloRange(env, -pair.d + conA.r - conB.r, IloInfinity));
         ineqs.push_back(Ineq(true, -pair.d + conA.r - conB.r));
         rows[nrows].setName((base + 
-                             "a" + std::to_string(conA.i) +
-                             "b" + std::to_string(conB.i)).c_str());
+                             "a" + std::to_string(index[conA.i]) +
+                             "b" + std::to_string(index[conB.i])).c_str());
         IloRange row = rows[nrows];
 
         row.setLinearCoef(cols[VCol], -e);
@@ -753,9 +771,11 @@ double Expander2::expandV2 (double e, bool velocityObjective, double velocityBou
           ineqs.back().add(vColB + 2 * xyz, pair.u.x[xyz]);
         }
 
-        row.setLinearCoef(cols[pCol + 2],  (conB.v - conA.v) / uscale);
-        ineqs.back().add(pCol + 2,  (conB.v - conA.v) / uscale);
-        if (conA.r == 0 && conB.r == 0) {
+        if (!pair.limitVirtualPairU || numOnSep >= 3) {
+          row.setLinearCoef(cols[pCol + 2],  (conB.v - conA.v) / uscale);
+          ineqs.back().add(pCol + 2,  (conB.v - conA.v) / uscale);
+        }
+        if (!pair.limitVirtualPairU || numOnSep == 4) {
           row.setLinearCoef(cols[pCol + 3],  (conB.w - conA.w) / uscale);
           ineqs.back().add(pCol + 3,  (conB.w - conA.w) / uscale);
         }
@@ -767,7 +787,7 @@ double Expander2::expandV2 (double e, bool velocityObjective, double velocityBou
 
   for (int ivert = 0; ivert < nverts; ivert++) {
     string base = "v";
-    base += std::to_string(verts[ivert]);
+    base += std::to_string(ivert);
     Point disp = disps[verts[ivert]];
     int vCol = 6 * ivert;
 
@@ -819,7 +839,6 @@ double Expander2::expandV2 (double e, bool velocityObjective, double velocityBou
   if ( !cplex.solve() ) {
     env.error() << "Failed to optimize LP" << endl;
     // exit(-1);
-    env.end();
     return 1;
   }
   
@@ -842,33 +861,12 @@ double Expander2::expandV2 (double e, bool velocityObjective, double velocityBou
   }
 
   if (verbose && imaxval >= 0 && (verbose || maxval > 1))
-    cout << (iCall-1) << " row violation " << imaxval << " " << rows[imaxval].getName() << " " << maxval << endl;
+    cerr << (iCall-1) << " row violation " << imaxval << " " << rows[imaxval].getName() << " " << maxval << endl;
 
   if (verbose)
-    cout << "V " << cplex.getValue(cols[VCol]) << endl;
+    cerr << "V " << cplex.getValue(cols[VCol]) << endl;
   
   double maxT = 1;
-  if (maxval < 1e-6) {
-    for (int i = 0; i < pairs.size(); i++) {
-      while (!checkPair(cplex, cols, index, i, maxT, uscale))
-        maxT *= 0.9;
-    }
-    // maxT = checkPair2(cplex, cols, index, i, maxT, uscale);
-    if (verbose)
-      cout << "maxT " << maxT << endl;
-  }
-  if (verbose)
-    cout << endl;
-
-  if (maxT < 1.0) {
-    env.end();
-    return 1234567890;
-  }
-
-  // maxT = 1;
-
-  saveV = cplex.getValue(cols[VCol] * maxT);
-
   for (int i = 0; i < nverts; i++) {
     double x[3] = { 0, 0, 0 };
     for (int xyz = 0; xyz < 3; xyz++)
@@ -878,11 +876,35 @@ double Expander2::expandV2 (double e, bool velocityObjective, double velocityBou
     values[verts[i]] = Point(x);
 
     if (verbose2 && fabs(x[0]) + fabs(x[1]) + fabs(x[2]) > 1e-8)
-      cout << verts[i] << " "
+      cerr << verts[i] << " "
 	   << values[verts[i]].x[0] << " "
 	   << values[verts[i]].x[1] << " "
 	   << values[verts[i]].x[2] << endl;
   }
+
+  if (maxval < 1e-6) {
+    for (int i = 0; i < pairs.size(); i++) {
+      while (!checkPair(cplex, cols, index, i, maxT, uscale))
+        maxT *= 0.9;
+    }
+    // maxT = checkPair2(cplex, cols, index, i, maxT, uscale);
+    if (verbose)
+      cerr << "maxT " << maxT << endl;
+  }
+  if (verbose)
+    cerr << endl;
+
+  if (maxT < 1.0) {
+    for (int i = 0; i < nverts; i++) {
+      double x[3] = { 0, 0, 0 };
+      values[verts[i]] = Point(x);
+    }
+    return 1234567890;
+  }
+
+  // maxT = 1;
+
+  //  saveV = cplex.getValue(cols[VCol] * maxT);
 
   env.end();
   
@@ -890,7 +912,7 @@ double Expander2::expandV2 (double e, bool velocityObjective, double velocityBou
 }
 
 bool Expander2::checkPair (IloCplex &cplex, IloNumVarArray& cols,
-                           map<int, int> &index,
+                           map<Vertex*, int> &index,
                            int ipair, double t, double s) {
   bool verbose = false;
   Pair &pair = pairs[ipair];
@@ -904,7 +926,7 @@ bool Expander2::checkPair (IloCplex &cplex, IloNumVarArray& cols,
   double sep1 = pair.d + (q_ - p_);
   if (minSep1 > sep1) {
     if (verbose)
-      cout << "minSep1 " << sep1 << endl;
+      cerr << "minSep1 " << sep1 << endl;
     minSep1 = sep1;
   }
 
@@ -913,8 +935,11 @@ bool Expander2::checkPair (IloCplex &cplex, IloNumVarArray& cols,
     vector<Constraint> &constraints = pair.constraints[ab];
     for (int i = 0; i < constraints.size(); i++) {
       Constraint &c = constraints[i];
-      x_ = c.v != 0 ? cplex.getValue(cols[pCol+2]) : x_;
-      y_ = c.r == 0 && c.w != 0 ? cplex.getValue(cols[pCol+3]) : y_;
+      try {
+	x_ = c.v != 0 ? cplex.getValue(cols[pCol+2]) : x_;
+	y_ = c.r == 0 && c.w != 0 ? cplex.getValue(cols[pCol+3]) : y_;
+      } catch (IloAlgorithm::NotExtractedException nee) {
+      }
     }
   }
 
@@ -941,7 +966,7 @@ bool Expander2::checkPair (IloCplex &cplex, IloNumVarArray& cols,
 	static double maxDis1 = -1e9;
 	if (maxDis1 < dis1) {
 	  if (verbose)
-	    cout << "maxDis1 " << dis1 << endl;
+	    cerr << "maxDis1 " << dis1 << endl;
 	  maxDis1 = dis1;
 	}
       }
@@ -952,7 +977,7 @@ bool Expander2::checkPair (IloCplex &cplex, IloNumVarArray& cols,
 	static double minDis1 = 1e9;
 	if (minDis1 > dis1) {
 	  if (verbose)
-	    cout << "minDis1 " << dis1 << endl;
+	    cerr << "minDis1 " << dis1 << endl;
 	  minDis1 = dis1;
 	}
       }
@@ -987,20 +1012,20 @@ bool Expander2::checkPair (IloCplex &cplex, IloNumVarArray& cols,
   static double minSep = 1e9;
   if (minSep > sep2) {
     if (verbose)
-      cout << "minSep " << sep2 << " d " << pair.d << " sep1 " << sep1 << endl;
+      cerr << "minSep " << sep2 << " d " << pair.d << " sep1 " << sep1 << endl;
     minSep = sep2;
   }
   if (sep2 < 0)
     minSep = 1e9;
-
-  return sep2 > 0;
+  bool intersects (Expander2 *, Expander2::Pair *);
+  return sep2 > 0 || !intersects(this, &pair);
 }
 
 #include "pv.h"
 using namespace acp;
 
 double Expander2::checkPair2 (IloCplex &cplex, IloNumVarArray& cols,
-			      map<int, int> &index,
+			      map<Vertex*, int> &index,
 			      int ipair, double t, double s) {
   bool verbose = false;
   Pair &pair = pairs[ipair];
@@ -1085,7 +1110,7 @@ double Expander2::checkPair2 (IloCplex &cplex, IloNumVarArray& cols,
     t = r[1];
   
   if (verbose && t < saveT)
-    cout << "t " << t << endl;
+    cerr << "t " << t << endl;
     
   return t;
 }

@@ -1254,12 +1254,12 @@ Polyhedron * Polyhedron::subdivide ()
 void Polyhedron::intersectFF ()
 {
   Octree<Face *> *octree = faceOctree();
-  Faces fa, fb;
-  octree->pairs(fa, fb);
+  vector<FFPair> ff;
+  octree->pairs(ff);
   EFVMap efvmap;
-  for (int i = 0; i < fa.size(); ++i)
-    if (!fa[i]->boundary.empty() && !fb[i]->boundary.empty())
-      intersectFF(fa[i], fb[i], efvmap);
+  for (vector<FFPair>::iterator i = ff.begin(); i != ff.end(); ++i)
+    if (!i->first->boundary.empty() && !i->second->boundary.empty())
+      intersectFF(i->first, i->second, efvmap);
   delete octree;
 }
 
@@ -1984,28 +1984,27 @@ Octree<Cell *> * Polyhedron::cellOctree () const
 
 Polyhedron * Polyhedron::round (double d)
 {
-  Polyhedron *a = removeIntersections(), *b = a->encaseNonManifold(d);
-  if (b->faces.empty()) {
-    delete b;
-    return a;
-  }
-  Polyhedron *c = a->boolean(b, Complement);
+  Polyhedron *a = subdivide(), *b = a->selfUnion(), *c = b->encaseNonManifold(d);
   delete a;
+  if (c->faces.empty()) {
+    delete c;
+    return b;
+  }
+  Polyhedron *res = b->boolean(c, Complement);
   delete b;
-  return c;
+  delete c;
+  return res;
 }
 
-Polyhedron * Polyhedron::removeIntersections ()
+Polyhedron * Polyhedron::selfUnion ()
 {
-  Polyhedron *a = subdivide();
-  a->computeWindingNumbers();
-  Polyhedron *b = new Polyhedron(perturbed);
+  computeWindingNumbers();
+  Polyhedron *a = new Polyhedron(perturbed);
   PVMap pvmap;
-  for (Faces::iterator f = a->faces.begin(); f != a->faces.end(); ++f)
+  for (Faces::iterator f = faces.begin(); f != faces.end(); ++f)
     if ((*f)->hfaces[0].s->c->wn == 0 && (*f)->hfaces[1].s->c->wn == 1)
-      b->getTriangle(*f, pvmap);
-  delete a;
-  return b;
+      a->getTriangle(*f, pvmap);
+  return a;
 }
 
 void Polyhedron::computeWindingNumbers ()
@@ -2073,6 +2072,9 @@ void Polyhedron::describe () const
 {
   if (cells.empty())
     return;
+  bool wflag = false;
+  for (int i = 1; !wflag && i < cells.size(); ++i)
+    wflag = cells[i]->wn;
   Cell *c = cells[0];
   cerr << "unbounded cell: " << c->inner.size() << " shells: ";
   for (Shells::iterator s = c->inner.begin(); s != c->inner.end(); ++s)
@@ -2080,7 +2082,10 @@ void Polyhedron::describe () const
   cerr << endl;
   for (int i = 1; i < cells.size(); ++i) {
     Cell *c = cells[i];
-    cerr << "bounded cell " << i << ": " << c->nShells() << " shells; ";
+    cerr << "bounded cell " << i << ": ";
+    if (wflag)
+      cerr << "wn = " << c->wn << "; ";
+    cerr << c->nShells() << " shells; ";
     for (int  j = 0; j < c->nShells(); ++j) {
       Shell *s = c->getShell(j);
       cerr << s->hfaces.size() << " hfaces, euler = " << s->euler() << "; ";
@@ -2195,7 +2200,7 @@ Polyhedron * sphere (double ox, double oy, double oz, double r, double err)
     for (Vertices::iterator v = va.begin(); v != va.end(); ++v) {
       PVMap::iterator i = pvmap.find((*v)->getP());
       if (i == pvmap.end()) {
-	PV3 p = o + r*(*v)->getP()->getP();
+	PV3 p = o + r*(*v)->getP()->getApprox(1.0);
 	Vertex *w = b->getVertex(p.x.mid(), p.y.mid(), p.z.mid());
 	pvmap.insert(PVPair((*v)->getP(), w));
 	vb.push_back(w);
@@ -2246,8 +2251,8 @@ double sphereError (Polyhedron *a)
   for (Faces::iterator f = a->faces.begin(); f != a->faces.end(); ++f) {
     Vertices ve;
     (*f)->getBoundary(0)->loop(ve);
-    PV3 p = (ve[0]->getP()->getP() + ve[1]->getP()->getP() 
-	     + ve[2]->getP()->getP())/3.0;
+    PV3 p = (ve[0]->getP()->getApprox(1.0) + ve[1]->getP()->getApprox(1.0) 
+	     + ve[2]->getP()->getApprox(1.0))/3.0;
     d = min(d, p.dot(p).mid());
   }
   return 1.0 - sqrt(d);
@@ -2258,8 +2263,8 @@ Polyhedron * sphereRefine (Polyhedron *a)
   Polyhedron *b = new Polyhedron;
   map<Edge *, Vertex *> evmap;
   for (Edges::iterator e = a->edges.begin(); e != a->edges.end(); ++e) {
-    PV3 pm = (0.5*((*e)->getT()->getP()->getP() +
-		   (*e)->getH()->getP()->getP())).unit();
+    PV3 pm = (0.5*((*e)->getT()->getP()->getApprox(1.0) +
+		   (*e)->getH()->getP()->getApprox(1.0))).unit();
     Vertex *vm = b->getVertex(pm.x.mid(), pm.y.mid(), pm.z.mid());
     evmap.insert(pair<Edge *, Vertex *>(*e, vm));
   }
@@ -2499,8 +2504,8 @@ void pes (const EdgeSet &ed)
 void pe (HEdge *e)
 {
   cerr << "(";
-  pp1(e->tail()->getP()->getP());
-  pp1(e->head()->getP()->getP());
+  pp1(e->tail()->getP()->getApprox());
+  pp1(e->head()->getP()->getApprox());
   cerr << ")" << endl;
 }
 
@@ -2671,10 +2676,17 @@ void edgesNM (Polyhedron *a, Edges &ed)
   for (int i = 0; i < a->edges.size(); ++i) {
     Edge *e = a->edges[i];
     int n = e->HEdgesN();
-    if (n == 1)
+    if (n == 1) {
       cerr << "dangling edge " << i << endl;
+      ed.push_back(e);
+    }
     else if (n > 2) {
       cerr << "non-manifold edge " << i << " hedges " << n << endl;
+      ed.push_back(e);
+    }
+    else if (e->getHEdge(0)->getForward() == e->getHEdge(1)->getForward()) {
+      cerr << "same sign hedges" << endl;
+      ed.push_back(e);
     }
   }
 }

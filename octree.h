@@ -113,20 +113,18 @@ class Octree {
       }
   }
 
-  void pairs (vector<T> &e1, vector<T> &e2, double s = 0.0) const {
+  void pairs (vector<pair<T, T>> &res, double s = 0.0) const {
     if (l) {
-      l->pairs(e1, e2, s);
-      r->pairs(e1, e2, s);
+      l->pairs(res, s);
+      r->pairs(res, s);
     }
     else
       for (int i = 0; i < elts.size(); ++i) {
 	double *bbi = elts[i].d->getBBox();
 	for (int j = i + 1; j < elts.size(); ++j)
 	  if (elts[i].compatible(elts[j]) &&
-	      bboxOverlap(bbi, elts[j].d->getBBox(), s)) {
-	    e1.push_back(elts[i].d);
-	    e2.push_back(elts[j].d);
-	  }
+	      bboxOverlap(bbi, elts[j].d->getBBox(), s))
+	    res.push_back(pair<T, T>(elts[i].d, elts[j].d));
       }
   }
   

@@ -5,6 +5,7 @@
 #include "polyhedron.h"
 #include "io.h"
 #include "expander2.h"
+#include "poly.h"
 
 void simplify (Polyhedron *a, double d, bool opt2 = false);
 
@@ -29,7 +30,7 @@ class DistancePP : public Primitive {
   DistancePP (Point *a, Point *b, double d) : a(a), b(b), d(d) {}
 };
 
-class DistancePL1 : public Primitive {
+class DistancePL : public Primitive {
   Point *a, *t, *h;
   double d;
   int sign () {
@@ -38,7 +39,7 @@ class DistancePL1 : public Primitive {
     return (d*d - w.dot(w)).sign();
   }
  public:
-  DistancePL1 (Point *a, Point *t, Point *h, double d) : a(a), t(t), h(h), d(d) {}
+  DistancePL (Point *a, Point *t, Point *h, double d) : a(a), t(t), h(h), d(d) {}
 };
 
 bool closeVE (Vertex *v, Vertex *w, Vertex *x, double d);
@@ -71,7 +72,7 @@ class IFeature {
       return false;
     int s = CloserPair(x.e->getT()->getP(), x.e->getH()->getP(),
 		       e->getT()->getP(), e->getH()->getP()); 
-    return s == 1 || s == 0 && e < x.e;
+    return s == 1 || (s == 0 && e < x.e);
   }
 };
 
@@ -165,15 +166,11 @@ class LineLinePoint : public Point {
 
 void simplify2 (Polyhedron *a, double d, bool opt2);
 
-bool closeVF (Vertex *v, Face *f, double d);
-
-bool closeEE (Edge *e, Edge *f, double d);
-
-enum FeatureType {VV, VE, VF, EE};
+enum FeatureType {VV, VE, VF, EE, EF};
 
 class Feature {
  public:
-  Feature () : v(0), e(0), f(0), fa(0) {}
+  Feature () : v(0), w(0), e(0), f(0), fa(0) {}
   
   Feature (Vertex *vi, Vertex *wi, bool flag = true) : type(VV),
     v(vi < wi ? vi : wi), w(vi < wi ? wi : vi), e(0), f(0), fa(0),
@@ -187,45 +184,21 @@ class Feature {
   
   Feature (Edge *ei, Edge *fi, bool flag = true) : type(EE), v(0), w(0),
     e(ei < fi ? ei : fi), f(ei < fi ? fi : ei), fa(0), flag(flag) {}
-  
+
+  Feature (Edge *e, Face *fa) : type(EF), v(0), w(0), e(e), f(0), fa(fa) {}
+
   bool operator< (const Feature &x) const {
     if (type != x.type)
       return type < x.type;
     switch (type) {
-    case VV: return v < x.v || v == x.v && w < x.w;
-    case VE: return v < x.v || v == x.v && e < x.e;
-    case VF: return v < x.v || v == x.v && fa < x.fa;
-    case EE: return e < x.e || e == x.e && f < x.f;
-    }
-  }
-
-  bool small (double d) const {
-    switch (type) {
-    case VV: return DistancePP(v->getP(), w->getP(), d) == 1;
-    case VE: return closeVE(v, e->getT(), e->getH(), d);
-    case VF: return closeVF(v, fa, d);
-    case EE: return closeEE(e, f, d);
+    case VV: return v < x.v || (v == x.v && w < x.w);
+    case VE: return v < x.v || (v == x.v && e < x.e);
+    case VF: return v < x.v || (v == x.v && fa < x.fa);
+    case EE: return e < x.e || (e == x.e && f < x.f);
+    default: assert(0); return 0;
     }
   }
   
-  void closestPoints (PTR<Point> &p, PTR<Point> &q) const {
-    if (type == EE) {
-      Point *et = e->getT()->getP(), *eh = e->getH()->getP(),
-	*ft = f->getT()->getP(), *fh = f->getH()->getP();
-      p = new LineLinePoint(et, eh, ft, fh);
-      q = new LineLinePoint(ft, fh, et, eh);
-    }
-    else {
-      p = v->getP();
-      if (type == VV)
-	q = w->getP();
-      else if (type == VE)
-	q = new LinePoint(v->getP(), e->getT()->getP(), e->getH()->getP());
-      else
-	q = new PlanePoint(fa->getP(), v->getP());
-    }
-  }
-
   bool point (Point *a) const {
     VertexSet vs;
     vertices(vs);
@@ -295,32 +268,25 @@ bool closeEET (Edge *e, Edge *f, double d);
 
 FeatureSet smallFeatures (const FeatureSet &fs, double d);
 
-PV3 orthogonal (const PV3 &u);
-
 double separation (const FeatureSet &fs);
 
 void simplify2s (Polyhedron *a, double d, FeatureSet &fs, VPMap &vpmap,
 		 bool vobj = true, double vbound = 1.0);
 
-double * solveLP (const FeatureSet &fs, double d, const VPMap &vpmap,
-		  bool vobj, double vbound, VIMap &vimap);
+Expander2 * solveLP (const FeatureSet &fs, double d, const VPMap &vpmap,
+		     bool vobj, double vbound, VertexSet &vs);
 
-void setupLP (const FeatureSet &fs, double d, VIMap &vimap, Expander2 &exp);
+void setupLP (const FeatureSet &fs, double d, VertexSet &vs, Expander2 *exp);
 
-Primitive4(InnerProduct4, Point *, a, Point *, b, Point *, c, Point *, d);
+Feature minimalFeature (const Feature &f, PTR<Point> &p, PTR<Point> &q);
 
-void featuresLPVV (Vertex *v, Vertex *w, FeatureSet &fs);
+Feature minimalFeature (Vertex *v, Face *f, PTR<Point> &p, PTR<Point> &q);
 
-void featuresLPVE (Vertex *v, Edge *e, FeatureSet &fs);
+Feature minimalFeature (Edge *e, Edge *f, PTR<Point> &p, PTR<Point> &q);
 
-void setupLP (const Feature &f, double d, VIMap &vimap, Expander2 &exp,
-	      bool minimal);
+bool small (const Feature &f, double d);
 
-Feature minimalFeature (const Feature &f);
-
-Feature minimalFeature (Vertex *v, Face *f);
-
-Feature minimalFeature (Edge *e, Edge *f);
+PV3 orthogonal (const PV3 &u);
 
 class SeparatorData {
  public:
@@ -353,16 +319,13 @@ class Separator : public Object<SeparatorData> {
     PV3 p = ac->get(), q = bc->get(), u = f.flag ? q - p : p - q,
       v = f.type == VE ? f.e->getU() : orthogonal(u),
       w = u.cross(v);
-#ifdef UNIT_U
-    Parameter pq = u.dot(u).sqrt();
-    return SeparatorData(p, q, u/pq, v.unit(), w.unit(), pq);
-#else
     Parameter pq = u.dot(u);
     return SeparatorData(p, q, u, v, w, pq);
-#endif
   }
  public:
-  Separator (const Feature &fin, double d) : f(fin), d(d) { f.closestPoints(ac, bc); }
+  Separator (const Feature &fin, double d) : d(d) {
+    f = minimalFeature(fin, ac, bc);
+  }
   
   PV3 getU () { return getApprox(1e-7).u; }
   
@@ -381,7 +344,7 @@ class Separator : public Object<SeparatorData> {
       double d = s->d;
       Parameter zero(0.0);
       PV3 vwr(s->get().v.dot(p)/d, 
-              s->f.type == VE && s->f.point(a) ? zero : s->get().w.dot(p)/d,
+	      s->f.type == VE && s->f.point(a) ? zero : s->get().w.dot(p)/d,
 	      s->f.point(a) ? zero : s->get().u.dot(p)/d);
       return vwr;
     }
@@ -390,28 +353,17 @@ class Separator : public Object<SeparatorData> {
   void getVWR (Point *a, bool flag, double *vwr) {
     VWR vwrObj(this, a, flag);
     PV3 p = vwrObj.getApprox(1e-7);
-#ifdef UNIT_U
-    vwr[0] = p.x.mid();
-    vwr[1] = p.y.mid();
-    vwr[2] = p.z.mid();
-#else
     SeparatorData sd = getApprox(1e-7);
     vwr[0] = p.x.mid() / sd.v.length().mid();
     vwr[1] = p.y.mid() / sd.w.length().mid();
     vwr[2] = p.z.mid() / sd.u.length().mid();
-#endif
   }
 };
 
-int getVertex (Vertex *v, VIMap &vimap);
-
 void getDV (Vertex *v, double d, const VPMap &vpmap, double *dv);
 
-bool check (Separator *s, const Vertices &v, const Vertices &w);
-
-Primitive3(SeparatorOrder, Separator *, s, Point *, a, Point *, b);
-
-void moveVertices (Polyhedron *a, VPMap &vpmap, const VIMap &vimap, double *dvw);
+void moveVertices (Polyhedron *a, double d, VPMap &vpmap, const VertexSet &vs,
+		   Expander2 *exp);
 
 FeatureSet smallFeatures (Polyhedron *a, double d, const FeatureSet &fs,
 			  VPMap *vpmap);
@@ -422,4 +374,75 @@ void restorePos (Polyhedron *a, const VPMap &vpmap);
 
 void describe2 (int n, const FeatureSet &fs, double t, const VPMap &vpmap);
 
+bool intersects (Expander2 *e, Expander2::Pair *p);
+
+bool intersects (const Points &pts, const Points &dsp, bool vf);
+
+bool intersectsVF (const Points &p);
+
+bool intersectsEE (const Points &p);
+
+class FIPoly : public Object<PPoly<Parameter>> {
+  Points pts, dsp;
+
+  PPoly<Parameter> calculate () {
+    PPoly<Parameter> p;
+    addTerms(p, 0, 1, 2);
+    addTerms(p, 0, 2, 3);
+    addTerms(p, 0, 3, 1);
+    addTerms(p, 2, 1, 3);
+    return p;
+  }
+
+  void addTerms (PPoly<Parameter> &p, int i, int j, int k) {
+    p.add(pts[i]->get().tripleProduct(pts[j]->get(), pts[k]->get()), 0);
+    p.add(dsp[i]->get().tripleProduct(pts[j]->get(), pts[k]->get()), 1);
+    p.add(pts[i]->get().tripleProduct(dsp[j]->get(), pts[k]->get()), 1);
+    p.add(pts[i]->get().tripleProduct(pts[j]->get(), dsp[k]->get()), 1);
+    p.add(pts[i]->get().tripleProduct(dsp[j]->get(), dsp[k]->get()), 2);
+    p.add(dsp[i]->get().tripleProduct(pts[j]->get(), dsp[k]->get()), 2);
+    p.add(dsp[i]->get().tripleProduct(dsp[j]->get(), pts[k]->get()), 2);
+    p.add(dsp[i]->get().tripleProduct(dsp[j]->get(), dsp[k]->get()), 3);
+  }
+
+ public:
+  FIPoly (const Points &pts, const Points &dsp) : pts(pts), dsp(dsp) {}
+};
+
+class TranslatedPoint : public Point {
+  PTR<Point> p, u;
+  ObjPTR<Parameter> t;
+  PV3 calculate () { return p->get() + t->get()*u->get(); }
+ public:
+  TranslatedPoint (Point *p, Point *u, Object<Parameter> *t) : p(p), u(u), t(t) {}
+};
+
+typedef pair<Vertex *, Vertex *> VVPair;
+
+typedef map<Vertex *, Vertex *> VVMap;
+
+Polyhedron * round (Polyhedron *a);
+
+Polyhedron * roundD (Polyhedron *a);
+
+Vertex * getVertexD (Polyhedron *a, VVMap &vvmap, Vertex *v);
+
+VertexSet intersectionVertices (Polyhedron *a);
+
+FeatureSet intersections (Polyhedron *a);
+
+void intersectionsT (void *ptr);
+
+void intersectionCandidates (Face *f, Face *g, FeatureSet &fs);
+
+bool intersectsT (Face *f, Edge *e);
+
+Polyhedron * roundF (Polyhedron *a, const VertexSet &vs, VertexSet &nvs);
+
+Vertex * getVertexF (Polyhedron *a, const VertexSet &vs, VertexSet &nvs,
+		     Vertex *v);
+
+void intersectFF (Polyhedron *a, const VertexSet &vs);
+
+bool moved (Face *f, const VertexSet &vs);
 #endif

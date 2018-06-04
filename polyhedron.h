@@ -8,6 +8,7 @@
 #include <fstream>
 
 #include "object.h"
+#include "pv.h"
 #include "rbtree.h"
 #include "octree.h"
 
@@ -427,6 +428,11 @@ class EEPoint : public Point {
     for (IDSet::iterator i = pef.begin(); i != pef.end(); ++i)
       ps.insert(*i);
   }
+
+  EEPoint (Point *et, Point *eh, Point *ft, Point *fh) : et(et), eh(eh), ft(ft), fh(fh) {
+    TrianglePlane p(et, eh, ft);
+    pc = ProjectionCoordinate(&p);
+  }
 };
 
 class Shell;
@@ -582,7 +588,7 @@ class Cell {
   Shells inner;
   int wn;
  public:
-  Cell (Shell *outer) : outer(outer) { if (outer) outer->c = this; }
+  Cell (Shell *outer) : outer(outer), wn(0) { if (outer) outer->c = this; }
   ~Cell () { delete outer; deleteShells(inner); }
   int nShells () const { return inner.size() + (outer ? 1 : 0); }
   
@@ -699,7 +705,7 @@ class FFF {
   }
 
   bool operator< (const FFF &x) const {
-    return a < x.a || a == x.a && b < x.b || a == x.a && b == x.b && c < x.c;
+    return a < x.a || (a == x.a && b < x.b) || (a == x.a && b == x.b && c < x.c);
   }
 
   Face *a, *b, *c;
@@ -833,7 +839,7 @@ class Polyhedron {
   FOctree * faceOctree (double s = 0.0) const;
   Octree<Cell *> * cellOctree () const;
   Polyhedron * round (double d);
-  Polyhedron * removeIntersections ();
+  Polyhedron * selfUnion ();
   void computeWindingNumbers ();
   void updateWN (Cell *c, HFaces &st) const;
   Polyhedron * encaseNonManifold (double d);

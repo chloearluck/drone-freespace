@@ -25,7 +25,7 @@ pages 37-52, 2012
 #ifndef OBJECT_H
 #define OBJECT_H
 
-#include "pv.h"
+#include "acp.h"
 #include <vector>
 
 namespace acp {
@@ -85,8 +85,11 @@ public:
   }
 };
 
+template<class P> class InputObject;
+
 template<class P>
 class Object : BaseObject, public RefCnt {
+  friend class InputObject<P>;
   friend class Poly;
   friend class AnglePoly;
 
@@ -131,14 +134,6 @@ public:
   // An empty object is assumed to be uninitialized, although the user
   // might really want it to be an empty object.
   bool uninitialized () { return size() == 0 || get(0).uninitialized(); }
-
-  void set (const P &p) {
-    assert(uninitialized());
-    this->p = p;
-    assert(!uninitialized());
-    if (precision() > 53u && size() > 0)
-      precisionIncreased.push_back(this);
-  }
 
   const P &getCurrentValue () {
     assert(!uninitialized());
@@ -190,6 +185,14 @@ public:
     else
       assert(precis == Parameter::highPrecision);
     return p;
+  }
+
+  void set (const P &p) {
+    assert(uninitialized());
+    this->p = p;
+    assert(!uninitialized());
+    if (precision() > 53u && size() > 0)
+      precisionIncreased.push_back(this);
   }
 
 private:
@@ -244,6 +247,24 @@ private:
       }
     }
     return true;
+  }
+};
+
+template<class P>
+class InputObject : public Object<P> {
+public:
+  InputObject (const P &q) { 
+    P &p = *(P*)&q;
+    for (int i = 0; i < p.size(); i++)
+      if (p[i].lb() < p[i].ub()) {
+        std::cerr << "Input object has non-trivial interval." << std::endl;
+        assert(0);
+      }
+    Object<P>::set(p); 
+  }
+
+  virtual P calculate () {
+    return Object<P>::getCurrentValue();
   }
 };
 

@@ -106,8 +106,6 @@ class PV3 {
     return x*b.x + y*b.y + z*b.z; 
   }
 
-  Parameter length() const { return (*this).dot(*this).sqrt(); }
-
   PV3 operator+ (const PV3 &b) const {
     return PV3(x + b.x, y + b.y, z + b.z);
   }
@@ -145,6 +143,8 @@ class PV3 {
   }
 
   PV3 unit () const { return *this / (*this).dot(*this).sqrt(); }
+
+  Parameter length() const { return (*this).dot(*this).sqrt(); }
 
   PV3 mid () const { return constant(x.mid(), y.mid(), z.mid()); }
 

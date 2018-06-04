@@ -4,6 +4,7 @@ using namespace std;
 
 class IloCplex;
 class IloNumVarArray;
+class Vertex;
 
 /* 
    For each vertex a involved in the LP, call
@@ -25,7 +26,7 @@ class IloNumVarArray;
                                           (a-p).dot(w)/delta,
                                           (a-p).dot(u)/delta));
 
-   where vert is the index of a.
+   where vert is pointer to a.
 
    For each b in B vertex, call
 
@@ -33,13 +34,13 @@ class IloNumVarArray;
                                           (b-q).dot(w)/delta,
                                           (b-q).dot(u)/delta));
 
-   where vert is the index of b.
+   where vert is pointer to  b.
 
    Call expander2.addPair(pair).
 
    After adding all pairs, call expander2.expandV();
 
-   The velocity of the vertex with index vert is
+   The velocity of the vertex with pointer vert is
 
    expander2.getMotion(vert)
 
@@ -78,12 +79,12 @@ public:
 
   class Constraint {
   public:
-    int i;	// vertex index of a or b
+    Vertex *i;	// vertex pointer of a or b
     double v;	// (a-p)*v/delta or (b-q)*v/delta
     double w;	// (a-p)*w/delta or (b-q)*w/delta
     double r;	// (a-p)*u/delta or (b-q)*u/delta
     
-    Constraint (int i, double v, double w, double r) 
+    Constraint (Vertex* i, double v, double w, double r) 
       : i(i), v(v), w(w), r(r) {}
   };
 
@@ -93,8 +94,18 @@ public:
     double d;
     vector<Constraint> constraints[2]; // [0] a constraints, [1] b constraints
 
+    // u --> u + l v + m w
+    // If actually a VE, set m = 0.
+    // If actually a VV, set l = m = 0.
+    bool limitVirtualPairU;
+
+    // limits on l and m that are not set to zero
+    double lMin, lMax, mMin, mMax;
+
     // u is unit(q - p).  d is |q-p|/delta
-    Pair (const Point &u, const Point &v, const Point &w, double d) : u(u), v(v), w(w), d(d) {}
+    Pair (const Point &u, const Point &v, const Point &w, double d, double dlm = 1)
+      : u(u), v(v), w(w), d(d), limitVirtualPairU(false),
+      lMin(- dlm), lMax(dlm), mMin(- dlm), mMax(dlm) {}
 
     void addConstraint (int ab, const Constraint &constraint) {
       constraints[ab].push_back(constraint);
@@ -104,26 +115,27 @@ public:
   };
 
 private:
-  map<int, Point> disps;
+  map<Vertex*, Point> disps;
   vector<Pair> pairs;
-  map<int, Point> values;
+  map<Vertex*, Point> values;
   double uscaleBase;
 
   double expandV2 (double e, bool velocityObjective, double velocityBound, double uscale);
 
   bool checkPair (IloCplex &cplex, IloNumVarArray& cols,
-                  map<int, int> &index,
+                  map<Vertex*, int> &index,
                   int ipair, double t, double s);
 
   double checkPair2 (IloCplex &cplex, IloNumVarArray& cols,
-		     map<int, int> &index,
+		     map<Vertex*, int> &index,
 		     int ipair, double t, double s);
   
 public:
-  Expander2 (double uscale=1.0) : uscaleBase(uscale) {}
+  Expander2 (double d, double uscale=1.0) : d(d), uscaleBase(uscale) {}
+  double d;
 
   // vert is index of vertex and disp = (a_current - a_orig)/delta
-  void addDisplacement (int vert, Point disp) { disps[vert] = disp; }
+  void addDisplacement (Vertex* vert, Point disp) { disps[vert] = disp; }
 
   void addPair (Pair &pair) { /* pair.reorient(); */ pairs.push_back(pair); }
 
@@ -136,8 +148,8 @@ public:
   // Expand by e*delta.
   bool expandV (double e=1.0, bool velocityObjective=true, double velocityBound=1.0);
 
-  Point motion (int i) {
-    map<int, Point>::iterator it = values.find(i);
+  Point motion (Vertex *i) {
+    map<Vertex*, Point>::iterator it = values.find(i);
     if (it == values.end())
       return Point(0, 0, 0);
     else

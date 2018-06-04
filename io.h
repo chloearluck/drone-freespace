@@ -34,14 +34,9 @@ void writePolyhedronVTK (Polyhedron *a, ostream &ostr);
 
 void writePolyhedronVTK (const Faces &fa, ostream &ostr);
 
-void writePolyhedronOBJ (const Faces &fa, ostream &ostr);
-
 int getPoint (VIMap &vimap, PV3s &pts, Vertex *v);
 
-void outputVTK (const PV3s &pts, const IVector &data, bool pflag, 
+void outputVTK (const PV3s &pts, const IVector &data, int ptype,
 		ostream &ostr);
-
-void outputOBJ (const PV3s &pts, const IVector &data, bool pflag, 
-    ostream &ostr);
 
 #endif

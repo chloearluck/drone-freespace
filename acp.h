@@ -506,6 +506,11 @@ class Parameter {
     return 0;
   }
   
+  bool operator== (int zero) {
+    assert(zero == 0);
+    return sign() == 0;
+  }
+
   // Approximate value of parameter for display purposes.
   double mid () const { return 0.5*(lb() + ub()); }
 
@@ -537,6 +542,10 @@ class Parameter {
 #endif    
     assert(l == sentinel && b.l == sentinel);
     return Parameter(u.m->plus(b.u.m));
+  }
+
+  Parameter & operator+= (const Parameter &p) {
+    return *this = *this + p;
   }
 
   Parameter operator+ (double b) const { return *this + Parameter(b); }

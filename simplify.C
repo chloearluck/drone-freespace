@@ -40,13 +40,14 @@ bool simplify1 (Polyhedron *a, double d, FOctree *octree, VPMap &vpmap, int &n1,
   while (!fq.empty()) {
     IFeature f = fq.top();
     fq.pop();
-    if (f.valid())
+    if (f.valid()) {
       if (!f.v) {
 	if (collapse(a, d, f.e, fq, octree, vpmap, bad))
 	  ++n1;
       }
       else if (flip(a, d, f.getH(), fq, octree, vpmap, bad))
-	++n2;
+          ++n2;
+    }
   }
   return n1 + n2 == n || !bad;
 }
@@ -54,7 +55,7 @@ bool simplify1 (Polyhedron *a, double d, FOctree *octree, VPMap &vpmap, int &n1,
 bool closeVE (Vertex *v, Vertex *w, Vertex *x, double d)
 {
   Point *a = v->getP(), *t = w->getP(), *h = x->getP();
-  return DistancePL1(a, t, h, d) == 1 && onEdge(a, t, h, true);
+  return DistancePL(a, t, h, d) == 1 && onEdge(a, t, h, true);
 }
 
 void addCollapseFlips (Edge *e, double d, IFeatureQ &fq)
@@ -93,7 +94,7 @@ bool collapse (Polyhedron *a, double d, Edge *e, IFeatureQ &fq, FOctree *octree,
   Faces ft = t->incidentFaces();
   for (Faces::iterator f = ft.begin(); f != ft.end(); ++f)
     a->replaceVertex(*f, t, h);
-  double dc = distanceUB(tp, hp) + 1.733*Parameter::delta;
+  double dc = 0.5*distanceUB(tp, hp);
   if (badCollapse(h, octree, dc)) {
     bad = true;
     for (Faces::iterator f = ft.begin(); f != ft.end(); ++f)
@@ -403,7 +404,7 @@ void simplify2 (Polyhedron *a, double d, bool opt2)
       ++n;
       simplify2s(a, d, fslp, vpmap, false, bound);
       double dbest = displacement(vpmap, dmax);
-      if (dbest >= dprev)
+      if (dbest + 1e-8 > dprev)
         break;
       while (separation(fslp) < 0.99999*d) {
 	++n;
@@ -437,33 +438,13 @@ void simplify2 (Polyhedron *a, double d, bool opt2)
   describe2(n, fs, getTime() - t, vpmap);
 }
 
-bool closeVF (Vertex *v, Face *f, double d)
-{
-  Point *p = v->getP();
-  Plane *pl = f->getP();
-  PTR<Point> q = new PlanePoint(pl, p);
-  return DistancePP(p, q, d) == 1 && f->contains(q, false);
-}
-
-bool closeEE (Edge *e, Edge *f, double d)
-{
-  Point *et = e->getT()->getP(), *eh = e->getH()->getP(),
-    *ft = f->getT()->getP(), *fh = f->getH()->getP();
-  if (Orientation(et, eh, ft, fh) == 0)
-    return false;
-  PTR<Point> p = new LineLinePoint(et, eh, ft, fh),
-    q = new LineLinePoint(ft, fh, et, eh);
-  return DistancePP(p, q, d) == 1 && onEdge(p, et, eh, true) &&
-    onEdge(q, ft, fh, true);
-}
-
 FeatureSet smallFeatures (Polyhedron *a, double d, VPMap *vpmap)
 {
   FOctree *octree = faceOctree(a, d);
   for (Faces::iterator f = a->faces.begin(); f != a->faces.end(); ++f)
     if (!(*f)->getBoundary().empty()) {
       (*f)->getPC();
-      (*f)->getP()->getApprox(1e-6);
+      (*f)->getP()->getApprox(1.0);
     }
   int m = 16;
   vector<FOctree *> nodes;
@@ -485,7 +466,7 @@ FeatureSet smallFeatures (Polyhedron *a, double d, VPMap *vpmap)
   FeatureSet fs;
   for (int i = 0; i < n; ++i)
     for (FeatureSet::iterator f = td[i].fs.begin(); f != td[i].fs.end(); ++f)
-      if (f->small(d))
+      if (small(*f, d))
 	fs.insert(*f);
   delete [] td;
   delete octree;
@@ -495,13 +476,13 @@ FeatureSet smallFeatures (Polyhedron *a, double d, VPMap *vpmap)
 void smallCandidatesT (void *ptr)
 {
   TData *td = (TData *) ptr;
-  Faces fa, fb;
-  td->octree->pairs(fa, fb, td->d);
+  vector<FFPair> ff;
+  td->octree->pairs(ff, td->d);
   VPMap *vpmap = td->vpmap;
-  for (int i = 0; i < fa.size(); ++i)
-    if (!fa[i]->getBoundary().empty() && !fb[i]->getBoundary().empty() &&
-	(!vpmap || moved(fa[i], *vpmap) || moved(fb[i], *vpmap)))
-      smallCandidates(fa[i], fb[i], td->d, td->fs);
+  for (vector<FFPair>::iterator i = ff.begin(); i != ff.end(); ++i)
+    if (!i->first->getBoundary().empty() && !i->second->getBoundary().empty() &&
+	(!vpmap || moved(i->first, *vpmap) || moved(i->second, *vpmap)))
+      smallCandidates(i->first, i->second, td->d, td->fs);
 }
 
 bool moved (Face *f, const VPMap &vpmap)
@@ -521,39 +502,16 @@ void smallCandidates (Face *f, Face *g, double d, FeatureSet &fs)
   Vertex *vg[] = {gb->tail(), gb->head(), gb->getNext()->head()};
   HEdge *ef[] = {fb, fb->getNext(), fb->getNext()->getNext()};
   HEdge *eg[] = {gb, gb->getNext(), gb->getNext()->getNext()};
-  for (int i = 0; i < 3; ++i) {
-    for (int j = 0; j < 3; ++j)
-      if (vf[i] != vg[j] &&
-      	  bboxOverlap(vf[i]->getBBox(), vg[j]->getBBox(), d) &&
-	  closeVVT(vf[i], vg[j], d))
-	fs.insert(Feature(vf[i], vg[j]));
-    bool flag = firstFace(vf[i], f);
-    for (int k = 0; k < 3; ++k) {
-      Edge *ee = eg[k]->getE();
-      if ((flag || eg[k]->getNext()->head() == vf[i]) &&
-	  ee->getHEdge(0) == eg[k] &&
-	  bboxOverlap(vf[i]->getBBox(), ee->getBBox(), d) &&
-	  closeVET(vf[i], ee, d))
-	fs.insert(Feature(vf[i], ee));
-    }
-    if (flag && bboxOverlap(vf[i]->getBBox(), g->getBBox(), d) &&
+  for (int i = 0; i < 3; ++i)
+    if (firstFace(vf[i], f) &&
+	bboxOverlap(vf[i]->getBBox(), g->getBBox(), d) &&
 	closeVFT(vf[i], g, d))
       fs.insert(Feature(vf[i], g));
-  }
-  for (int i = 0; i < 3; ++i) {
-    bool flag = firstFace(vg[i], g);
-    for (int j = 0; j < 3; ++j) {
-      Edge *ee = ef[j]->getE();
-      if ((flag || ef[j]->getNext()->head() == vg[i]) &&
-	  ee->getHEdge(0) == ef[j] &&
-	  bboxOverlap(vg[i]->getBBox(), ee->getBBox(), d) &&
-	  closeVET(vg[i], ee, d))
-	fs.insert(Feature(vg[i], ee));
-    }
-    if (flag && bboxOverlap(vg[i]->getBBox(), f->getBBox(), d) &&
+  for (int i = 0; i < 3; ++i)
+    if (firstFace(vg[i], g) &&
+	bboxOverlap(vg[i]->getBBox(), f->getBBox(), d) &&
 	closeVFT(vg[i], f, d))
       fs.insert(Feature(vg[i], f));
-  }
   for (int i = 0; i < 3; ++i) {
     Edge *e1 = ef[i]->getE();
     if (e1->getHEdge(0) == ef[i])
@@ -587,10 +545,11 @@ bool closeVVT (Vertex *v, Vertex *w, double d)
 
 bool closeVET (Vertex *v, Edge *e, double d)
 {
-  if (v == e->getT() || v == e->getH())
+  Vertex *et = e->getT(), *eh = e->getH();
+  if (v == et || v == eh)
     return false;
-  PV3 a = v->getP()->getApprox(1.0), t = e->getT()->getP()->getApprox(1.0),
-    h = e->getH()->getP()->getApprox(1.0), u = h - t;
+  PV3 a = v->getP()->getApprox(1.0), t = et->getP()->getApprox(1.0),
+    h = eh->getP()->getApprox(1.0), u = h - t;
   Parameter k = u.dot(a - t), uu = u.dot(u);
   if (k.ub() <= 0.0 || k.lb() >= uu.ub())
     return false;
@@ -601,14 +560,18 @@ bool closeVET (Vertex *v, Edge *e, double d)
 
 bool closeVFT (Vertex *v, Face *f, double d)
 {
-  HEdge *fb = f->getBoundary(0);
-  Vertex *ve[] = {fb->tail(), fb->head(), fb->getNext()->head()};
+  HEdge *fb = f->getBoundary(0), *fbn = fb->getNext(), *fbnn = fbn->getNext();
+  Vertex *ve[] = {fb->tail(), fb->head(), fbn->head()};
   if (v == ve[0] || v == ve[1] || v == ve[2])
     return false;
   PV3 p = v->getP()->getApprox(1.0), n = f->getP()->getApprox(1.0).n;
   Parameter k1 = n.dot(p) + f->getP()->getApprox(1.0).k, k2 = d*d*n.dot(n) - k1*k1;
   if (k2.sign(false) == -1)
     return false;
+  if (closeVET(v, fb->getE(), d) || closeVET(v, fbn->getE(), d) ||
+      closeVET(v, fbnn->getE(), d) || closeVVT(v, ve[0], d) ||
+      closeVVT(v, ve[1], d) || closeVVT(v, ve[2], d))
+    return true;
   PV3 pts[3];
   for (int i = 0; i < 3; ++i)
     pts[i] = ve[i]->getP()->getApprox(1.0);
@@ -621,10 +584,14 @@ bool closeVFT (Vertex *v, Face *f, double d)
 
 bool closeEET (Edge *e, Edge *f, double d)
 {
-  Point *a = e->getT()->getP(), *b = f->getT()->getP(), 
-    *p = e->getH()->getP(), *q = f->getH()->getP();
+  Vertex *et = e->getT(), *eh = e->getH(), *ft = f->getT(), *fh = f->getH();
+  Point *a = et->getP(), *b = ft->getP(), *p = eh->getP(), *q = fh->getP();
   if (a == b || a == q || p == b || p == q)
     return false;
+  if (closeVET(et, f, d) || closeVET(eh, f, d) || closeVET(ft, e, d) ||
+      closeVET(fh, e, d) || closeVVT(et, ft, d) || closeVVT(et, fh, d) ||
+      closeVVT(eh, ft, d) || closeVVT(eh, fh, d))
+    return true;
   PV3 aa = a->getApprox(1.0), u = p->getApprox(1.0) - aa,
     bb = b->getApprox(1.0), v = q->getApprox(1.0) - bb, w = bb - aa;
   Parameter uu = u.dot(u), uv = u.dot(v), vv = v.dot(v), uw = u.dot(w),
@@ -640,20 +607,13 @@ bool closeEET (Edge *e, Edge *f, double d)
 FeatureSet smallFeatures (const FeatureSet &fs, double d)
 {
   FeatureSet res;
-  for (FeatureSet::const_iterator f = fs.begin(); f != fs.end(); ++f)
-    if (f->small(d))
-      res.insert(*f);
+  for (FeatureSet::const_iterator f = fs.begin(); f != fs.end(); ++f) {
+    PTR<Point> p, q;
+    Feature g = minimalFeature(*f, p, q);
+    if (DistancePP(p, q, d) == 1)
+      res.insert(g);
+  }
   return res;
-}
-
-PV3 orthogonal (const PV3 &u)
-{
-  Parameter ux = u.x.abs(), uy = u.y.abs(), uz = u.z.abs();
-  if ((uy - ux).sign() > -1 && (uz - ux).sign() > -1)
-    return PV3(Parameter(0.0), - u.z, u.y);
-  if ((ux - uy).sign() > -1 && (uz - uy).sign() > -1)
-    return PV3(- u.z, Parameter(0.0), u.x);
-  return PV3(- u.y, u.x, Parameter(0.0));
 }
 
 double separation (const FeatureSet &fs)
@@ -661,7 +621,7 @@ double separation (const FeatureSet &fs)
   double d = 1e10;
   for (FeatureSet::const_iterator f = fs.begin(); f != fs.end(); ++f) {
     PTR<Point> p, q;
-    f->closestPoints(p, q);
+    minimalFeature(*f, p, q);
     PV3 u = p->getApprox(1e-8) - q->getApprox(1e-8);
     Parameter k = u.dot(u);
     d = min(d, k.ub());
@@ -672,224 +632,159 @@ double separation (const FeatureSet &fs)
 void simplify2s (Polyhedron *a, double d, FeatureSet &fs, VPMap &vpmap,
 		 bool vobj, double vbound)
 {
-  VIMap vimap;
-  double *v = solveLP(fs, d, vpmap, vobj, vbound, vimap);
-  moveVertices(a, vpmap, vimap, v);
-  delete [] v;
+  VertexSet vs;
+  Expander2 *exp = solveLP(fs, d, vpmap, vobj, vbound, vs);
+  moveVertices(a, d, vpmap, vs, exp);
+  delete exp;
   fs = smallFeatures(a, 3.465*d, fs, &vpmap);
 }
 
-double * solveLP (const FeatureSet &fs, double d, const VPMap &vpmap,
-		  bool vobj, double vbound, VIMap &vimap)
+Expander2 * solveLP (const FeatureSet &fs, double d, const VPMap &vpmap,
+		     bool vobj, double vbound, VertexSet &vs)
 {
-  Expander2 exp;
-  setupLP(fs, d, vimap, exp);
-  for (VIMap::iterator i = vimap.begin(); i != vimap.end(); ++i) {
+  Expander2 *exp = new Expander2(d);
+  setupLP(fs, d, vs, exp);
+  for (VertexSet::iterator v = vs.begin(); v != vs.end(); ++v) {
     double dv[3];
-    getDV(i->first, d, vpmap, dv);
-    exp.addDisplacement(i->second, Expander2::Point(dv));
+    getDV(*v, d, vpmap, dv);
+    exp->addDisplacement(*v, Expander2::Point(dv));
   }
-  exp.expandV(1.0, vobj, vbound);
-  double *x = new double [3*vimap.size()];
-  for (VIMap::iterator i = vimap.begin(); i != vimap.end(); ++i) {
-    int k = i->second;
-    Expander2::Point p = exp.motion(k);
-    for (int j = 0; j < 3; ++j)
-      x[3*k+j] = d*p.x[j];
-  }
-  return x;
+  Parameter::disable();
+  exp->expandV(1.0, vobj, vbound);
+  Parameter::enable();
+  return exp;
 }
 
-void setupLP (const FeatureSet &fs, double d, VIMap &vimap, Expander2 &exp)
+void setupLP (const FeatureSet &fs, double d, VertexSet &vs, Expander2 *exp)
 {
-  FeatureSet fsnm;
-  for (FeatureSet::const_iterator f = fs.begin(); f != fs.end(); ++f)
-    if (f->type == VV)
-      featuresLPVV(f->v, f->w, fsnm);
-    else if (f->type == VE)
-      featuresLPVE(f->v, f->e, fsnm);
-    else
-      setupLP(*f, d, vimap, exp, true);
-  for (FeatureSet::const_iterator f = fsnm.begin(); f != fsnm.end(); ++f)
-    setupLP(*f, d, vimap, exp, false);
-}
-
-int InnerProduct4::sign ()
-{
-  return (a->getP() - b->getP()).dot(c->getP() - d->getP()).sign();
-}
-
-void featuresLPVV (Vertex *v, Vertex *w, FeatureSet &fs)
-{
-  Point *p = v->getP(), *q = w->getP();
-  HEdges hv, hw;
-  Edges edv, edw;
-  v->outgoingHEdges(hv);
-  w->outgoingHEdges(hw);
-  for (HEdges::iterator h = hv.begin(); h != hv.end(); ++h)
-    if (InnerProduct4((*h)->head()->getP(), p, q, p) == -1)
-      edv.push_back((*h)->getE());
-  for (HEdges::iterator h = hw.begin(); h != hw.end(); ++h)
-    if (InnerProduct4((*h)->head()->getP(), q, p, q) == -1)
-      edw.push_back((*h)->getE());
-  for (Edges::iterator e = edv.begin(); e != edv.end(); ++e)
-    for (Edges::iterator f = edw.begin(); f != edw.end(); ++f)
-      fs.insert(Feature(*e, *f));
-  for (HEdges::iterator h = hv.begin(); h != hv.end(); ++h)
-    if (InnerProduct4((*h)->head()->getP(), p, q, p) == -1 &&
-	InnerProduct4((*h)->getNext()->head()->getP(), p, q, p) == -1)
-      fs.insert(Feature(w, (*h)->getF()));
-  for (HEdges::iterator h = hw.begin(); h != hw.end(); ++h)
-    if (InnerProduct4((*h)->head()->getP(), q, p, q) == -1 &&
-	InnerProduct4((*h)->getNext()->head()->getP(), q, p, q) == -1)
-      fs.insert(Feature(v, (*h)->getF()));
-}
-
-void featuresLPVE (Vertex *v, Edge *e, FeatureSet &fs)
-{
-  PTR<Point> p = v->getP(),
-    q = new LinePoint(p, e->getT()->getP(), e->getH()->getP());
-  HEdges hv;
-  v->outgoingHEdges(hv);
-  for (HEdges::iterator h = hv.begin(); h != hv.end(); ++h)
-    if (InnerProduct4((*h)->head()->getP(), p, q, p) == -1)
-      fs.insert(Feature((*h)->getE(), e));
-  for (int i = 0; i < 2; ++i) {
-    HEdge *h = e->getHEdge(i);
-    if (InnerProduct4(h->getNext()->head()->getP(), q, p, q) == -1)
-      fs.insert(Feature(v, h->getF()));
-  }
-}
-
-void setupLP (const Feature &f, double d, VIMap &vimap, Expander2 &exp,
-	      bool minimal)
-{
-  Vertices ve[2];
-  if (f.type == VF) {
-    ve[0].push_back(f.v);
-    f.fa->boundaryVertices(ve[1]);
-  }
-  else {
-    ve[0].push_back(f.e->getT());
-    ve[0].push_back(f.e->getH());
-    ve[1].push_back(f.f->getT());
-    ve[1].push_back(f.f->getH());
-  }
-  Separator s(minimal ? f : minimalFeature(f), d);
-  if (!check(&s, ve[0], ve[1]))
-    cerr << "bad feature" << endl;
-  SeparatorData data = s.getApprox(1e-7);
-#ifdef UNIT_U
-  Expander2::Point u(data.u.x.mid(), data.u.y.mid(), data.u.z.mid());
-  Expander2::Point v(data.v.x.mid(), data.v.y.mid(), data.v.z.mid());
-  Expander2::Point w(data.w.x.mid(), data.w.y.mid(), data.w.z.mid());
-  Expander2::Pair pair(u, v, w, data.pq.mid()/d);
-#else
-  PV3 uu = data.u.unit();
-  PV3 vu = data.v.unit();
-  PV3 wu = data.w.unit();
-  Expander2::Point u(uu.x.mid(), uu.y.mid(), uu.z.mid());
-  Expander2::Point v(vu.x.mid(), vu.y.mid(), vu.z.mid());
-  Expander2::Point w(wu.x.mid(), wu.y.mid(), wu.z.mid());
-  Expander2::Pair pair(u, v, w, data.pq.sqrt().mid()/d);
-#endif
-  for (int ab = 0; ab < 2; ++ab)
-    for (Vertices::iterator x = ve[ab].begin(); x != ve[ab].end(); ++x) {
-      int xi = getVertex(*x, vimap);
-      double vwr[3];
-      s.getVWR((*x)->getP(), ab == 0, vwr);
-      pair.addConstraint(ab, Expander2::Constraint(xi, vwr[0], vwr[1], vwr[2]));
+  for (FeatureSet::const_iterator f = fs.begin(); f != fs.end(); ++f) {
+    Vertices ve[2];
+    if (f->v) {
+      ve[0].push_back(f->v);
+      f->fa->boundaryVertices(ve[1]);
     }
-  exp.addPair(pair);
+    else {
+      ve[0].push_back(f->e->getT());
+      ve[0].push_back(f->e->getH());
+      ve[1].push_back(f->f->getT());
+      ve[1].push_back(f->f->getH());
+    }
+    Separator s(*f, d);
+    SeparatorData data = s.getApprox(1e-7);
+    PV3 uu = data.u.unit(), vu = data.v.unit(), wu = data.w.unit();
+    Expander2::Point u(uu.x.mid(), uu.y.mid(), uu.z.mid());
+    Expander2::Point v(vu.x.mid(), vu.y.mid(), vu.z.mid());
+    Expander2::Point w(wu.x.mid(), wu.y.mid(), wu.z.mid());
+    Expander2::Pair pair(u, v, w, data.pq.sqrt().mid()/d);
+    for (int ab = 0; ab < 2; ++ab)
+      for (Vertices::iterator x = ve[ab].begin(); x != ve[ab].end(); ++x) {
+	double vwr[3];
+	s.getVWR((*x)->getP(), ab == 0, vwr);
+	pair.addConstraint(ab, Expander2::Constraint(*x, vwr[0], vwr[1], vwr[2]));
+	vs.insert(*x);
+      }
+    exp->addPair(pair);
+  }
 }
 
-Feature minimalFeature (const Feature &f)
+Feature minimalFeature (const Feature &f, PTR<Point> &p, PTR<Point> &q)
 {
-  return f.type == VF ? minimalFeature(f.v, f.fa)
-    : minimalFeature(f.e, f.f);
+  return f.type == VF ? minimalFeature(f.v, f.fa, p, q)
+    : minimalFeature(f.e, f.f, p, q);
 }
 
-Feature minimalFeature (Vertex *v, Face *f)
+Feature minimalFeature (Vertex *v, Face *f, PTR<Point> &p, PTR<Point> &q)
 {
-  Point *a = v->getP();
-  if (a->side(f->getP()) != 0) {
-    PlanePoint pp(f->getP(), a);
-    if (f->containsConvex(&pp, false))
+  p = v->getP();
+  if (p->side(f->getP()) != 0) {
+    q = new PlanePoint(f->getP(), p);
+    if (f->containsConvex(q, true))
       return Feature(v, f);
   }
   HEdges ed;
   f->boundaryHEdges(ed);
-  PTR<Point> p = 0;
+  q = 0;
   Edge *e = 0;
   for (int i = 0; i < 3; ++i) {
     Edge *ei = ed[i]->getE();
     Point *t = ei->getT()->getP(), *h = ei->getH()->getP();
-    if (onEdge(a, t, h, true)) {
-      PTR<Point> pi = new LinePoint(a, t, h);
-      if (!e || CloserPair(a, pi, a, p) == 1) {
+    if (onEdge(p, t, h, true)) {
+      PTR<Point> qi = new LinePoint(p, t, h);
+      if (!q || CloserPair(p, qi, p, q) == 1) {
+	q = qi;
 	e = ei;
-	p = pi;
       }
     }
   }
-  Vertex *w = ed[0]->tail();
-  for (int i = 1; i < 3; ++i)
-    if (CloserPair(a, ed[i]->tail()->getP(), a, w->getP()) == 1)
+  Vertex *w = 0;
+  for (int i = 0; i < 3; ++i)
+    if (!q || CloserPair(p, ed[i]->tail()->getP(), p, q) == 1) {
       w = ed[i]->tail();
-  if (p && CloserPair(a, p, a, w->getP()) == 1)
+      e = 0;
+    }
+  if (e)
     return Feature(v, e);
-  return Feature(v, w, v < w);
+  q = w->getP();
+  return Feature(v, w);
 }
 
-Feature minimalFeature (Edge *e, Edge *f)
+Feature minimalFeature (Edge *e, Edge *f, PTR<Point> &p, PTR<Point> &q)
 {
   Vertex *vs[] = {e->getT(), e->getH(), f->getT(), f->getH()};
   Point *et = vs[0]->getP(), *eh = vs[1]->getP(), *ft = vs[2]->getP(),
     *fh = vs[3]->getP();
   if (Orientation(et, eh, ft, fh) != 0) {
-    LineLinePoint pe(et, eh, ft, fh), pf(ft, fh, et, eh);
-    if (onEdge(&pe, et, eh, true) && onEdge(&pf, ft, fh, true))
+    p = new LineLinePoint(et, eh, ft, fh);
+    q = new LineLinePoint(ft, fh, et, eh);
+    if (onEdge(p, et, eh, true) && onEdge(q, ft, fh, true))
       return Feature(e, f);
   }
   Edge *es[] = {f, f, e, e};
-  PTR<Point> p = 0;
+  PTR<Point> r = 0;
   int fi = -1;
   for (int i = 0; i < 4; ++i) {
     Point *a = vs[i]->getP(), *t = es[i]->getT()->getP(),
       *h = es[i]->getH()->getP();
     if (onEdge(a, t, h, true)) {
-      PTR<Point> pi = new LinePoint(a, t, h);
-      if (!p || CloserPair(a, pi, vs[fi]->getP(), p) == 1) {
-	p = pi;
+      PTR<Point> ri = new LinePoint(a, t, h);
+      if (!r || CloserPair(a, ri, vs[fi]->getP(), r) == 1) {
+	r = ri;
 	fi = i;
       }
     }
   }
-  Vertex *v = vs[0], *w = vs[2];
-  if (CloserPair(vs[0]->getP(), vs[3]->getP(), v->getP(), w->getP()) == 1)
-    w = vs[3];
-  if (CloserPair(vs[1]->getP(), vs[2]->getP(), v->getP(), w->getP()) == 1) {
-    v = vs[1];
-    w = vs[2];
-  }
-  if (CloserPair(vs[1]->getP(), vs[3]->getP(), v->getP(), w->getP()) == 1) {
-    v = vs[1];
-    w = vs[3];
-  }
-  if (p && CloserPair(vs[fi]->getP(), p, v->getP(), w->getP()) == 1)
+  Vertex *v = 0, *w = 0;
+  for (int i = 0; i < 2; ++i)
+    for (int j = 2; j < 4; ++j)
+      if (!v || CloserPair(vs[i]->getP(), vs[j]->getP(), v->getP(), w->getP()) == 1) {
+	v = vs[i];
+	w = vs[j];
+      }
+  if (r && CloserPair(vs[fi]->getP(), r, v->getP(), w->getP()) == 1) {
+    p = vs[fi]->getP();
+    q = r;
     return Feature(vs[fi], es[fi], fi < 2);
-  bool flag = (v == vs[0] || v == vs[1]) == (v < w);
-  return Feature(v, w, flag);
+  }
+  p = v->getP();
+  q = w->getP();
+  return Feature(v, w, v == vs[0] || v == vs[1]);
 }
 
-int getVertex (Vertex *v, VIMap &vimap)
+bool small (const Feature &f, double d)
 {
-  VIMap::iterator iter = vimap.find(v);
-  if (iter != vimap.end())
-    return iter->second;
-  int k = vimap.size();
-  vimap.insert(VIPair(v, k));
-  return k;
+  PTR<Point> p, q;
+  minimalFeature(f, p, q);
+  return DistancePP(p, q, d) == 1;
+}
+
+PV3 orthogonal (const PV3 &u)
+{
+  Parameter ux = u.x.abs(), uy = u.y.abs(), uz = u.z.abs();
+  if ((uy - ux).sign() > -1 && (uz - ux).sign() > -1)
+    return PV3(Parameter(0.0), - u.z, u.y);
+  if ((ux - uy).sign() > -1 && (uz - uy).sign() > -1)
+    return PV3(- u.z, Parameter(0.0), u.x);
+  return PV3(- u.y, u.x, Parameter(0.0));
 }
 
 void getDV (Vertex *v, double d, const VPMap &vpmap, double *dv)
@@ -904,32 +799,17 @@ void getDV (Vertex *v, double d, const VPMap &vpmap, double *dv)
     dv[i] = u[i].mid();
 }
 
-bool check (Separator *s, const Vertices &v, const Vertices &w)
+void moveVertices (Polyhedron *a, double d, VPMap &vpmap, const VertexSet &vs,
+		   Expander2 *exp)
 {
-  bool res = true;
-  for (Vertices::const_iterator vi = v.begin(); vi != v.end(); ++vi)
-    for (Vertices::const_iterator wi = w.begin(); wi != w.end(); ++wi)
-      if (SeparatorOrder(s, (*vi)->getP(), (*wi)->getP()) < 1)
-	res = false;
-  return res;
-}
-
-int SeparatorOrder::sign ()
-{
-  return s->getU().dot(b->getP() - a->getP()).sign();
-}
-
-void moveVertices (Polyhedron *a, VPMap &vpmap, const VIMap &vimap, double *dvw)
-{
-  for (VIMap::const_iterator i = vimap.begin(); i != vimap.end(); ++i) {
-    double *di = dvw + 3*i->second;
-    if (di[0] != 0.0 || di[1] != 0.0 || di[2] != 0.0) {
-      Vertex *v = i->first;
-      vpmap.insert(VPPair(v, v->getP()));
-      PTR<Point> vp = v->getP(),
-	dp = new InputPoint(di[0], di[1], di[2], false),
+  for (VertexSet::const_iterator v = vs.begin(); v != vs.end(); ++v) {
+    Expander2::Point dv = exp->motion(*v);
+    if (dv.x[0] != 0.0 || dv.x[1] != 0.0 || dv.x[2] != 0.0) {
+      PTR<Point> vp = (*v)->getP(),
+	dp = new InputPoint(d*dv.x[0], d*dv.x[1], d*dv.x[2], false),
 	q = new SumPoint(vp, dp);
-      a->moveVertex(v, q);
+      vpmap.insert(VPPair(*v, vp));
+      a->moveVertex(*v, q);
     }
   }
 }
@@ -939,7 +819,7 @@ FeatureSet smallFeatures (Polyhedron *a, double d, const FeatureSet &fs,
 {
   FeatureSet nfs = smallFeatures(a, d, vpmap);
   for (FeatureSet::iterator f = fs.begin(); f != fs.end(); ++f)
-    if (f->small(d))
+    if (small(*f, d))
       nfs.insert(*f);
   return nfs;  
 }
@@ -970,6 +850,7 @@ void describe2 (int n, const FeatureSet &fs, double t, const VPMap &vpmap)
     case VE: ++ve; break;
     case VF: ++vf; break;
     case EE: ++ee; break;
+    default: break;
     }
   double dmax, dr = displacement(vpmap, dmax)/vpmap.size();
   cerr << "simplify 2: time = " << t;
@@ -990,59 +871,242 @@ void describe2 (int n, const FeatureSet &fs, double t, const VPMap &vpmap)
   cerr << endl;
 }
 
-// debug
-
-int fsn (const FeatureSet &fs)
+bool intersects (Expander2 *e, Expander2::Pair *p)
 {
-  return fs.size();
+  Points pts, dsp;
+  for (int i = 0; i < 2; ++i)
+    for (int j = 0; j < p->constraints[i].size(); ++j) {
+      Expander2::Constraint c = p->constraints[i][j];
+      pts.push_back(c.i->getP());
+      Expander2::Point m = e->motion(c.i);
+      PTR<Point> q = new InputPoint(e->d*m.x[0], e->d*m.x[1], e->d*m.x[2], false);
+      dsp.push_back(q);
+    }
+  bool enabled = Parameter::isEnabled();
+  Parameter::enable();
+  bool res = intersects(pts, dsp, p->constraints[0].size() == 1);
+  if (!enabled)
+    Parameter::disable();
+  return res;
 }
 
-double amax (int n, double *a)
+bool intersects (const Points &pts, const Points &dsp, bool vf)
 {
-  double x = 0.0;
+  ObjPTR<PPoly<Parameter>> p = new FIPoly(pts, dsp);
+  Roots rts = PolySolver(p).getRoots(0.0, 1.0);
+  for (Roots::iterator r = rts.begin(); r != rts.end(); ++r) {
+    Points rpts;
+    for (int i = 0; i < 4; ++i)
+      rpts.push_back(new TranslatedPoint(pts[i], dsp[i], *r));
+    if (vf ? intersectsVF(rpts) : intersectsEE(rpts))
+      return true;
+  }
+  return false;
+}
+
+bool intersectsVF (const Points &p)
+{
+  TrianglePlane pl(p[1], p[2], p[3]);
+  int c = ProjectionCoordinate(&pl);
+  return LeftTurn(p[0], p[1], p[2], c) != -1 &&
+    LeftTurn(p[0], p[2], p[3], c) != -1 &&
+    LeftTurn(p[0], p[3], p[1], c) != -1;  
+}
+
+bool intersectsEE (const Points &p)
+{
+  PTR<Point> a = new EEPoint(p[0], p[1], p[2], p[3]);
+  return onEdge(a, p[0], p[1], false) && onEdge(a, p[2], p[3], false);
+}
+
+Polyhedron * round (Polyhedron *a)
+{
+  Polyhedron *b = roundD(a);
+  while (true) {
+    VertexSet vs = intersectionVertices(b);
+    if (vs.empty())
+      return b;
+    VertexSet nvs;
+    Polyhedron *c = roundF(b, vs, nvs);
+    intersectFF(c, nvs);
+    Polyhedron *d = c->subdivideAux(), *e = d->selfUnion();
+    cerr << " intersection vertices = " << vs.size() << " faces = " << e->faces.size()
+	 << endl;
+    delete b;
+    delete c;
+    delete d;
+    b = roundD(e);
+    delete e;
+  }
+}
+
+Polyhedron * roundD (Polyhedron *a)
+{
+  Polyhedron *b = new Polyhedron(false);
+  VVMap vvmap;
+  for (Faces::iterator f = a->faces.begin(); f != a->faces.end(); ++f) {
+    Vertices ve;
+    (*f)->boundaryVertices(ve);
+    Vertex *u = getVertexD(b, vvmap, ve[0]), *v = getVertexD(b, vvmap, ve[1]),
+      *w = getVertexD(b, vvmap, ve[2]);
+    if (u != v && u != w && v != w)
+      b->addTriangle(u, v, w);
+  }
+  return b;
+}
+
+Vertex * getVertexD (Polyhedron *a, VVMap &vvmap, Vertex *v)
+{
+  VVMap::iterator i = vvmap.find(v);
+  if (i != vvmap.end())
+    return i->second;
+  PV3 p = v->getP()->getApprox();
+  PTR<Point> q = new InputPoint(p.x.mid(), p.y.mid(), p.z.mid(), false);
+  Vertex *w = a->getVertex(q);
+  vvmap.insert(VVPair(v, w));
+  return w;
+}
+
+VertexSet intersectionVertices (Polyhedron *a)
+{
+  VertexSet vs;
+  FeatureSet fs = intersections(a);
+  for (FeatureSet::iterator f = fs.begin(); f != fs.end(); ++f) {
+    vs.insert(f->e->getT());
+    vs.insert(f->e->getH());
+    Vertices vf;
+    f->fa->boundaryVertices(vf);
+    vs.insert(vf.begin(), vf.end());
+  }
+  return vs;
+}
+
+FeatureSet intersections (Polyhedron *a)
+{
+  FOctree *octree = a->faceOctree();
+  for (Faces::iterator f = a->faces.begin(); f != a->faces.end(); ++f) {
+    (*f)->getPC();
+    (*f)->getP()->getApprox(1e-6);
+  }
+  int m = 16;
+  vector<FOctree *> nodes;
+  octree->expand(m, nodes);
+  int n = nodes.size();
+  TData *td = new TData [n];
   for (int i = 0; i < n; ++i)
-    x = max(x, fabs(a[i]));
-  return x;
+    td[i].octree = nodes[i];
+  pthread_t *threads = new pthread_t [n];
+  for (int i = 0; i < n; ++i)
+    pthread_create(threads + i, 0,
+		   (void* (*)(void*)) intersectionsT, (void *) (td + i));
+  for (int i = 0; i < n; ++i)
+    pthread_join(threads[i], 0);
+  delete [] threads;
+  FeatureSet fs;
+  for (int i = 0; i < n; ++i)
+    for (FeatureSet::iterator f = td[i].fs.begin(); f != td[i].fs.end(); ++f)
+      if (f->fa->intersects(f->e, false))
+	fs.insert(*f);
+  delete [] td;
+  delete octree;
+  return fs;
 }
 
-void pedges (const Edges &, int);
-
-void pedges (const FeatureSet &fs, int i)
+void intersectionsT (void *ptr)
 {
-  EdgeSet es;
-  for (FeatureSet::const_iterator f = fs.begin(); f != fs.end(); ++f)
-    switch (f->type) {
-    case VV: {
-      HEdge *e = f->v->connected(f->w);
-      if (e)
-	es.insert(e->getE());
-      break;
-    }
-    case VE: {
-      es.insert(f->e);
-      for (int j = 0; j < 2; ++j) {
-	HEdge *e = f->e->getHEdge(j);
-	if (e->getNext()->head() == f->v) {
-	  es.insert(e->getE());
-	  es.insert(e->getNext()->getE());
-	  break;
-	}
-      }
-      break;
-    }
-    case VF: {
-      HEdges ed;
-      f->fa->boundaryHEdges(ed);
-      for (int i = 0; i < 3; ++i)
-	es.insert(ed[i]->getE());
-      break;
-    }
-    case EE:
-      es.insert(f->e);
-      es.insert(f->f);
-    }
-  Edges ed(es.begin(), es.end());
-  pedges(ed, i);
+  TData *td = (TData *) ptr;
+  vector<FFPair> ff;
+  td->octree->pairs(ff, td->d);
+  VPMap *vpmap = td->vpmap;
+  for (vector<FFPair>::iterator i = ff.begin(); i != ff.end(); ++i) {
+    intersectionCandidates(i->first, i->second, td->fs);
+    intersectionCandidates(i->second, i->first, td->fs);
+  }
 }
-  
-      
+
+void intersectionCandidates (Face *f, Face *g, FeatureSet &fs)
+{
+  HEdges ed;
+  g->boundaryHEdges(ed);
+  for (HEdges::iterator h = ed.begin(); h != ed.end(); ++h) {
+    Edge *e = (*h)->getE();
+    if (*h == e->getHEdge(0) && intersectsT(f, e))
+      fs.insert(Feature(e, f));
+  }
+}
+
+bool intersectsT (Face *f, Edge *e)
+{
+  if (f->boundaryVertex(e->getT()) || f->boundaryVertex(e->getH()) ||
+      !bboxOverlap(f->getBBox(), e->getBBox()))
+    return false;
+  PV3 t = e->getT()->getP()->getApprox(1.0), h = e->getH()->getP()->getApprox(1.0),
+    n = f->getP()->getApprox(1.0).n;
+  Parameter k = f->getP()->getApprox(1.0).k;
+  if ((n.dot(t) + k).sign(false)*(n.dot(h) + k).sign(false) == 1)
+    return false;
+  PV3 u = h - t;
+  Parameter k2 = n.dot(u);
+  if (k2.sign(false) == 0)
+    return true;
+  PV3 p = t - ((n.dot(t) + k)/k2)*u;
+  Vertices ve;
+  f->boundaryVertices(ve);
+  PV3 pts[3];
+  for (int i = 0; i < 3; ++i)
+    pts[i] = ve[i]->getP()->getApprox(1.0);
+  int c = f->getPC();
+  for (int i = 0; i < 3; ++i)
+    if (cross(pts[(i+1)%3] - pts[i], p - pts[i], c).sign(false) == -1)
+      return false;
+  return true;
+}
+
+Polyhedron * roundF (Polyhedron *a, const VertexSet &vs, VertexSet &nvs)
+{
+  Polyhedron *b = new Polyhedron(false);
+  for (Faces::const_iterator f = a->faces.begin(); f != a->faces.end(); ++f) {
+    Vertices ve;
+    (*f)->boundaryVertices(ve);
+    Vertex *u = getVertexF(b, vs, nvs, ve[0]), *v = getVertexF(b, vs, nvs, ve[1]),
+      *w = getVertexF(b, vs, nvs, ve[2]);
+    if (u != v && u != w && v != w)
+      b->addTriangle(u, v, w);
+  }
+  return b;
+}
+
+Vertex * getVertexF (Polyhedron *a, const VertexSet &vs, VertexSet &nvs,
+		     Vertex *v)
+{
+  if (vs.find(v) == vs.end())
+    return a->getVertex(v->getP());
+  PV3 p = v->getP()->getApprox();
+  PTR<Point> q = new InputPoint(float(p.x.mid()), float(p.y.mid()),
+				float(p.z.mid()), false);
+  Vertex *nv = a->getVertex(q);
+  nvs.insert(nv);
+  return nv;
+}
+
+void intersectFF (Polyhedron *a, const VertexSet &vs)
+{
+  Octree<Face *> *octree = a->faceOctree();
+  vector<FFPair> ff;
+  octree->pairs(ff);
+  EFVMap efvmap;
+  for (vector<FFPair>::iterator i = ff.begin(); i != ff.end(); ++i)
+    if (moved(i->first, vs) || moved(i->second, vs))
+      a->intersectFF(i->first, i->second, efvmap);
+  delete octree;
+}
+
+bool moved (Face *f, const VertexSet &vs)
+{
+  Vertices ve;
+  f->boundaryVertices(ve);
+  for (Vertices::iterator v = ve.begin(); v != ve.end(); ++v)
+    if (vs.find(*v) != vs.end())
+      return true;
+  return false;
+}
