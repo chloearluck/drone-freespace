@@ -143,12 +143,12 @@ PV3 IntersectionPoint::calculate () {
 }
 
 PV3 FaceIntersectionPoint::calculate () {
-  PTR<Plane> p = new TrianglePlane(a,b,c);
   PV3 t = tail->getP();
   PV3 v = head->getP()-t;
-  PV3 n = p->getN();
-  Parameter k = -(n.dot(t) + p->getK())/n.dot(v);
-  return t + k*v;
+  PV3 n = (b->getP()-a->getP()).cross(c->getP()-a->getP());
+  Parameter k = a->getP().dot(n);
+  Parameter s = (k - t.dot(n))/v.dot(n);
+  return t + s*v;
 }
 
 PV3 FaceNearestPoint::calculate () {
