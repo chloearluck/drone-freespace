@@ -1,5 +1,6 @@
 #include "sumfaces.h"
 #include "io.h"
+#include <time.h>
 
 const bool BLOCKSPACES_FROM_FILE = true;
 
@@ -100,13 +101,25 @@ int main (int argc, char *argv[]) {
 
   PTR<Point> sin_cos_alpha = new SinCosAlpha(tan_half_angle);
   PTR<Point> sample_sin_cos_alpha = new SinCosAlpha(sample_tan_half_angle);
+  int non_candidates = 0;
+  int candidates = 0;
+
+  time_t start,end;
+  time (&start);
+
   for (int i=0; i<feature_pairs.size(); i++) {
     PTR<Feature> frob = feature_pairs[i].first;
     PTR<Feature> fobs = feature_pairs[i].second;
     bool * b = candidatePairs(fobs, frob, sin_cos_alpha, sample_sin_cos_alpha, blockspaces, samples_per_rotation);
 
-    for (int j=0; j<40; j++)
+    for (int j=0; j<40; j++) {
       cout<<b[j];
-    cout<<endl;
+      if (b[j]) candidates++; else non_candidates++;
+    }
+    cout<<" "<< ((double)non_candidates)/(candidates+non_candidates)*100 << "% of candidates eliminated"<<endl;
   }
+
+  time (&end);
+  double dif = difftime (end,start);
+  cout<<"computation time "<<dif<<" seconds"<<endl;
 }

@@ -47,7 +47,7 @@ void save(Face * f, const char * filename) {
 }
 
 void debug(PTR<Feature> feature, Edge * e, Face * f, int angle_range, int debug_msg) {
-  if (random()/((double)RAND_MAX) < 0.05 && debug_msg != 0) {
+  if (random()/((double)RAND_MAX) < 0.1 && debug_msg != 0 && debug_msg != 1) {
     cout<<"angle range: "<<angle_range<<endl;
     save(feature, "sumface.vtk");
     if (e != NULL)
@@ -114,7 +114,7 @@ bool * candidatePairs(PTR<Feature> fobs, PTR<Feature> frob, PTR<Point> sin_cos_a
           !blockspaces[i]->contains(sumface->p[2]) ||
           (sumface->p.size() == 4 && !blockspaces[i]->contains(sumface->p[3]))) {
         candidate[i] = true;
-        debug(sumface, NULL, NULL, i, 0);
+        if (DEBUG) debug(sumface, NULL, NULL, i, 0);
         break;
       }
 
@@ -124,7 +124,7 @@ bool * candidatePairs(PTR<Feature> fobs, PTR<Feature> frob, PTR<Point> sin_cos_a
         if (FaceEdgeIntersect((*edge)->getT()->getP(), (*edge)->getH()->getP(),
                               sumface->p[0], sumface->p[1], sumface->p[2]) == 1) {
           candidate[i] = true;
-          debug(sumface, (*edge), NULL, i, 1);
+          if (DEBUG) debug(sumface, (*edge), NULL, i, 1);
           break;
         }
 
@@ -132,7 +132,7 @@ bool * candidatePairs(PTR<Feature> fobs, PTR<Feature> frob, PTR<Point> sin_cos_a
             FaceEdgeIntersect((*edge)->getT()->getP(), (*edge)->getH()->getP(),
                               sumface->p[0], sumface->p[2], sumface->p[3]) == 1) {
           candidate[i] = true;
-          debug(sumface, (*edge), NULL, i, 3);
+          if (DEBUG) debug(sumface, (*edge), NULL, i, 3);
           break;
         }
       }
@@ -153,7 +153,7 @@ bool * candidatePairs(PTR<Feature> fobs, PTR<Feature> frob, PTR<Point> sin_cos_a
 
           if (FaceEdgeIntersect(tail, head, vs[0]->getP(), vs[1]->getP(), vs[2]->getP()) == 1) {
             candidate[i] = true;
-            debug(sumface, NULL, (*face), i, 2);
+            if (DEBUG) debug(sumface, NULL, (*face), i, 2);
             break;
           }
         }
