@@ -1,55 +1,10 @@
 #include "sumfaces.h"
 #include "io.h"
 #include <time.h>
+#include <string>
 
 const bool BLOCKSPACES_FROM_FILE = true;
-
-void save(std::vector<PTR<Feature> > & features, int n_points, const char * filename) {
-  ofstream out;
-  out.open(filename);
-  out << "# vtk DataFile Version 3.0\nvtk output\nASCII\nDATASET POLYDATA\nPOINTS "<<n_points<<" double"<<endl;
-  for (int i=0; i<features.size(); i++)
-    for (int j=0; j<features[i]->p.size(); j++)
-      out << features[i]->p[j]->getApprox().getX().mid() << " " <<
-             features[i]->p[j]->getApprox().getY().mid() << " " <<
-             features[i]->p[j]->getApprox().getZ().mid() << endl;
-  out << "POLYGONS "<<features.size()<<" "<<features.size() + n_points<<endl;
-  int index = 0;
-  for (int i=0; i<features.size(); i++) {
-      out << features[i]->p.size() << " " << index++ << " " << index++ << " " << index++;
-      if (features[i]->p.size() == 4)
-        out << " " << index++;
-      out << endl;
-  }
-  out.close();
-}
-
-void all_pairs(std::vector<std::pair<PTR<Feature>, PTR<Feature> > > & feature_pairs, Polyhedron * robot, Polyhedron * obstacle) {
-  for (int i=0; i<robot->vertices.size(); i++)
-    for (int j=0; j<obstacle->faces.size(); j++) {
-      PTR<Feature> frob = new Feature(robot->vertices[i]->getP());
-      Vertices vs;
-      obstacle->faces[j]->boundaryVertices(vs);
-      assert(vs.size() == 3);
-      PTR<Feature> fobs = new Feature(vs[0]->getP(), vs[1]->getP(), vs[2]->getP());
-      feature_pairs.push_back(make_pair(frob, fobs));
-    }
-  for (int i=0; i<robot->faces.size(); i++)
-    for (int j=0; j<obstacle->vertices.size(); j++) {
-      Vertices vs;
-      robot->faces[i]->boundaryVertices(vs);
-      assert(vs.size() == 3);
-      PTR<Feature> frob = new Feature(vs[0]->getP(), vs[1]->getP(), vs[2]->getP());
-      PTR<Feature> fobs = new Feature(obstacle->vertices[j]->getP());
-      feature_pairs.push_back(make_pair(frob, fobs));
-    }
-  for (int i=0; i<robot->edges.size(); i++)
-    for (int j=0; j<obstacle->edges.size(); j++) {
-      PTR<Feature> frob = new Feature(robot->edges[i]->getH()->getP(), robot->edges[i]->getT()->getP());
-      PTR<Feature> fobs = new Feature(obstacle->edges[j]->getH()->getP(), obstacle->edges[j]->getT()->getP());
-      feature_pairs.push_back(make_pair(frob, fobs));
-    }
-}
+const bool GENERATE_INPUT_FILE = false;
 
 double tanHalfAngle (int n) {
   return tan((1.0 + 1.0e-8) * M_PI / n);
@@ -60,7 +15,59 @@ double sampleTanHalfAngle(int num_rotations, int samples_per_rotation) {
   return tan(sample_theta / 2);
 }
 
+void generateInputFile(const char * directory) {
+  std::string dir(directory);
+
+  Polyhedron * robot = loadPoly((dir + "/robot").c_str());
+  Polyhedron * obstacle = loadPoly((dir + "/obstacle").c_str());
+
+  ofstream out;
+  out.open((dir + "/pairs.txt").c_str());
+  for (int i=0; i<robot->vertices.size(); i++)
+    for (int j=0; j<obstacle->faces.size(); j++) {
+      out << "3 ";
+      Vertices vs;
+      obstacle->faces[j]->boundaryVertices(vs);
+      assert(vs.size() == 3);
+      for (int k=0; k<3; k++)
+        out << (int)(std::find(obstacle->vertices.begin(), obstacle->vertices.end(), vs[k]) - obstacle->vertices.begin()) << " ";
+      out<< "1 " << i << endl;
+    }
+
+  for (int i=0; i<robot->faces.size(); i++)
+    for (int j=0; j<obstacle->vertices.size(); j++) {
+      out << "1 "<< j << " 3 ";
+      Vertices vs;
+      robot->faces[i]->boundaryVertices(vs);
+      assert(vs.size() == 3);
+      for (int k=0; k<3; k++)
+        out << (int)(std::find(robot->vertices.begin(), robot->vertices.end(), vs[k]) - robot->vertices.begin()) << " ";
+      out << endl;
+    }
+
+  for (int i=0; i<robot->edges.size(); i++)
+    for (int j=0; j<obstacle->edges.size(); j++) {
+      out << "2 ";
+      out << (int)(find(obstacle->vertices.begin(), obstacle->vertices.end(), obstacle->edges[j]->getH()) - obstacle->vertices.begin()) << " ";
+      out << (int)(find(obstacle->vertices.begin(), obstacle->vertices.end(), obstacle->edges[j]->getT()) - obstacle->vertices.begin()) << " ";
+      out << "2 ";
+      out << (int)(find(robot->vertices.begin(), robot->vertices.end(), robot->edges[i]->getH()) - robot->vertices.begin()) << " ";
+      out << (int)(find(robot->vertices.begin(), robot->vertices.end(), robot->edges[i]->getT()) - robot->vertices.begin()) << endl;
+    }
+
+  out.close();
+} 
+
 int main (int argc, char *argv[]) {
+  if (argc < 2) {
+    cout << "not enough input arguments" << endl;
+    return 0;
+  }
+  char * directory = argv[1];
+  std::string dir(directory);
+
+  if (GENERATE_INPUT_FILE) generateInputFile(directory);
+
   int num_rotations = 40;
   int samples_per_rotation = 10;
   PTR<Object<Parameter> > tan_half_angle = new InputParameter(tanHalfAngle(num_rotations));
@@ -68,8 +75,8 @@ int main (int argc, char *argv[]) {
 
   Parameter::enable();
 
-  Polyhedron * robot = loadPoly("frustum");
-  Polyhedron * obstacle = loadPoly("droneRoom");
+  Polyhedron * robot = loadPoly((dir + "/robot").c_str());
+  Polyhedron * obstacle = loadPoly((dir + "/obstacle").c_str());
   std::vector<Polyhedron*> blockspaces;
   if (!BLOCKSPACES_FROM_FILE) {
     FreeSpace * fs  = new FreeSpace(robot, obstacle, tan_half_angle, num_rotations, false);
@@ -86,38 +93,71 @@ int main (int argc, char *argv[]) {
   for (int i=0; i<blockspaces.size(); i++)
     blockspaces[i]->computeWindingNumbers();
 
-  std::vector<std::pair<PTR<Feature>, PTR<Feature> > > feature_pairs;
-  all_pairs(feature_pairs, robot, obstacle);
-
-  //DEBUG
-  std::vector<PTR<Feature> > features;
-  int n_points = 0;
-  for (int i=0; i<feature_pairs.size(); i++) {
-    PTR<Feature> f = feature_pairs[i].first->sum(feature_pairs[i].second);
-    n_points += f->p.size();
-    features.push_back(f);
-  }
-  save(features, n_points, "features00.vtk");
-
   PTR<Point> sin_cos_alpha = new SinCosAlpha(tan_half_angle);
   PTR<Point> sample_sin_cos_alpha = new SinCosAlpha(sample_tan_half_angle);
+  
+  std::vector<std::pair<PTR<Feature>, PTR<Feature> > > feature_pairs;
+  ifstream infile ((dir + "/pairs.txt").c_str());
+  int n[6];
+  while (infile >> n[0] >> n[1] >> n[2] >> n[3] >> n[4] >> n[5]) {
+    PTR<Feature> fobs, frob;
+    if (n[0] == 3) {
+      fobs = new Feature(obstacle->vertices[n[1]]->getP(), 
+                         obstacle->vertices[n[2]]->getP(), 
+                         obstacle->vertices[n[3]]->getP());
+      frob = new Feature(robot->vertices[n[5]]->getP());
+    } else if (n[0] == 2) {
+      fobs = new Feature(obstacle->vertices[n[1]]->getP(), 
+                         obstacle->vertices[n[2]]->getP());
+      frob = new Feature(robot->vertices[n[4]]->getP(), 
+                         robot->vertices[n[5]]->getP());
+    } else if (n[0] == 1) {
+      fobs = new Feature(obstacle->vertices[n[1]]->getP());
+      frob = new Feature(robot->vertices[n[3]]->getP(), 
+                         robot->vertices[n[4]]->getP(), 
+                         robot->vertices[n[5]]->getP());
+    } else {
+      cout << "invalid pair" << endl;
+      return 0;
+    }
+    feature_pairs.push_back(make_pair(frob, fobs));
+  }
+
+  int start_index, end_index;
+  if (argc > 3) {
+    start_index = atoi(argv[2]);
+    end_index = atoi(argv[3]);
+  } else {
+    start_index = 0;
+    end_index = feature_pairs.size()-1;
+  }
+
   int non_candidates = 0;
   int candidates = 0;
-
-  time_t start,end;
+  time_t start,mid,end;
   time (&start);
 
-  for (int i=0; i<feature_pairs.size(); i++) {
+  ofstream out;
+  out.open((dir + "/out-" + std::to_string(num_rotations) + ".txt").c_str());
+
+  for (int i=start_index; i<=end_index; i++) {
     PTR<Feature> frob = feature_pairs[i].first;
     PTR<Feature> fobs = feature_pairs[i].second;
     bool * b = candidatePairs(fobs, frob, sin_cos_alpha, sample_sin_cos_alpha, blockspaces, samples_per_rotation);
+    time(&mid);
 
     for (int j=0; j<40; j++) {
       cout<<b[j];
+      out<<b[j];
       if (b[j]) candidates++; else non_candidates++;
     }
+    out << endl;
     cout<<" "<< ((double)non_candidates)/(candidates+non_candidates)*100 << "% of candidates eliminated"<<endl;
+    double dif = difftime(mid, start);
+    cout<<"average "<<dif/(non_candidates+candidates)<<" seconds per feature pair" << endl;
   }
+
+  out.close();
 
   time (&end);
   double dif = difftime (end,start);
