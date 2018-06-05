@@ -31,10 +31,10 @@ class Feature : public RefCnt {
     }
 
     if (this->p.size() == 2 && this->p.size() == 2) {
-      p_new.push_back(new SumPoint(this->p[0], this->p[0]));
-      p_new.push_back(new SumPoint(this->p[0], this->p[1]));
-      p_new.push_back(new SumPoint(this->p[1], this->p[1]));
-      p_new.push_back(new SumPoint(this->p[1], this->p[0]));
+      p_new.push_back(new SumPoint(this->p[0], that->p[0]));
+      p_new.push_back(new SumPoint(this->p[0], that->p[1]));
+      p_new.push_back(new SumPoint(this->p[1], that->p[1]));
+      p_new.push_back(new SumPoint(this->p[1], that->p[0]));
       return new Feature(p_new);
     }
 
