@@ -115,6 +115,67 @@ struct CompareZ {
   return p;
 }*/
 
+Primitive4(InOrderVertices, PTR<Point>, p0, PTR<Point>, p1, PTR<Point>, p2, PTR<Point>, p3);
+int InOrderVertices::sign() {
+  PV3 n1  = (p1->getP()-p0->getP()).cross(p2->getP()-p0->getP());
+  PV3 n2  = (p2->getP()-p1->getP()).cross(p3->getP()-p1->getP());
+
+  if (n1.dot(n2) > 0) {
+    return 1;
+  }
+  return 0;
+}
+
+void saveTriangulation(const char * filename, std::vector<OuterApproxFace> & splitTList) {
+  ofstream out;
+  out.open(filename);
+
+
+  int ntrapezoids = 0;
+  for (std::vector<OuterApproxFace>::iterator it=splitTList.begin(); it!=splitTList.end(); ++it)
+    if (it->isTrapazoid)
+      ntrapezoids++;
+
+  out << "# vtk DataFile Version 3.0\nvtk output\nASCII\nDATASET POLYDATA\nPOINTS "<<3*(splitTList.size()-ntrapezoids)+4*ntrapezoids<<" double"<<endl;
+
+  for (std::vector<OuterApproxFace>::iterator it=splitTList.begin(); it!=splitTList.end(); ++it) {
+    //if the polyhedron is a trapezoid, we need to make sure we're printing them in the right order
+    bool swap = it->isTrapazoid && (InOrderVertices(it->top1->p, it->top2->p, it->bottom1->p, it->bottom2->p) == 0);
+
+    out << it->top1->p->getApprox().getX().mid() << " "
+        << it->top1->p->getApprox().getY().mid() << " "
+        << it->top1->p->getApprox().getZ().mid() << endl;
+    if (it->top2 != NULL)
+      out << it->top2->p->getApprox().getX().mid() << " "
+          << it->top2->p->getApprox().getY().mid() << " "
+          << it->top2->p->getApprox().getZ().mid() << endl;
+    if (!swap)
+      out << it->bottom1->p->getApprox().getX().mid() << " "
+          << it->bottom1->p->getApprox().getY().mid() << " "
+          << it->bottom1->p->getApprox().getZ().mid() << endl;
+    if (it->bottom2 != NULL)
+      out << it->bottom2->p->getApprox().getX().mid() << " "
+          << it->bottom2->p->getApprox().getY().mid() << " "
+          << it->bottom2->p->getApprox().getZ().mid() << endl;
+    if (swap)
+      out << it->bottom1->p->getApprox().getX().mid() << " "
+          << it->bottom1->p->getApprox().getY().mid() << " "
+          << it->bottom1->p->getApprox().getZ().mid() << endl;
+  }
+
+  out << "POLYGONS "<<splitTList.size()<<" "<<4*(splitTList.size()-ntrapezoids)+5*ntrapezoids<<endl;
+  int index = 0;
+  for (std::vector<OuterApproxFace>::iterator it=splitTList.begin(); it!=splitTList.end(); ++it) {
+    out << (it->isTrapazoid? 4 : 3) << " ";
+    out << index++ << " " << index++ << " " << index++;
+    if (it->isTrapazoid)
+      out << " " << index++;
+    out << endl;
+  }
+
+  out.close();
+}
+
 //generate 3 outer approximation points from rotate point p around the origin, add them to pList
 void pointOuterApprox(Points &pList, OuterApproxVertex * p) {
   pList.push_back(p->p);
@@ -299,6 +360,7 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, PTR<Object<Param
   tList.clear();
 
   cout<<"split triangles"<<endl;
+  saveTriangulation("triangulation.vtk", splitTList);
 
   std::vector<Polyhedron *> polyList;
   for (int i=0; i<splitTList.size(); i++) {
