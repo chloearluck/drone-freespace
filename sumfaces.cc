@@ -10,8 +10,17 @@ void save(PTR<Feature> feature, const char * filename) {
     out << feature->p[i]->getApprox().getX().mid() << " " <<
            feature->p[i]->getApprox().getY().mid() << " " <<
            feature->p[i]->getApprox().getZ().mid() << endl;
-  out << "POLYGONS "<<"1 "<<feature->p.size()+1<<endl;
-  out << feature->p.size() << " 0 1 2" << (feature->p.size() == 4? " 3" : "") << endl;
+  
+  if (feature->p.size() >= 3) {
+    out << "POLYGONS "<<"1 "<<feature->p.size()+1<<endl;
+    out << feature->p.size() << " 0 1 2" << (feature->p.size() == 4? " 3" : "") << endl;
+  } else {
+    out << "LINES 1 " << feature->p.size()+1 << endl;
+    if (feature->p.size() == 1)
+      out << "1 0" << endl;
+    else
+      out << "2 0 1" << endl;
+  }
   out.close();
 }
 
@@ -47,7 +56,7 @@ void save(Face * f, const char * filename) {
 }
 
 void debug(PTR<Feature> feature, Edge * e, Face * f, int angle_range, int debug_msg) {
-  if (random()/((double)RAND_MAX) < 0.1 && debug_msg != 0 && debug_msg != 1) {
+  if (random()/((double)RAND_MAX) < 0.5 /*&& debug_msg != 0 && debug_msg != 1*/) {
     cout<<"angle range: "<<angle_range<<endl;
     save(feature, "sumface.vtk");
     if (e != NULL)
@@ -97,6 +106,9 @@ int FaceEdgeIntersect::sign() {
 
 bool * candidatePairs(PTR<Feature> fobs, PTR<Feature> frob, PTR<Point> sin_cos_alpha, PTR<Point> sin_cos_alpha_sample, std::vector<Polyhedron*> & blockspaces, int n_samples) {
   bool * candidate = new bool[blockspaces.size()];
+
+  if (DEBUG) save(fobs, "fosb.vtk");
+  if (DEBUG) save(frob, "frob.vtk");
 
   for (int i=0; i<blockspaces.size(); i++) {
     candidate[i] = false;
