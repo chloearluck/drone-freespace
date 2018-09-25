@@ -5,8 +5,9 @@
 
 const bool BLOCKSPACES_FROM_FILE = true;
 const bool GENERATE_INPUT_FILE = false;
-const bool GENERATE_ANGLE_RANGES_FILE = false;
+const bool GENERATE_ANGLE_RANGES_FILE = true;
 const bool COMPARE_LIFESPANS = true;
+const bool OUTFILE_IN_LIFESPAN_ORDER = false;
 
 double tanHalfAngle (int n) {
   return tan((1.0 + 1.0e-8) * M_PI / n);
@@ -201,9 +202,15 @@ void testLifeSpans(std::string directory, std::string outfile, int num_rotations
   char s[50];
   int lifespan_candidates = 0;
   int eliminated_candidates = 0;
+
+  ofstream out;
+  if (OUTFILE_IN_LIFESPAN_ORDER) 
+    out.open((directory + "/faces-out.txt").c_str());
     
 
+  Parameter::disable();
   while (infile >> s >> n[0] >> n[1] >> n[2] >> n[3] >> n[4] >> n[5]) {
+    Parameter::enable();
     assert(strcmp(s,"face") == 0);
     cout << s << ": " << n[0] << " " << n[1] << " " << n[2] << " " << n[3] << " " << n[4] << " " << n[5] << endl;
 
@@ -236,8 +243,13 @@ void testLifeSpans(std::string directory, std::string outfile, int num_rotations
     cout << endl;
 
     cout << "angle ranges from approximation:  ";
-    for (int i=0; i< num_rotations; i++)
+    for (int i=0; i< num_rotations; i++) {
       cout << b2[i];
+      if (OUTFILE_IN_LIFESPAN_ORDER)
+        out << b2[i];
+    }
+    if (OUTFILE_IN_LIFESPAN_ORDER)
+      out << endl;
     cout << endl;
 
     cout << "result: ";
@@ -256,7 +268,13 @@ void testLifeSpans(std::string directory, std::string outfile, int num_rotations
         cout << "1"; //the candidate can't be eliminated
     }
     cout << endl << "\%:" << ((double)eliminated_candidates)/lifespan_candidates*100 << endl;
+    cout << "eliminated_candidates: " << eliminated_candidates << endl;
+    cout << "lifespan_candidates: " << lifespan_candidates << endl;
+    Parameter::disable();
   }
+  Parameter::enable();
+  if (OUTFILE_IN_LIFESPAN_ORDER)
+      out.close();
 }
 
 int main (int argc, char *argv[]) {
@@ -299,6 +317,7 @@ int main (int argc, char *argv[]) {
       blockspaces[i]->computeWindingNumbers();
 
     //read feature pairs
+    robot = robot->negative();
     std::vector<std::pair<PTR<Feature>, PTR<Feature> > > feature_pairs;
     ifstream infile ((dir + "/pairs.txt").c_str());
     int n[6];
