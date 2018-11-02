@@ -12,31 +12,46 @@
 
   This file contains code described in
 
-Robust Complete Path Planning in the Plane
-Victor Milenkovic, Elisha Sacks, and Steven Trac
-Proceedings of the Workshop on the Algorithmic Foundations of Robotics (WAFR)
-pages 37-52, 2012
+  Robust Complete Path Planning in the Plane
+  Victor Milenkovic, Elisha Sacks, and Steven Trac
+  Proceedings of the Workshop on the Algorithmic Foundations of Robotics (WAFR)
+  pages 37-52, 2012
 
-   This code is under development.
-   It is free for use for academic and research purposes.
-   Permission from the authors is required for commercial use.
+  This code is under development.
+  It is free for use for academic and research purposes.
+  Permission from the authors is required for commercial use.
 */
 
-#ifndef OBJECT_H
-#define OBJECT_H
+#ifndef OBJECT
+#define OBJECT
 
-#include "acp.h"
-#include <vector>
+#include "pv.h"
+#include <map>
+#include <limits.h>
 
 namespace acp {
-
+  
 class RefCnt {
   template<class T> friend class PTR;
   int refCnt;
-  void incRef () { refCnt++; }
-  void decRef () { if (--refCnt == 0) delete this; }
+  
+  void incRef () {
+    pthread_mutex_lock(&mutex);
+    refCnt++;
+    pthread_mutex_unlock(&mutex);
+  }
+
+  void decRef () { 
+    pthread_mutex_lock(&mutex);
+    bool flag = --refCnt == 0;
+    pthread_mutex_unlock(&mutex);
+    if (flag)
+      delete this;
+  }
+protected:
+  pthread_mutex_t mutex;
 public:
-  RefCnt () : refCnt(0) {}
+  RefCnt () : refCnt(0) { mutex = PTHREAD_MUTEX_INITIALIZER; }
   virtual ~RefCnt () { assert(refCnt == 0); }
 };
 
@@ -57,214 +72,207 @@ public:
   T *operator-> () const { return t; }
 };
 
-class BaseObject {
-  friend class Primitive;
-  friend class Parameter;
-  template<class P> friend class Object;
-  template<class P> friend class InputObject;
-  friend class Poly;
-  friend class AnglePoly;
+extern pthread_key_t mikey;
+extern pthread_key_t cpkey;
+extern pthread_key_t hsekey;
 
-  static std::vector<BaseObject*> precisionIncreased;
+class BaseObject : public RefCnt {
+protected:
+  static unsigned int deltaPrecision;
+  static unsigned int maxPrecision;
+  static bool throwSignExceptions[128];
 
-  virtual void decreasePrecision () = 0;
+  static unsigned int getPrecision () { return MInt::getPrecision(); }
+  static void setPrecision (unsigned int p) { return MInt::setPrecision(p); }
 
 public:
-  static void decreaseAll () {
-    for (int i = 0; i < precisionIncreased.size(); i++)
-      precisionIncreased[i]->decreasePrecision();
-    precisionIncreased.clear();
+  static bool usePrecisionException;
+
+  static bool & throwSignException () {
+    void *v = pthread_getspecific(hsekey);
+    return v ? *(bool *) v : throwSignExceptions[0];
   }
 
-  virtual ~BaseObject () {
-    for (int i = precisionIncreased.size(); --i >= 0;)
-      if (precisionIncreased[i] == this) {
-        //precisionIncreased[i]->decreasePrecision();
-        precisionIncreased.erase(precisionIncreased.begin()+i);
-      }
+  BaseObject () {}
+  virtual ~BaseObject () {}
+  
+  static void addThread (unsigned int i) {
+    assert(i < 128);
+    pthread_setspecific(mikey, (void *) (MInt::mints + i));
+    pthread_setspecific(cpkey, (void *) (MInt::curPrecisions + i));
+    pthread_setspecific(hsekey, (void *) (throwSignExceptions + i));
+    MInt::curPrecisions[i] = 53u;
+  }    
+};
+
+class PrecisionException : public std::exception {
+public:
+  virtual const char* what() const throw() {
+    return "Maximum precision exceeded";
   }
 };
 
-template<class P> class InputObject;
+extern PrecisionException precisionException;
 
 template<class P>
-class Object : BaseObject, public RefCnt {
-  friend class InputObject<P>;
-  friend class Poly;
-  friend class AnglePoly;
-
-  P p;
+class Object :  public BaseObject {
+  friend class Parameter;
   
-  int size () { return p.size(); }
-  Parameter &get (int i) { return p[i]; }
-
-  // The precision of an empty object is the prevailing precision;
-  // otherwise, it is the precision of the first (0th) coordinate.
-  unsigned int precision () { 
-    return size() == 0 ? Parameter::highPrecision : get(0).precision(); 
-  }
-
-  // "increased" means this object is at the prevailing precision.
-  bool increased () { return precision() == Parameter::highPrecision; }
-
-  void increasePrecision () {
-    // std::cout << "increasing precision of " << this << std::endl;
-    for (int i = 0; i < size(); i++)
-      get(i).increasePrecision();
-  }
-
-  void decreasePrecision () {
-    // std::cout << "decreasing precision of " << this << std::endl;
-    for (int i = 0; i < size(); i++)
-      get(i).decreasePrecision();
-  }
+  P p;
 
   virtual P calculate () {
-    if (uninitialized())
-      std::cerr << "An extension of Object must call set(p) in the constructor "
-                << "or override calculate()" << std::endl;
-    assert(!uninitialized());
-    if (size() > 0 && get(0).lb() < get(0).ub())
-      std::cerr << "Calculate is not overridden but coordinates are non-trivial intervals.\n";
-    assert(!(size() > 0 && get(0).lb() < get(0).ub()));
-    return getCurrentValue();
+    if (!input())
+      cerr << "Object<P> missing calculate method" << endl;
+    assert(0);
   }
 
-public:
-  // An empty object is assumed to be uninitialized, although the user
-  // might really want it to be an empty object.
-  bool uninitialized () { return size() == 0 || get(0).uninitialized(); }
-
-  const P &getCurrentValue () {
-    assert(!uninitialized());
-    int precis = precision();
-    if (precis < Parameter::highPrecision) {
-      increasePrecision();
-      if (precis == 53u)
-        precisionIncreased.push_back(this);
-    }
-    return p;
-  }
-
-  const P &get () {
-    assert(!Parameter::handleSignException);
-    int precis = uninitialized() ? 0 : precision();
-    if (precis < Parameter::highPrecision) {
-      p = calculate();
-
-      if (Parameter::highPrecision > 53u && precis <= 53u)
-        precisionIncreased.push_back(this);
-    }
-    else
-      assert(precis == Parameter::highPrecision);
-    return p;
-  }
-
-  void copyMod (P q) {
-    assert(p.size() == q.size());
-    for (int i = 0; i < p.size(); i++)
-      p[i].copyMod(q[i]);
-  }
-
-  const P &getApprox (double accuracy=1e-17) {
-    int precis = uninitialized() ? 0 : precision();
-    if (precis < Parameter::highPrecision || 
-        !checkAccuracy(accuracy, true)) {
-      if (Parameter::handleSignException)
-        safe_setp(accuracy);
-      else {
-	p = calculate();
-	if (Parameter::highPrecision > 53u && precis <= 53u)
-	  precisionIncreased.push_back(this);
-        checkAccuracy(accuracy);
-      }
-
-      if (Parameter::highPrecision > 53u && precis <= 53u)
-        precisionIncreased.push_back(this);
-    }
-    else
-      assert(precis == Parameter::highPrecision);
-    return p;
-  }
-
-  void set (const P &p) {
-    assert(uninitialized());
-    this->p = p;
-    assert(!uninitialized());
-    if (precision() > 53u && size() > 0)
-      precisionIncreased.push_back(this);
-  }
-
-private:
-  void safe_setp (double accuracy) {
-    assert(Parameter::handleSignException == true);
-    Parameter::handleSignException = false;
-    int precis = uninitialized() ? 0 : precision();
-    bool failed = false;
-    while (true)
-      try {
-	if (uninitialized() || precision() < Parameter::highPrecision)
-	  p = calculate();
-        checkAccuracy(accuracy);
-        if (failed) {
-          decreasePrecision();  // ???
-          decreaseAll();
-          Parameter::highPrecision = 53u;
-        }
-        Parameter::handleSignException = true;
-        return;
-      } catch (SignException se) {
-        failed = true;
-      }
-  }
-
-  bool checkAccuracy (double accuracy, bool nothrow=false) {
-    if (accuracy == 1.0) return true;
+  bool checkAccuracy (double acc) {
+    if (acc == 1.0) return true;
     for (int i = 0; i < p.size(); i++) {
-      Parameter &x = p[i];
-      if (nothrow && p[i].lb() < p[i].ub() && p[i].sign(false) == 0)
+      double l = p[i].lb(), u = p[i].ub();  
+      if ((l < 0.0 && u >= 0.0) || (l <= 0.0 && u > 0.0))
 	return false;
-      int s = p[i].sign();
-      if (s == 0) {
-        x = Parameter::constant(0);
-        continue;
-      }
-
-      double l = x.lb();
-      double u = x.ub();
-
-      if ((l > 0 && u - l > accuracy * l) ||
-          (u < 0 && u - l > accuracy * -u)) {
-        double m = (l + u) / 2;
-	double lm = (l + m) / 2;
-	double mu = (m + u) / 2;
-	if ((l < lm) + (lm < m) + (m < mu) + (mu < u) <= 3)
-        // if (l == m || m == u)
-          continue;
-        if (!nothrow)
-          (x - m).sign();
-        return false;
+      if ((l > 0.0 && u - l > l*acc) || (u < 0.0 && u - l > - u*acc)) {
+	double ln = nextafter(l, 1.0 + u);
+	if (ln < u) {
+	  ln = nextafter(ln, 1.0 + u);
+	  if (ln < u)
+	    return false;
+	}
       }
     }
     return true;
   }
-};
 
-template<class P>
-class InputObject : public Object<P> {
 public:
-  InputObject (const P &q) { 
-    P &p = *(P*)&q;
-    for (int i = 0; i < p.size(); i++)
-      if (p[i].lb() < p[i].ub()) {
+  Object () {}
+  
+  Object (const P& q) : p(q) {
+    for (int i = 0; i < p.size(); i++) {
+      if (p[i].high())
+        p[i].decreasePrecision();
+      if (p[i].lb() != p[i].ub()) {
         std::cerr << "Input object has non-trivial interval." << std::endl;
         assert(0);
       }
-    Object<P>::set(p); 
+    }
   }
 
-  virtual P calculate () {
-    return Object<P>::getCurrentValue();
+  ~Object () { 
+    for (int i = 0; i < p.size(); i++)
+      if (p[i].high())
+        delete p[i].u.m;
+  }
+  
+  int precision () const { return p.size() == 0 ? 0 : p[0].precision(); }
+  bool uninitialized () const { return p.size() == 0 ? 0 : p[0].uninitialized(); }
+
+  bool input () {
+    if (p.size() == 0)
+      return false;
+    for (int i = 0; i < p.size(); i++)
+      if (p[i].high() || p[i].lb() != p[i].ub())
+        return false;
+    return true;
+  }
+
+  P getCurrentP () const { 
+    P q = p;
+    if (precision() == 53u && MInt::getPrecision() > 53u)
+      for (int i = 0; i < q.size(); i++)
+        q[i].increasePrecision();
+    return q;
+  }
+
+  P get () {
+    try {
+      pthread_mutex_lock(&mutex);
+      P q = get1();
+      pthread_mutex_unlock(&mutex);
+      return q;
+    }
+    catch (SignException se) {
+      pthread_mutex_unlock(&mutex);
+      throw se;
+    }
+    catch (unsigned int p) {
+      pthread_mutex_unlock(&mutex);
+      throw p;
+    }
+  }
+
+private:
+  P get1 () {
+    if (MInt::getPrecision() == 53u && p.size() > 0 && p[0].low() && !p[0].uninitialized())
+      return p;        
+
+    unsigned int precObject = precision();
+    unsigned int precNeeded = MInt::getPrecision();
+
+    if (precObject >= precNeeded && 
+        (precObject == 53u || p[0].hasTheRightPrimes())) {
+      if (precObject == 53u || precNeeded > 53u)
+        return p;
+      P q = p;
+      for (int i = 0; i < q.size(); i++)
+        q[i].decreasePrecision();
+      return q;
+    }
+
+    if (input()) {
+      P q = p;
+      for (int i = 0; i < p.size(); i++)
+        q[i].increasePrecision();
+      return q;
+    }
+
+    if (precNeeded == 53u)
+      return p = calculate();
+
+    P q = calculate();
+    for (int i = 0; i < q.size(); i++)
+      if (q[i].zeroMod())
+        q[i] = Parameter::constant(0.0);
+
+    if (precObject > 53u)
+      for (int i = 0; i < p.size(); i++)
+        delete p[i].u.m;
+
+    p = q;
+
+    for (int i = 0; i < p.size(); i++)
+      p[i].u.m = p[i].u.m->clone();
+
+    return p;
+  }
+
+public:
+  P getApprox (double acc = 1e-17) {
+    try {
+      get();
+      assert(precision() > 0); // DEBUG
+      if (checkAccuracy(acc))
+        return get();
+    }
+    catch (SignException se) {}
+    MInt::setPrecision(212u);
+    while (MInt::getPrecision() <= maxPrecision) {
+      try {
+        get();
+        assert(precision() > 0); // DEBUG
+        if (checkAccuracy(acc)) {	
+          MInt::setPrecision(53u);
+          return get();
+        }
+      }
+      catch (SignException se) {}
+      MInt::setPrecision(MInt::getPrecision() + deltaPrecision);
+    }
+    if (usePrecisionException || precision() == 0)
+      throw precisionException;
+    setPrecision(53u);
+    assert(precision() > 0); // DEBUG
+    return get();
   }
 };
 
@@ -280,79 +288,85 @@ public:
   }
 };
 
-class Primitive {
-  // Calculate the sign from the objects.
+class Primitive : public BaseObject {
   virtual int sign () = 0;
-  
 public:
   operator int () {
-    if (!Parameter::handleSignException)
+    if (MInt::getPrecision() > 53u || throwSignException())
       return sign();
-    Parameter::handleSignException = false;
-    bool failed = false;
-    while (true)
+    try {
+      return sign();
+    }
+    catch (SignException se) {}
+    setPrecision(106u);
+    while (MInt::getPrecision() <= maxPrecision) {
       try {
         int s = sign();
-        if (failed) {
-          BaseObject::decreaseAll();
-          Parameter::highPrecision = 53u;
-        }
-        Parameter::handleSignException = true;
+        MInt::setPrecision(53u);
         return s;
-      } catch (SignException se) {
-        failed = true;
       }
+      catch (unsigned int p) {
+        ModInt::changePrime(p);
+      }
+      catch (SignException se) {
+        if (getPrecision() == 106u)
+          MInt::setPrecision(212u);
+        else
+          MInt::setPrecision(MInt::getPrecision() + deltaPrecision);
+      }
+    }
+    if (usePrecisionException)
+      throw precisionException;
+    MInt::setPrecision(53u);
+    return 0;
   }
-
-  int unsafe () { return sign(); }
 };
 
-}  
+}
 
-// Macro to create one-argument primitive.
-#define Primitive1(P, t1, v1)                                    \
-  class P : public acp::Primitive {                              \
-    t1 v1;                                                       \
-  int sign ();                                                   \
-  public:                                                        \
-  P (t1 v1) : v1(v1) {}                                          \
+#define DeclareSign				\
+  private:					\
+    int sign ()
+
+#define Primitive1(P, t1, v1)		\
+  class P : public acp::Primitive {	\
+    int sign();				\
+    t1 v1;				\
+  public:				\
+    P (t1 v1) : v1(v1) {}		\
   };
 
-// Macro to create two-argument primitive.
-#define Primitive2(P, t1, v1, t2, v2)                            \
-  class P : public acp::Primitive {                              \
-    t1 v1; t2 v2;                                                \
-  int sign ();                                                   \
-  public:                                                        \
-  P (t1 v1, t2 v2) : v1(v1), v2(v2) {}                           \
+#define Primitive2(P, t1, v1, t2, v2)		\
+  class P : public acp::Primitive {		\
+    int sign();					\
+    t1 v1; t2 v2;				\
+  public:					\
+    P (t1 v1, t2 v2) : v1(v1), v2(v2) {}	\
   };
 
-// Macro to create three-argument primitive.
-#define Primitive3(P, t1, v1, t2, v2, t3, v3)                       \
-  class P : public acp::Primitive {                                 \
-    t1 v1; t2 v2; t3 v3;                                            \
-  int sign ();                                                      \
-  public:                                                           \
-  P (t1 v1, t2 v2, t3 v3) : v1(v1), v2(v2), v3(v3) {}               \
+#define Primitive3(P, t1, v1, t2, v2, t3, v3)		\
+  class P : public acp::Primitive {			\
+    int sign();						\
+    t1 v1; t2 v2; t3 v3;				\
+  public:						\
+    P (t1 v1, t2 v2, t3 v3) : v1(v1), v2(v2), v3(v3) {}	\
   };
 
-// Macro to create four-argument primitive.
-#define Primitive4(P, t1, v1, t2, v2, t3, v3, t4, v4)                 \
-  class P : public acp::Primitive {                                   \
-    t1 v1; t2 v2; t3 v3; t4 v4;                                       \
-    int sign ();                                                      \
-  public:                                                             \
-  P (t1 v1, t2 v2, t3 v3, t4 v4) : v1(v1), v2(v2), v3(v3), v4(v4) {}  \
+#define Primitive4(P, t1, v1, t2, v2, t3, v3, t4, v4)			\
+  class P : public acp::Primitive {					\
+    int sign();								\
+    t1 v1; t2 v2; t3 v3; t4 v4;						\
+  public:								\
+    P (t1 v1, t2 v2, t3 v3, t4 v4) : v1(v1), v2(v2), v3(v3), v4(v4) {}	\
   };
 
-// Macro to create five-argument primitive.
-#define Primitive5(P, t1, v1, t2, v2, t3, v3, t4, v4, t5, v5)           \
-  class P : public acp::Primitive {                                     \
-    t1 v1; t2 v2; t3 v3; t4 v4; t5 v5;                                  \
-    int sign ();                                                        \
-  public:                                                               \
-  P (t1 v1, t2 v2, t3 v3, t4 v4, t5 v5)                                 \
-    : v1(v1), v2(v2), v3(v3), v4(v4), v5(v5) {}                         \
+#define Primitive5(P, t1, v1, t2, v2, t3, v3, t4, v4, t5, v5)	\
+  class P : public acp::Primitive {				\
+    int sign();							\
+    t1 v1; t2 v2; t3 v3; t4 v4; t5 v5;				\
+  public:							\
+    P (t1 v1, t2 v2, t3 v3, t4 v4, t5 v5)			\
+      : v1(v1), v2(v2), v3(v3), v4(v4), v5(v5) {}		\
   };
 
 #endif

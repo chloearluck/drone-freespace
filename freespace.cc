@@ -107,7 +107,7 @@ class OuterApproxFace {
 };
 
 Primitive2(DiffZ, PTR<Point>, i, PTR<Point>, j);
-int DiffZ::sign() { return (i->getP().getZ() - j->getP().getZ()).sign(); }
+int DiffZ::sign() { return (i->get().z - j->get().z).sign(); }
 struct CompareZ {
   bool operator()(PTR<Point> i, PTR<Point> j) {
     return (DiffZ(i, j) < 0); 
@@ -140,8 +140,8 @@ struct CompareZ {
 
 Primitive4(InOrderVertices, PTR<Point>, p0, PTR<Point>, p1, PTR<Point>, p2, PTR<Point>, p3);
 int InOrderVertices::sign() {
-  PV3 n1  = (p1->getP()-p0->getP()).cross(p2->getP()-p0->getP());
-  PV3 n2  = (p2->getP()-p1->getP()).cross(p3->getP()-p1->getP());
+  PV3 n1  = (p1->get()-p0->get()).cross(p2->get()-p0->get());
+  PV3 n2  = (p2->get()-p1->get()).cross(p3->get()-p1->get());
 
   if (n1.dot(n2) > 0) {
     return 1;
@@ -204,11 +204,11 @@ int FrontDiagonal::sign() {
   //return -1 if the front diagonal is top2 bottom1
   //return  1 if the front diagonal is top1 bottom2
   //bottom3 is the following point on the bottom pentagon 
-  PV3 t1 = top1->getP()->getP();
-  PV3 t2 = top2->getP()->getP();
-  PV3 b1 = bottom1->getP()->getP();
-  PV3 b2 = bottom2->getP()->getP();
-  PV3 b3 = bottom3->getP()->getP();
+  PV3 t1 = top1->getP()->get();
+  PV3 t2 = top2->getP()->get();
+  PV3 b1 = bottom1->getP()->get();
+  PV3 b2 = bottom2->getP()->get();
+  PV3 b3 = bottom3->getP()->get();
   //if b2 is on the same side of triangle t1 t2 b1 as b3, return -1
   if ( vol(t1, t2, b1, b2).sign() == vol(t1, t2, b1, b3).sign() )
     return -1;
@@ -218,8 +218,8 @@ int FrontDiagonal::sign() {
 
 Primitive3(Area2D, PTR<Point>, a, PTR<Point>, b, PTR<Point>, c);
 int Area2D::sign() {
-  PV3 v1 = b->getP()-a->getP();
-  PV3 v2 = c->getP()-a->getP();
+  PV3 v1 = b->get()-a->get();
+  PV3 v2 = c->get()-a->get();
   return (v1.getX()*v2.getY() - v1.getY() * v2.getX()).sign();
 }
 
@@ -241,37 +241,6 @@ Polyhedron * trapezoidOuterApprox(OuterApproxFace t) {
   Vertex * bq_tanint = bottomIsTriangle? a->getVertex(t.bottom1->t) : a->getVertex(t.bottom2->t);
   Vertex * bp_rot = a->getVertex(t.bottom1->r);
   Vertex * bq_rot = bottomIsTriangle? bp_rot : a->getVertex(t.bottom2->r);
-
-  //TO DO: remove this old code
-  /*
-  //top pentagon, triangulated
-  a->addTriangle(tq, tq_tanint, tq_rot);
-  if (!topIsTriangle)
-    if (Area2D(tp_rot->getP(), tq->getP(), tq_rot->getP()) != Area2D(tp_rot->getP(), tq->getP(), tp->getP())) {
-      //drop diagonal p' q
-      a->addTriangle(tp_rot, tp, tq); 
-      a->addTriangle(tp_rot, tq, tq_rot); 
-    } else {
-      //drop diagonal p q'
-      a->addTriangle(tp, tq_rot, tp_rot); 
-      a->addTriangle(tq, tq_rot, tp); 
-      assert(Area2D(tp->getP(), tq_rot->getP(), tq_rot->getP()) != Area2D(tp->getP(), tq_rot->getP(), tq->getP()));
-    }
-
-  //bottom pentagon, triangulated
-  a->addTriangle(bq, bq_tanint, bq_rot);
-  if (!bottomIsTriangle)
-    if (Area2D(bp_rot->getP(), bq->getP(), bq_rot->getP()) != Area2D(bp_rot->getP(), bq->getP(), bp->getP())) {
-      //drop diagonal p' q
-      a->addTriangle(bp_rot, bp, bq); 
-      a->addTriangle(bp_rot, bq, bq_rot); 
-    } else {
-      //drop diagonal p q'
-      a->addTriangle(bp, bq_rot, bp_rot); 
-      a->addTriangle(bq, bq_rot, bp); 
-      assert(Area2D(bp->getP(), bq_rot->getP(), bq_rot->getP()) != Area2D(bp->getP(), bq_rot->getP(), bq->getP()));
-    }
-  */
 
   //top pentagon, triangulated
   if (topIsTriangle) {
@@ -371,7 +340,7 @@ Polyhedron * trapezoidOuterApprox(OuterApproxFace t) {
     a->addTriangle(tp_rot, bp, tp);
   }
 
-  //DEBUG ONLY
+  //DEBUG 
   a->computeWindingNumbers();
   if (a->cells.size() != 2) {
     cout << "trapezoids outer approximation has "<<a->cells.size()<<" cells"<<endl;
@@ -501,15 +470,15 @@ Polyhedron * rotate(Polyhedron * p) {
 
 Primitive3(RequiresVerticalSplit, OuterApproxFace, f, PTR<Object<Parameter> >, sin2theta, PTR<Object<Parameter > >, Rtheta);
 int RequiresVerticalSplit::sign() {
-  Parameter dh = f.top1->p->getP().getZ() - f.bottom1->p->getP().getZ();
+  Parameter dh = f.top1->p->get().getZ() - f.bottom1->p->get().getZ();
   if (dh > Rtheta->get()) {
     return 1;
   }
   //p p' side
-  PV3 t1 = f.top1->p->getP();
-  PV3 t2 = f.top1->r->getP();
-  PV3 b1 = f.bottom1->p->getP();
-  PV3 b2 = f.bottom1->r->getP();
+  PV3 t1 = f.top1->p->get();
+  PV3 t2 = f.top1->r->get();
+  PV3 b1 = f.bottom1->p->get();
+  PV3 b2 = f.bottom1->r->get();
   PV3 vt = t2-t1;
   PV3 vb = b2-b1;
   Parameter vtxvb = vt.getX()*vb.getY() - vt.getY()*vb.getX();
@@ -518,10 +487,10 @@ int RequiresVerticalSplit::sign() {
     return 1;
 
   //q t side
-  t1 = (f.top2 != NULL? f.top2->p->getP() : f.top1->p->getP());
-  t2 = (f.top2 != NULL? f.top2->t->getP() : f.top1->t->getP());
-  b1 = (f.bottom2 != NULL? f.bottom2->p->getP() : f.bottom1->p->getP());
-  b2 = (f.bottom2 != NULL? f.bottom2->t->getP() : f.bottom1->t->getP());
+  t1 = (f.top2 != NULL? f.top2->p->get() : f.top1->p->get());
+  t2 = (f.top2 != NULL? f.top2->t->get() : f.top1->t->get());
+  b1 = (f.bottom2 != NULL? f.bottom2->p->get() : f.bottom1->p->get());
+  b2 = (f.bottom2 != NULL? f.bottom2->t->get() : f.bottom1->t->get());
   vt = t2-t1;
   vb = b2-b1;
   vtxvb = vt.getX()*vb.getY() - vt.getY()*vb.getX();
@@ -532,8 +501,8 @@ int RequiresVerticalSplit::sign() {
     return 1;
 
   //q' t side (QUESTION: identical to q t? hence redundant)
-  t1 = (f.top2 != NULL? f.top2->r->getP() : f.top1->r->getP());
-  b1 = (f.bottom2 != NULL? f.bottom2->r->getP() : f.bottom1->r->getP());
+  t1 = (f.top2 != NULL? f.top2->r->get() : f.top1->r->get());
+  b1 = (f.bottom2 != NULL? f.bottom2->r->get() : f.bottom1->r->get());
   vt = t2-t1;
   vb = b2-b1;
   vtxvb = vt.getX()*vb.getY() - vt.getY()*vb.getX();
@@ -612,7 +581,7 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, PTR<Object<Param
   for (int i=0; i<splitTList2.size(); i++) {
     polyList.push_back(trapezoidOuterApprox(splitTList2[i]));
   }
-  cout<<"found polyhedral outer approximations of each trapezoid"<<endl;
+  cout<<"found polyhedral outer approximations of "<<polyList.size()<<" trapezoids"<<endl;
 
   Polyhedron * outerApproxShell = multiUnion(&polyList[0], polyList.size());
   cout <<"done multiUnion"<<endl;
@@ -653,4 +622,5 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, PTR<Object<Param
   for (int i=0; i< numRotations; i++)
     delete allRotations[i];
   allRotations.clear(); 
+
 }

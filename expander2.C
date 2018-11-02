@@ -205,7 +205,7 @@ bool Expander2::expand () {
 
   IloCplex cplex(model);
 
-  // cplex.exportModel("expand.lp");
+  cplex.exportModel("expand.lp");
 
   cplex.setOut(env.getNullStream());
   if ( !cplex.solve() ) {
@@ -380,7 +380,7 @@ bool Expander2::expand (double e) {
 
   static int iCall = 100;
   string base = "expand";
-  // cplex.exportModel((base + std::to_string(iCall++) + ".lp").c_str());
+  cplex.exportModel((base + std::to_string(iCall++) + ".lp").c_str());
 
   cplex.setOut(env.getNullStream());
   if ( !cplex.solve() ) {
@@ -832,7 +832,7 @@ double Expander2::expandV2 (double e, bool velocityObjective, double velocityBou
   IloCplex cplex(model);
 
   string base = "expand";
-  // cplex.exportModel((base + std::to_string(iCall++) + ".lp").c_str());
+  cplex.exportModel((base + std::to_string(iCall++) + ".lp").c_str());
 
   cplex.setOut(env.getNullStream());
   //cplex.setParam(IloCplex::RootAlg, IloCplex::Primal);

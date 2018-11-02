@@ -31,7 +31,8 @@ namespace acp {
 
 class PV2 {
 public:
-  int size () { return 2; }
+  int size () const { return 2; }
+  const Parameter &operator[] (int i) const { return i == 0 ? x : y; }
   Parameter &operator[] (int i) { return i == 0 ? x : y; }
 
   PV2 () {}
@@ -42,8 +43,6 @@ public:
     return PV2(Parameter::constant(x), Parameter::constant(y));
   }
   PV2 (const Parameter &ix, const Parameter &iy) : x(ix), y(iy) {}
-  PV2 (const PV2 &p) : x(p.x), y(p.y) {}
-  PV2 & operator= (const PV2 &p) { x = p.x; y = p.y; return *this; }
   bool uninitialized () { return x.uninitialized() && y.uninitialized(); }
   Parameter getX () const { return x; }
   Parameter getY () const { return y; }
@@ -71,11 +70,12 @@ public:
 };
 
 inline PV2 operator* (double k, PV2 v) { return v * k; }
+
 inline PV2 operator* (const Parameter &k, PV2 v) { return v * k; }
 
 class PV3 {
  public:
-  int size () { return 3; }
+  int size () const { return 3; }
 
   PV3 () {}
   static PV3 input (double x, double y, double z) {
@@ -90,9 +90,6 @@ class PV3 {
   }
   PV3 (const Parameter &ix, const Parameter &iy, const Parameter &iz)
     : x(ix), y(iy), z(iz) {}
-  PV3 (const PV3 &p) : x(p.x), y(p.y), z(p.z) {}
-  PV3 & operator= (const PV3 &p) 
-    { x = p.x; y = p.y; z = p.z; return *this; }
 
   bool uninitialized () { return x.uninitialized() && y.uninitialized() && z.uninitialized(); }
 
@@ -100,6 +97,7 @@ class PV3 {
   Parameter getY () const { return y; }
   Parameter getZ () const { return z; }
 
+  const Parameter &operator[] (int i) const { return i == 0 ? x : i == 1 ? y : z; }
   Parameter &operator[] (int i) { return i == 0 ? x : i == 1 ? y : z; }
 
   Parameter dot (const PV3 &b) const { 
@@ -152,6 +150,7 @@ class PV3 {
 };
 
 inline PV3 operator* (double k, PV3 v) { return v * k; }
+
 inline PV3 operator* (const Parameter &k, PV3 v) { return v * k; }
 
 }

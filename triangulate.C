@@ -201,7 +201,7 @@ void triangulateLoop (const Vertices2 &u, Triangles &tr)
   stack.push_back(u[1]);
   int n = u.size();
   for (int i = 2; i + 1 < n; ++i)
-    if (u[i]->flag == (*stack.rbegin())->flag)
+    if (u[i]->flag == stack.back()->flag)
       triangulateSame(u[i], stack, tr);
     else
       triangulateOther(u[i], stack, tr);

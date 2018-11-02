@@ -6,12 +6,12 @@ Polyhedron * minkowskiSum (Polyhedron *a, Polyhedron *b)
   Octree<Face *> *octree = con->faceOctree();
   Polyhedron *c = new Polyhedron(a->perturbed);
   PVMap pvmap;
-  FaceSet fdone, fs;
+  set<Face *> fdone, fs;
   Face *f0 = con->minkowskiInit(fdone, octree, c, pvmap);
   Faces st;
   st.push_back(f0);
   while (!st.empty()) {
-    Face *f = *st.rbegin();
+    Face *f = st.back();
     st.pop_back();
     if (fs.insert(f).second)
       con->expand(fdone, octree, c, pvmap, f, st);
@@ -23,7 +23,15 @@ Polyhedron * minkowskiSum (Polyhedron *a, Polyhedron *b)
   return d;
 }
 
-Face * Convolution::minkowskiInit (FaceSet &fdone, Octree<Face *> *octree,
+int NormalOrderR::sign ()
+{
+  PV3 m = p->get().n, n = q->get().n, r = Rdir->get();
+  Parameter mm = m.dot(m), mr = m.dot(r), nn = n.dot(n), nr = n.dot(r),
+    k = nr*nr*mm - mr*mr*nn;
+  return k.sign();
+}
+
+Face * Convolution::minkowskiInit (set<Face *> &fdone, Octree<Face *> *octree,
 				   Polyhedron *a, PVMap &pvmap)
 {
   Vertex *v;
@@ -47,28 +55,29 @@ Face * Convolution::rmaxFace (Vertex *&v)
     for (HEdges::iterator h = (*e)->hedges.begin(); h != (*e)->hedges.end(); ++h)
       if ((*h)->tail() == v) {
 	Face *g = (*h)->f;
-	if (!f || f->p.id != g->p.id && NormalOrderR(f->getP(), g->getP()) == 1)
+	if (!f || f->getP()->id != g->getP()->id &&
+	    NormalOrderR(f->getP(), g->getP()) == 1)
 	  f = g;
       }
   return f;
 }
 
-void Convolution::subdivide (Face *f, FaceSet &fdone, Octree<Face *> *octree,
+void Convolution::subdivide (Face *f, set<Face *> &fdone, Octree<Face *> *octree,
 			     Polyhedron *a, PVMap &pvmap)
 {
   if (!fdone.insert(f).second)
     return;
-  iedges.clear();
+  newEdges.clear();
   intersectFF(f, fdone, octree);
   intersectFFF(f, fffvmap);
-  for (EdgeSet::iterator e = iedges.begin(); e != iedges.end(); ++e)
+  for (EdgeSet::iterator e = newEdges.begin(); e != newEdges.end(); ++e)
     (*e)->sortVertices();
   int nf = a->faces.size();
   subfaces(f, a, pvmap);
   sortHEdges(a, nf);
 }
 
-void Convolution::intersectFF (Face *f, const FaceSet &fdone, 
+void Convolution::intersectFF (Face *f, const set<Face *> &fdone, 
 			       Octree<Face *> *octree)
 {
   Faces ff;
@@ -78,7 +87,7 @@ void Convolution::intersectFF (Face *f, const FaceSet &fdone,
       Polyhedron::intersectFF(f, *g, efvmap);
 }
 
-void Convolution::expand (FaceSet &fdone, Octree<Face *> *octree,
+void Convolution::expand (set<Face *> &fdone, Octree<Face *> *octree,
 			  Polyhedron *a, PVMap &pvmap, Face *f, Faces &st)
 {
   HEdges he;
@@ -106,14 +115,6 @@ void Convolution::neighborFaces (HEdge *e, Faces &fa) const
   }
 }
 
-int NormalOrderR::sign ()
-{
-  PV3 m = p->getN(), n = q->getN(), r = Rdir.getP();
-  Parameter mm = m.dot(m), mr = m.dot(r), nn = n.dot(n), nr = n.dot(r),
-    k = nr*nr*mm - mr*mr*nn;
-  return k.sign();
-}
-
 void sortHEdges (Polyhedron *a, int nf)
 {
   EdgeSet es;
@@ -125,6 +126,11 @@ void sortHEdges (Polyhedron *a, int nf)
   }
   for (EdgeSet::iterator e = es.begin(); e != es.end(); ++e)
     (*e)->sortHEdges();
+}
+
+int TripleProduct::sign ()
+{
+  return a->get().tripleProduct(b->get(), c->get()).sign();
 }
 
 void sphereBBox (Edge *e, double *bbox)
@@ -230,20 +236,24 @@ void merge (double *bbox1, double *bbox2)
   }
 }
 
-BSPElt::BSPElt (Vertex *v, const HEdges &ed) : l(0u), ed(ed)
+BSPElt::BSPElt (Vertex *v, const HEdges &ed, bool convex) : l(0u), ed(ed), convex(convex)
 {
   d.v = v;
-  int m = ed.size();
-  sphereBBox(ed, bbox);
+  if (ed.empty()) {
+    bbox[0] = bbox[2] = bbox[4] = -1.0;
+    bbox[1] = bbox[3] = bbox[5] = 1.0;
+  }
+  else
+    sphereBBox(ed, bbox);
 }
 
-BSPElt::BSPElt (Edge *e) : l(0)
+BSPElt::BSPElt (Edge *e, bool convex) : l(0), convex(convex)
 {
   d.e = e;
   sphereBBox(e, bbox);
 }
 
-BSPElt::BSPElt (Face *f) : l(0)
+BSPElt::BSPElt (Face *f) : l(0), convex(true)
 {
   d.f = f;
   FNormal n(f);
@@ -258,26 +268,17 @@ BSPElt::BSPElt (const BSPElt &x)
   l = x.l;
   for (int i = 0; i < 6; ++i)
     bbox[i] = x.bbox[i];
+  convex = x.convex;
 }
 
 int BSPElt::side (Point *r) const
 {
-  PV3 p(Parameter::interval(bbox[0], bbox[1]),
-	Parameter::interval(bbox[2], bbox[3]),
-	Parameter::interval(bbox[4], bbox[5]));
+  PV3 p(Parameter(Parameter::constant(bbox[0]), Parameter::constant(bbox[1])),
+	Parameter(Parameter::constant(bbox[2]), Parameter::constant(bbox[3])),
+	Parameter(Parameter::constant(bbox[4]), Parameter::constant(bbox[5])));
   Parameter k = p.dot(r->getApprox(1.0));
   return k.sign(false);
 }
-
-/* acp0 version
-int BSPElt::side (Point *r) const
-{
-  PV3 p = r->getP();
-  IParameter x(bbox[0], bbox[1]), y(bbox[2], bbox[3]), z(bbox[4], bbox[5]),
-    k = x*p.x + y*p.y + z*p.z;
-  return k.sign();
-}
-*/
 
 void BSPTree (BSPElts &aelts, BSPElts &belts, BSPElts &ea, BSPElts &eb, 
 	      int nmax, int dmax, ID c)
@@ -285,8 +286,7 @@ void BSPTree (BSPElts &aelts, BSPElts &belts, BSPElts &ea, BSPElts &eb,
   if (dmax == 0 || aelts.size() < nmax && belts.size() < nmax)
     BSPLeaf(aelts, belts, ea, eb);
   else {
-    InputPoint r(randomNumber(-1.0, 1.0), randomNumber(-1.0, 1.0),
-		 randomNumber(-1.0, 1.0));
+    Point r(randomNumber(-1.0, 1.0), randomNumber(-1.0, 1.0), randomNumber(-1.0, 1.0));
     BSPElts aelts1, aelts2, belts1, belts2;
     BSPPartition(aelts, &r, c, aelts1, aelts2);
     BSPPartition(belts, &r, c, belts1, belts2);
@@ -357,8 +357,8 @@ void MinkHullFace::cone (HEdges &hedges) const
 
 int DegenerateConflict::sign ()
 {
-  PV3 u = b->getP() - a->getP(), v = c->getP() - a->getP(), w = d->getP() - a->getP(),
-    x = u.cross(v);
+  PV3 u = b->get() - a->get(), v = c->get() - a->get(),
+    w = d->get() - a->get(), x = u.cross(v);
   if (x.tripleProduct(v, w).sign() == 1)
     return 1;
   return x.tripleProduct(w, u).sign();
@@ -498,11 +498,11 @@ bool convexOrder (const HEdges &hedges)
   return false;
 }
 
-Polyhedron * triangulate (const FaceSet &fs, bool perturbed)
+Polyhedron * triangulate (const set<Face *> &fs, bool perturbed)
 {
   Polyhedron *a = new Polyhedron(perturbed);
   PVMap pvmap;
-  for (FaceSet::const_iterator f = fs.begin(); f != fs.end(); ++f) {
+  for (set<Face *>::const_iterator f = fs.begin(); f != fs.end(); ++f) {
     Triangles tr;
     (*f)->triangulate(tr);
     int pc = (*f)->getPC();
@@ -548,7 +548,7 @@ bool minkowskiShell (Polyhedron *a, Polyhedron *b, Shell *s)
 
 Convolution * convolution (Polyhedron *a, Polyhedron *b)
 {
-  Convolution *c = new Convolution(a->perturbed && b->perturbed);
+  Convolution *c = new Convolution(a->perturbed && b->perturbed, true);
   VVPairVMap vmap;
   FaceDescSet fds;
   sumVF(a, b, true, fds, vmap, c);
@@ -589,11 +589,6 @@ bool compatibleVF (HEdges &ed, Face *f)
   return true;
 }
 
-int InnerProductEF::sign ()
-{
-  return e->getU().dot(f->getP()->getN()).sign();
-}
-
 void sumVF (Vertex *v, Face *f, bool avflag, FaceDescSet &fds, 
 	    VVPairVMap &vmap, Polyhedron *con)
 {
@@ -604,6 +599,11 @@ void sumVF (Vertex *v, Face *f, bool avflag, FaceDescSet &fds,
   if (!con->perturbed && !fds.insert(vo).second)
     return;
   con->addTriangle(vo[0], vo[1], vo[2]);
+}
+
+int InnerProductEF::sign ()
+{
+  return e->getU().dot(f->getP()->get().n).sign();
 }
 
 Vertex * sumVV (Vertex *a, Vertex *b, bool aflag, VVPairVMap &vmap, 
@@ -651,8 +651,8 @@ int convexEdge (Edge *e)
 
 int ConvexEdge::sign ()
 {
-  return e1->getU().tripleProduct(e1->getF()->getP()->getN(),
-				  e2->getF()->getP()->getN()).sign();
+  return e1->getU().tripleProduct(e1->getF()->getP()->get().n,
+				  e2->getF()->getP()->get().n).sign();
 }
 
 bool compatibleEE (Edge *e, Edge *f, bool &aflag)
@@ -660,22 +660,17 @@ bool compatibleEE (Edge *e, Edge *f, bool &aflag)
   HEdge *e1 = e->getHEdge(0)->getForward() ? e->getHEdge(0) : e->getHEdge(1),
     *f1 = f->getHEdge(0)->getForward() ? f->getHEdge(0) : f->getHEdge(1),
     *e2 = e1->ccw(), *f2 = f1->ccw();
-  int s1 = CompatibleEdge(f, e1->getF()), s2 = CompatibleEdge(f, e2->getF());
+  int s1 = InnerProductEF(f1, e1->getF()), s2 = InnerProductEF(f1, e2->getF());
   aflag = s1 == 1 || s1 == 0 && s2 == -1;
   if (s1 == s2)
     return false;
-  int s3 = CompatibleEdge(e, f1->getF());
+  int s3 = InnerProductEF(e1, f1->getF());
   if (s1 != 0 && s1 == s3 || s2 != 0 && s2 == - s3)
     return false;
-  int s4 = CompatibleEdge(e, f2->getF());
+  int s4 = InnerProductEF(e1, f2->getF());
   if (s3 == s4)
     return false;
   return s4 == 0 || (s1 == 0 ? s2 == - s4 : s1 == s4);
-}
-
-int CompatibleEdge::sign ()
-{
-  return e->getU().dot(f->getP()->getN()).sign();
 }
 
 void sumEE (Edge *e, Edge *f, bool aflag, FaceDescSet &fds,

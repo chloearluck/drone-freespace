@@ -27,30 +27,33 @@ pages 37-52, 2012
 
 #include "pv.h"
 #include <vector>
+#include <map>
 #include <unordered_map>
 using namespace std;
 using namespace acp;
 
 namespace acp {
 
-template<class T>
 class PPoly {
  public:
   PPoly () {}
-  PPoly (double c) { add(T(c), 0); }
+  PPoly (double c) { add(Parameter::constant(c), 0); }
+  PPoly (const vector<Parameter> &a) : a(a) {}
+
   int size () const { return a.size(); }
-  T &operator[] (int i) { return a[i]; }
-  T lc () const { return *a.rbegin(); }
+  const Parameter &operator[] (int i) const { return a[i]; }
+  Parameter &operator[] (int i) { return a[i]; }
+  Parameter lc () const { return *a.rbegin(); }
   int deg () const { return a.size() - 1; }
   bool zero () const { return a.empty(); }
 
-  void add (const T &c, int e) {
+  void add (const Parameter &c, int e) {
     int d = deg();
     if (e <= d)
       a[e] = a[e] + c;
     else {
       while (d + 1 < e) {
-	a.push_back(T(0.0));
+	a.push_back(Parameter::constant(0.0));
 	++d;
       }
       a.push_back(c);
@@ -93,12 +96,44 @@ class PPoly {
     return q;
   }
   
+  PPoly monic () const {
+    PPoly p;
+    int d = deg();
+    Parameter ad = a[d];
+    for (unsigned int i = 0u; i < d; ++i)
+      p.a.push_back(a[i]/ad);
+    p.a.push_back(Parameter::constant(1.0));
+    return p;
+  }
+
+  PPoly quotient (const PPoly &divisor, PPoly &remainder) {
+    if (divisor.deg() > deg()) {
+      remainder = *this;
+      return PPoly();
+    }
+    PPoly f = *this;
+    PPoly g = divisor.monic();
+    int gd = gd;
+    PPoly q;
+    q.a.resize(deg() - gd + 1);
+    for (int i = q.deg(); i >= 0; i--) {
+      q.a[i] = f.a[gd + i];
+      for (int j = 0; j < gd; j++)
+        f.a[i + j] = f.a[i + j] - q.a[i] * g.a[j];
+    }
+    f.a.resize(gd - 1);
+    while (f.deg() >= 0 && f.a[f.deg()].sign() == 0)
+      f.a.pop_back();
+    remainder = f;
+    return q;
+  }
+
   PPoly rem (const PPoly &p, PPoly &q) const {
-    T lp = p.lc();
+    Parameter lp = p.lc();
     int dp = p.deg();
     PPoly r(*this);
     while (dp <= r.deg()) {
-      T k = r.lc()/lp;
+      Parameter k = r.lc()/lp;
       int dk = r.deg() - dp;
       q.add(k, dk);
       r.a.pop_back();
@@ -110,7 +145,7 @@ class PPoly {
   }
 
   void checkDegree () {
-    while (!zero() && zerop(lc()))
+    while (!zero() && lc().sign() == 0)
       a.pop_back();
   }
 
@@ -119,6 +154,8 @@ class PPoly {
     s = PPoly(1);
     t = PPoly(0);
     PPoly r(*this), nr(p), ns, nt(1);
+    r.checkDegree();
+    nr.checkDegree();
     while (!nr.zero()) {
       PPoly q, nnr = r.rem(nr, q), nns = s - q*ns, nnt = t - q*nt;
       r = nr;
@@ -131,19 +168,19 @@ class PPoly {
     return r;
   }
 
-  T value (const T &x) const
+  Parameter value (const Parameter &x) const
   {
     int d = deg();
-    T y = a[d];
+    Parameter y = a[d];
     for (int i = d - 1; i >= 0; --i)
       y = x*y + a[i];
     return y;
   }
 
-  T der (const T &x) const
+  Parameter der (const Parameter &x) const
   {
     int d = deg();
-    T y = d*a[d];
+    Parameter y = d*a[d];
     for (int i = d - 1; i > 0; --i)
       y = x*y + i*a[i];
     return y;
@@ -174,15 +211,15 @@ class PPoly {
     return p;
   }
 
-  T shrinkBracket (T x, int sub) const {
+  Parameter shrinkBracket (Parameter x, int sub) const {
     bool bflag = false;
     while (true) {
       bool flag = true;
-      T xm = x.midP(), fm = value(xm), df = der(x);
+      Parameter xm = x.midP(), fm = value(xm), df = der(x);
       if (df.sign(false) == 0)
 	flag = false;
       else {
-	T nx = (xm - fm/df).intersect(x);
+	Parameter nx = (xm - fm/df).intersect(x);
 	if (nx.subset(x))
 	  x = nx;
 	else
@@ -191,13 +228,13 @@ class PPoly {
       if (!flag) {
 	int sm = fm.sign(false);
 	if (sm == sub) {
-	  T nx = x.interval(xm);
+	  Parameter nx = x.interval(xm);
 	  if (!nx.subset(x))
 	    break;
 	  x = nx;
 	}
 	else if (sm == - sub) {
-	  T nx = xm.interval(x);
+	  Parameter nx = xm.interval(x);
 	  if (!nx.subset(x))
 	    break;
 	  x = nx;
@@ -213,10 +250,10 @@ class PPoly {
     return x;
   }
 
-  T shrinkBracketB (const T &x, int sub) const {
-    T xlb = x.lbP(), xm = x.midP(), xub = x.ubP();
+  Parameter shrinkBracketB (const Parameter &x, int sub) const {
+    Parameter xlb = x.lbP(), xm = x.midP(), xub = x.ubP();
     while ((xlb - xm).sign(false) < 0) {
-      T nx = xlb.interval(xm).midP();
+      Parameter nx = xlb.interval(xm).midP();
       if ((nx - xlb).sign(false) == 0 || (nx - xm).sign(false) == 0)
 	break;
       int sm = value(nx).sign(false);
@@ -229,7 +266,7 @@ class PPoly {
     }
     xm = x.midP();
     while ((xm - xub).sign(false) < 0) {
-      T nx = xm.interval(xub).midP();
+      Parameter nx = xm.interval(xub).midP();
       if ((nx - xm).sign(false) == 0 || (nx - xub).sign(false) == 0)
 	break;
       int sm = value(nx).sign(false);
@@ -240,16 +277,16 @@ class PPoly {
       else
 	xub = nx;
     }
-    T nx = xlb.interval(xub);
+    Parameter nx = xlb.interval(xub);
     return nx.subset(x) ? nx : x;
   }
 
-  PPoly moebius (const T &l, const T &u) const
+  PPoly moebius (const Parameter &l, const Parameter &u) const
   {
     return shift(l).dual().shift(1.0/(u - l));
   }
 
-  PPoly shift (const T &s) const
+  PPoly shift (const Parameter &s) const
   {
     PPoly p = *this;
     if (s.sign() == 0)
@@ -261,7 +298,7 @@ class PPoly {
     return p;
   }
 
-  PPoly shiftX (const T &s) const
+  PPoly shiftX (const Parameter &s) const
   {
     PPoly p = *this;
     if (s.sign() == 0)
@@ -272,9 +309,9 @@ class PPoly {
     return p;
   }
 
-  void scale (const T &s)
+  void scale (const Parameter &s)
   {
-    T ss = s;
+    Parameter ss = s;
     for (int i = 1; i <= deg(); ++i) {
       a[i] = ss*a[i];
       ss = ss*s;
@@ -297,19 +334,14 @@ class PPoly {
     cerr << ")" << endl;
   }
 
-  vector<T> a;
+  vector<Parameter> a;
 };
-
-template<class T>
-bool zerop (const PPoly<T> &p) {
-  return p.zero() || (p.deg() == 0 && zerop(p.lc()));
- }
 
 typedef std::pair<Parameter, Parameter> Int;
 typedef std::vector<Int> Ints;
 class Mobius;
 
-class PPoly1 : public PPoly<Parameter> {
+class PPoly1 : public PPoly {
 public:
 
   static bool print_all;
@@ -324,10 +356,10 @@ public:
         add(a[i], i);
   }
   PPoly1 (const Parameter &c, int d) : d(d) { add(c, d); }
-  PPoly1 (const PPoly<Parameter> &ppoly) : PPoly<Parameter>(ppoly), d(ppoly.deg()) {}
+  PPoly1 (const PPoly &ppoly) : PPoly(ppoly), d(ppoly.deg()) {}
 
-  bool increased () const { return a[0].increased(); }
-  bool decreased () const { return a[0].decreased(); }
+  bool increased () const { return false; /* a[0].increased(); */ }
+  bool decreased () const { return true; /* a[0].decreased(); */ }
   Parameter value (const Parameter &x) const;
   Parameter der (const Parameter &x) const;
   PPoly1 der () const;
@@ -365,7 +397,7 @@ public:
 
   void print();
 
-  int size () { return a.size(); }
+  int size () const { return a.size(); }
   Parameter &operator[] (int i) { return a[i]; }
 
   PPoly1 monic () const;
@@ -386,18 +418,77 @@ public:
 
 class PPoly2 {
  public:
-  PPoly2 () : nt(0), a(0), m(0), degx(-2), degy(-2) {}
-  PPoly2 (int nt) : nt(nt), a(new Parameter [nt]), m(new int [2*nt]), degx(-2), degy(-2) {}
-  PPoly2 (int nt, Parameter *a, int *m);
-  PPoly2 (const PPoly2 &p);
-  void setDegree ();
-  ~PPoly2 () {delete [] a; delete [] m;}
-  PPoly2 & operator= (const PPoly2 &p);
+  PPoly2 () : d(-2), degx(-2), degy(-2) {}
+  PPoly2 (int nt) : a(nt), m(2*nt), d(-2), degx(-2), degy(-2) {}
+  PPoly2 (int nt, Parameter *a, int *m) : a(nt), m(2*nt), d(-2), degx(-2), degy(-2) {
+    int k = nt*2;
+    for (int i = 0; i < nt; ++i)
+      this->a[i] = a[i];
+    for (int i = 0; i < k; ++i)
+      this->m[i] = m[i];
+    setDegree();
+    degx = degX();
+    degy = degY();
+  }
+
+  void setDegree () {
+    d = 0;
+    for (int i = 0; i < a.size(); ++i) {
+      int di = 0;
+      for (int j = 0; j < 2; ++j)
+        di += m[2*i+j];
+      if (d < di)
+        d = di;
+    }
+    degx = degX();
+    degy = degY();
+  }
+
   int degree () const { return d; }
-  bool increased () const { return a[0].increased(); }
-  bool decreased () const { return a[0].decreased(); }
-  Parameter value (Parameter *x) const;
-  Parameter value (const std::initializer_list<Parameter>& x) const;
+  bool increased () const { assert(0); return false; /* a[0].increased(); */ }
+  bool decreased () const { assert(0); return true; /* a[0].decreased(); */ }
+  Parameter value (Parameter *x) const {
+    Parameter xp[degx+1];
+    Parameter yp[degy+1];
+    
+    Parameter p = x[0];
+    for(int i = 1; i <= degx; i++) {
+      xp[i] = p;
+      p = p*x[0];
+    }
+    
+    p = x[1];
+    for(int i = 1; i <= degy; i++) {
+      yp[i] = p;
+      p = p*x[1];
+    }
+    
+    Parameter y;
+    auto mp = m.begin();
+    for(int i = 0; i < a.size(); ++i) {
+      Parameter z = a[i];
+      if(*mp) z = z*xp[*mp];
+      mp++;
+      if(*mp) z = z*yp[*mp];
+      mp++;
+      if(i == 0)
+        y = z;
+      else
+        y = y + z;
+    }
+    
+    return y;
+  }
+  
+  Parameter value (const std::initializer_list<Parameter>& x) const {
+    Parameter xy[2] = {*(x.begin()), *(x.begin()+1)};
+    return value(xy);
+  }
+
+  Parameter value (const PV2 p) {
+    Parameter xy[2] = {p.x, p.y};
+    return value(xy);
+  }
 
   static PPoly2 one() {
     int nt = 1;
@@ -415,37 +506,277 @@ class PPoly2 {
     return PPoly2(nt, a, m);
   }
 
-  PPoly1 subX(Parameter x) const;
-  PPoly1 subY(Parameter y) const;
+  PPoly1 subX(Parameter x) const  {
+    vector<Parameter> coef(degy + 1);
+    
+    for(int i = 0; i < coef.size(); i++) {
+      coef[i] = Parameter::constant(0);
+    }
+    
+    vector<Parameter> powx;
+    powx.push_back(Parameter::constant(1));
+    powx.push_back(x);
+    for(int i = 2; i <= degx; i++) {
+      powx.push_back(powx[powx.size()-1] * x);
+    }
+    
+    for(int i = 0; i < a.size(); i++) {
 
-  PPoly2 derX () const;
-  PPoly2 derY () const;
+      int dx = m[2*i];
+      int dy = m[2*i+1];
+      coef[dy] = coef[dy] + (a[i] * powx[dx]);
+      
+    }
+    
+    return PPoly1(degx, &coef[0]);
+  }
 
-  int degX() const;
-  int degY() const;
+  PPoly1 subY(Parameter y) const {
+    vector<Parameter> coef(degx + 1);
+    
+    for(int i = 0; i < coef.size(); i++) {
+      coef[i] = Parameter::constant(0);
+    }
+    
+    vector<Parameter> powy;
+    powy.push_back(Parameter::constant(1));
+    powy.push_back(y);
+    for(int i = 2; i <= degy; i++) {
+      powy.push_back(powy[powy.size()-1] * y);
+    }
+    
+    for(int i = 0; i < a.size(); i++) {
+      
+      int dx = m[2*i];
+      int dy = m[2*i+1];
+      coef[dx] = coef[dx] + (a[i] * powy[dy]);
+      
+    }
 
-  void print_input() const;
-  void print() const;
+    return PPoly1(degy, &coef[0]);
+  }
 
-  PV2 polish (const PV2 &x) const;
+  PPoly2 derX () const  {
+    vector<Parameter> coef;
+    vector<int> pow;
+    
+    for(int i = 0; i < a.size(); i++) {
+      if(m[2*i] < 1) continue;
+      coef.push_back(a[i] * m[2*i]);
+      pow.push_back(m[2*i] - 1);
+      pow.push_back(m[2*i + 1]);
+    }
+    
+    return PPoly2(coef.size(), &coef[0], &pow[0]);
+  }
 
-  PPoly2 operator* (const PPoly2 &g) const;
-  PPoly2 operator* (const Parameter &p) const;
-  PPoly2 operator* (const double p) const;
-  PPoly2 plusCtimes (double c, const PPoly2 &b) const;
+  PPoly2 derY () const  {
+    vector<Parameter> coef;
+    vector<int> pow;
+    
+    for(int i = 0; i < a.size(); i++) {
+      if(m[2*i + 1] < 1) continue;
+      coef.push_back(a[i] * m[2*i + 1]);
+      pow.push_back(m[2*i]);
+      pow.push_back(m[2*i + 1] - 1);
+    }
+    
+    return PPoly2(coef.size(), &coef[0], &pow[0]);
+    
+  }
+  
+  int degX() const  {
+    int d = 0;
+    
+    for(int i = 0; i < a.size(); i++) {
+      int x = m[2*i];
+      d = std::max(d, x);
+    }
+    
+    return d;
+  }
+
+  int degY() const {
+    int d = 0;
+    
+    for(int i = 0; i < a.size(); i++) {
+      int x = m[2*i + 1];
+      d = std::max(d, x);
+    }
+    
+    return d;
+  }
+
+  void print_input() const {
+    for(int i = 0; i < a.size(); i++) {
+      printf("%.16f %d %d%s", a[i].mid(), m[2*i], m[2*i+1], (i == a.size()-1 ? "\n" : " " ));
+    }
+  }
+
+  void print() const {
+    for(int i = 0; i < a.size(); i++) {
+      printf("%.16f*x^(%d)*y^(%d) %s", a[i].mid(), m[2*i], m[2*i+1], (i == a.size()-1 ? "\n" : "+ "));
+    }
+  }
+
+  PV2 polish (const PV2 &r) const {
+    assert(0);
+    return r;
+  }
+
+  PPoly2 operator* (const PPoly2 &b) const {
+    int cnt = 0;
+    // Parameter ca[nt*b.nt];
+    vector<Parameter> ca(a.size()*b.a.size());
+    int cm[2*a.size()*b.a.size()];
+    int exps[2];
+    for (int i = 0; i < a.size(); i++) {
+      auto mp = m.begin() + i * 2;
+      for (int j = 0; j < b.a.size(); j++) {
+        Parameter coef = a[i] * b.a[j];
+        auto bmp = b.m.begin() + j * 2;
+        for (int k = 0; k < 2; k++)
+          exps[k] = mp[k] + bmp[k];
+        int l;
+        for (l = 0; l < cnt; l++) {
+          int *cmp = cm + l * 2;
+          int h;
+          for (h = 0; h < 2; h++)
+            if (cmp[h] != exps[h])
+              break;
+          if (h == 2) {
+            ca[l] = ca[l] + coef;
+            break;
+          }
+        }
+        if (l == cnt) {
+          int *cmp = cm + l * 2;
+          for (int h = 0; h < 2; h++)
+            cmp[h] = exps[h];
+          ca[l] = coef;
+          cnt++;
+        }
+      }
+    }
+    // return PPoly2(cnt, ca, cm);
+    return PPoly2(cnt, &ca[0], cm);
+  }
+
+  PPoly2 operator* (const Parameter &p) const {
+    vector<Parameter> ca(a.size());
+    int cm[2*a.size()];
+    
+    for(int i = 0; i < a.size(); i++) {
+      ca[i] = a[i] * p;
+      cm[2*i] = m[2*i];
+      cm[2*i + 1] = m[2*i + 1];
+    }
+    
+    return PPoly2(a.size(), &ca[0], cm);
+  }
+
+  PPoly2 operator* (const double p) const {
+    vector<Parameter> ca(a.size());
+    int cm[2*a.size()];
+    
+    for(int i = 0; i < a.size(); i++) {
+      ca[i] = a[i] * p;
+      cm[2*i] = m[2*i];
+      cm[2*i + 1] = m[2*i + 1];
+    }
+    
+    return PPoly2(a.size(), &ca[0], cm);
+  }
+
+  PPoly2 plusCtimes (double c, const PPoly2 &b) const  {
+    int pnt = a.size();
+    vector<Parameter> pa(a.size() + b.a.size());
+    int pm[2 * (a.size() + b.a.size())];
+    
+    for (int i = 0; i < a.size(); i++)
+      pa[i] = a[i];
+    int ntnv = a.size() * 2;
+    for (int i = 0; i < ntnv; i++)
+      pm[i] = m[i];
+    
+    auto bmp = b.m.begin();
+    for (int i = 0; i < b.a.size(); i++) {
+      int j;
+      for (j = 0; j < a.size(); j++) {
+        auto mp = m.begin() + j * 2;
+        int k;
+        for (k = 0; k < 2; k++)
+          if (mp[k] != bmp[k])
+            break;
+        if (k == 2) {
+          pa[j] = pa[j] + c * b.a[i];
+          break;
+        }
+      }
+      if (j == a.size()) {
+        pa[pnt] = c * b.a[i];
+        int *pmp = pm + pnt * 2;
+        for (int k = 0; k < 2; k++)
+          pmp[k] = bmp[k];
+        pnt++;
+      }
+      bmp += 2;
+    }
+    
+    return PPoly2(pnt, &pa[0], pm);
+  }
+
   PPoly2 operator+ (const PPoly2 &b) const { return plusCtimes(1.0, b); }
   PPoly2 operator- (const PPoly2 &b) const { return plusCtimes(-1.0, b); }
 
-  int size () { return nt; }
+  int size () const { return a.size(); }
+  const Parameter &operator[] (int i) const { return a[i]; }
   Parameter &operator[] (int i) { return a[i]; }
 
-  int nt, d;
-  Parameter *a;
-  int *m;
+  int d;
+  vector<int> m;
+  vector<Parameter> a;
   int degx, degy;
-
 };
 
+class Index3 {
+public:
+  int i[3];
+  Index3 (int i0, int i1, int i2) { i[0] = i0; i[1] = i1; i[2] = i2; }
+
+  bool operator< (const Index3 &b) const {
+    const Index3 &a = *this;
+    for (int j = 3; --j >= 0;)
+      if (a.i[j] != b.i[j])
+        return a.i[j] < b.i[j];
+    return false;
+  }
+    
+  class Compare {
+  public:
+    bool operator() (const Index3 &a, const Index3 &b) {
+      for (int j = 2; --j >= 0;)
+        if (a.i[j] != b.i[j])
+          return a.i[j] < b.i[j];
+      return false;
+    }
+  };
+
+  class Hasher {
+  public:
+    size_t operator() (const Index3 &a) const {
+      return a.i[0] * 779230947 + a.i[1] * 247091631 + a.i[2] * 1194289623;
+    }
+  };
+  
+  class Equals {
+  public:
+    bool operator() (const Index3 &a, const Index3 &b) const {
+      return a.i[0] == b.i[0] && a.i[1] == b.i[1] && a.i[2] == b.i[2];
+    }
+  };
+};
+ 
 class PPoly3 {
 public:
   PPoly3 () {}
@@ -457,39 +788,67 @@ public:
       a.push_back(c);
     }
     else
-      a[it->second] += c;
+      a[it->second] = a[it->second] + c;
   }
 
-  Parameter value
-    (const Parameter& x, const Parameter& y, const Parameter& z) const;
+  Parameter value (const Parameter& x, const Parameter& y, const Parameter& z) const {
+    const Parameter *xyz[3] = { &x, &y, &z };
+    
+    vector<Parameter> powers[3];
+    for (int i = 0; i < 3; i++)
+      powers[i].push_back(Parameter::constant(1));
+    
+    Parameter sum = Parameter::constant(0);
+    
+    for (auto pair = ia.begin(); pair != ia.end(); pair++) {
+      Index3 ind = pair->first;
+      Parameter term = a[pair->second];
+      
+      for (int i = 0; i < 3; i++) {
+        while (powers[i].size() <= ind.i[i])
+          powers[i].push_back(*xyz[i] * powers[i].back());
+        term = term * powers[i][ind.i[i]];
+      }
+      
+      sum = sum + term;
+    }
+    
+    return sum;
+  }
 
   // xyz = 0, 1, 2:  substituting for yz, xz, xy.
-  PPoly<Parameter> substitute2
-    (int xyz, const Parameter& x, const Parameter& y, const Parameter& z) const;
-
-  class Index3 {
-  public:
-    int i[3];
-    Index3 (int i0, int i1, int i2) { i[0] = i0; i[1] = i1; i[2] = i2; }
-  };  
-
-  class Hasher {
-  public:
-    size_t operator() (const Index3 &a) const {
-      return a.i[0] * 779230947 + a.i[1] * 247091631 + a.i[2] * 1194289623;
+  PPoly substitute2
+    (int ixyz, const Parameter& x, const Parameter& y, const Parameter& z) const {
+    const Parameter *xyz[3] = { &x, &y, &z };
+    
+    vector<Parameter> powers[3];
+    for (int i = 0; i < 3; i++)
+      powers[i].push_back(Parameter::constant(1));
+    
+    PPoly ppoly;
+    
+    for (auto pair = ia.begin(); pair != ia.end(); pair++) {
+      Index3 ind = pair->first;
+      Parameter term = a[pair->second];
+      
+      for (int i = 0; i < 3; i++) 
+	if (i != ixyz) {
+	  while (powers[i].size() <= ind.i[i])
+	    powers[i].push_back(*xyz[i] * powers[i].back());
+	  term = term * powers[i][ind.i[i]];
+	}
+      
+      ppoly.add(term, ind.i[ixyz]);
     }
-  };
-
-  class Equals {
-  public:
-    bool operator() (const Index3 &a, const Index3 &b) const {
-      return a.i[0] == b.i[0] && a.i[1] == b.i[1] && a.i[2] == b.i[2];
-    }
-  };
+    
+    return ppoly;
+  }
   
-  unordered_map<Index3, int, Hasher, Equals> ia;
+  // unordered_map<Index3, int, Index3::Hasher, Index3::Equals> ia;
+  map<Index3, int> ia;
   vector<Parameter> a;
-  int size () { return a.size(); }
+  int size () const { return a.size(); }
+  const Parameter &operator[] (int i) const { return a[i]; }
   Parameter &operator[] (int i) { return a[i]; }
 };
 

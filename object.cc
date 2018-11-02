@@ -25,6 +25,13 @@ pages 37-52, 2012
 #include "object.h"
 
 namespace acp {
-std::vector<BaseObject*> BaseObject::precisionIncreased;
+  pthread_key_t mikey;
+  pthread_key_t cpkey;
+  pthread_key_t hsekey;
+  PrecisionException precisionException;
+  bool BaseObject::usePrecisionException = true;
+  unsigned int BaseObject::deltaPrecision = 53u;
+  unsigned int BaseObject::maxPrecision = 848u;
+  bool BaseObject::throwSignExceptions[128];
 }
 

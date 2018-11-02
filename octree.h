@@ -187,7 +187,7 @@ class Octree {
       int i = 0;
       while (i < elts.size())
 	if (elts[i].d == e.d) {
-	  elts[i] = *elts.rbegin();
+	  elts[i] = elts.back();
 	  elts.pop_back();
 	}
 	else
@@ -200,7 +200,7 @@ class Octree {
     vector<Octree *> st;
     st.push_back(this);
     while (!st.empty()) {
-      Octree *o = *st.rbegin();
+      Octree *o = st.back();
       st.pop_back();
       if (!o->l || o->n <= nmax)
 	res.push_back(o);

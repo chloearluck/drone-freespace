@@ -11,19 +11,12 @@ void simplify (Polyhedron *a, double d, bool opt2 = false);
 
 void simplify1 (Polyhedron *a, double d);
 
-FOctree * faceOctree (Polyhedron *a, double s = 0.0);
-
-typedef pair<Vertex *, PTR<Point> > VPPair;
-
-typedef map<Vertex *, PTR<Point> > VPMap;
-
-bool simplify1 (Polyhedron *a, double d, FOctree *octree, VPMap &vpmap, int &n1, int &n2);
-
 class DistancePP : public Primitive {
   Point *a, *b;
   double d;
+
   int sign () {
-    PV3 u = a->getP() - b->getP();
+    PV3 u = a->get() - b->get();
     return (d*d - u.dot(u)).sign();
   }
  public:
@@ -33,9 +26,10 @@ class DistancePP : public Primitive {
 class DistancePL : public Primitive {
   Point *a, *t, *h;
   double d;
+
   int sign () {
-    PV3 tp = t->getP(), u = h->getP() - tp,
-      p = tp + ((a->getP() - tp).dot(u)/u.dot(u))*u, w = a->getP() - p;
+    PV3 tp = t->get(), u = h->get() - tp,
+      p = tp + ((a->get() - tp).dot(u)/u.dot(u))*u, w = a->get() - p;
     return (d*d - w.dot(w)).sign();
   }
  public:
@@ -43,6 +37,12 @@ class DistancePL : public Primitive {
 };
 
 bool closeVE (Vertex *v, Vertex *w, Vertex *x, double d);
+
+Octree<Face *> * faceOctree (Polyhedron *a, double s = 0.0);
+
+typedef pair<Vertex *, PTR<Point> > VPPair;
+
+typedef map<Vertex *, PTR<Point> > VPMap;
 
 class IFeature {
  public:
@@ -63,17 +63,7 @@ class IFeature {
     return e->HEdgesN() == 2 && (!v || getH()->getNext()->head() == v);
   }
   
-  bool operator< (const IFeature &x) const {
-    if (!x.v && v)
-      return true;
-    if (x.v && !v)
-      return false;
-    if (v == x.v && e == x.e && forward == x.forward)
-      return false;
-    int s = CloserPair(x.e->getT()->getP(), x.e->getH()->getP(),
-		       e->getT()->getP(), e->getH()->getP()); 
-    return s == 1 || (s == 0 && e < x.e);
-  }
+  bool operator< (const IFeature &x) const { return !x.v && v; }
 };
 
 typedef priority_queue<IFeature> IFeatureQ;
@@ -82,63 +72,38 @@ void addCollapseFlips (Edge *e, double d, IFeatureQ &fq);
 
 void addFlips (Edge *e, double d, IFeatureQ &fq);
 
-bool collapse (Polyhedron *a, double d, Edge *e, IFeatureQ &fq, FOctree *octree,
-	       VPMap &vpmap, bool &bad);
+void simplify1 (Polyhedron *a, double d, IFeatureQ &fq, IFeatureQ &nfq,
+		Octree<Face *> *octree, VPMap &vpmap, int &n1, int &n2);
+
+bool collapse (Polyhedron *a, double d, Edge *e, IFeatureQ &fq, IFeatureQ &nfq,
+	       Octree<Face *> *octree, VPMap &vpmap);
 
 bool collapsible (Edge *e);
 
-double distanceUB (Point *t, Point *h);
-
-bool badCollapse (Vertex *v, FOctree *octree, double dc);
-
-void newEdges (Face *f,  Vertex *v, bool *ef);
-
-bool intersects (Face *f, bool *evf, Face *g);
-
-bool intersectsFFP (Face *f, bool *ef, Face *g, bool *eg);
-
-bool intersectsPE (Face *f, bool *evf, Face *g, bool *evg, Edges &iedges,
-		   Faces &ifaces, bool &pflag);
-
-bool intersectsFEP (Face *f, bool *ef, Edge *e, bool ee);
+bool badCollapse (Vertex *v, Octree<Face *> *octree);
 
 void addStar (Vertex *v, double d, IFeatureQ &fq);
 
-bool flip (Polyhedron *a, double d, HEdge *e, IFeatureQ &fq, FOctree *octree,
-	   VPMap &vpmap, bool &bad);
+bool flip (Polyhedron *a, double d, HEdge *e, IFeatureQ &fq, IFeatureQ &nfq,
+	   Octree<Face *> *octree, VPMap &vpmap);
 
 bool flippable (HEdge *e, double d);
 
 HEdge * flip (Polyhedron *a, HEdge *e);
 
-bool badFlip (HEdge *e, FOctree *octree);
-
-void newEdges (Face *f, Edge *e, bool *ef);
+bool badFlip (HEdge *e, Octree<Face *> *octree);
 
 void describe1 (double t, int n1, int n2, const VPMap &vpmap);
 
 double displacement (const VPMap &vpmap, double &dmax);
 
-class LinePoint : public Point {
-  Point *a, *t, *h;
-  PV3 calculate () {
-    PV3 ap = a->getP(), tp = t->getP(), u = h->getP() - tp;
-    return tp + (u.dot(ap - tp)/u.dot(u))*u;
-  }
- public:
-  LinePoint (Point *a, Point *t, Point *h) : a(a), t(t), h(h) {
-    IDSet psth = intersection(t->getps(), h->getps());
-    for (IDSet::iterator i = psth.begin(); i != psth.end(); ++i)
-      ps.insert(*i);
-  }
-};
-
 class PlanePoint : public Point {
   Plane *p;
   Point *a;
+
   PV3 calculate () {
-    PV3 n = p->getN(), q = a->getP();
-    return  q - ((q.dot(n) + p->getK())/n.dot(n))*n;
+    PV3 n = p->get().n, q = a->get();
+    return  q - ((q.dot(n) + p->get().k)/n.dot(n))*n;
   }
  public:
   PlanePoint (Plane *p, Point *a) : p(p), a(a) {
@@ -146,20 +111,36 @@ class PlanePoint : public Point {
   }
 };
 
+class LinePoint : public Point {
+  Point *a, *t, *h;
+  
+  PV3 calculate () {
+    PV3 ap = a->get(), tp = t->get(), u = h->get() - tp;
+    return tp + (u.dot(ap - tp)/u.dot(u))*u;
+  }
+ public:
+  LinePoint (Point *a, Point *t, Point *h) : a(a), t(t), h(h) {
+    set<ID> psth = intersection(t->getps(), h->getps());
+    for (set<ID>::iterator i = psth.begin(); i != psth.end(); ++i)
+      ps.insert(*i);
+  }
+};
+
 class LineLinePoint : public Point {
   Point *a, *b, *c, *d;
+  
   PV3 calculate () {
-    PV3 ap = a->getP(), u = b->getP() - ap, cp = c->getP(), v = d->getP() - cp,
+    PV3 ap = a->get(), u = b->get() - ap, cp = c->get(), v = d->get() - cp,
       w = cp - ap;
     Parameter k1 = u.dot(u), k2 = u.dot(v), k4 = - v.dot(v), k5 = u.dot(w),
       k6 = v.dot(w), den = k1*k4 + k2*k2, k = (k5*k4 + k2*k6)/den;
-      return ap + k*u;
+    return ap + k*u;
   }
  public:
   LineLinePoint (Point *a, Point *b, Point *c, Point *d)
     : a(a), b(b), c(c), d(d) {
-    IDSet psab = intersection(a->getps(), b->getps());
-    for (IDSet::iterator i = psab.begin(); i != psab.end(); ++i)
+    set<ID> psab = intersection(a->getps(), b->getps());
+    for (set<ID>::iterator i = psab.begin(); i != psab.end(); ++i)
       ps.insert(*i);
   }
 };
@@ -191,24 +172,25 @@ class Feature {
     if (type != x.type)
       return type < x.type;
     switch (type) {
-    case VV: return v < x.v || (v == x.v && w < x.w);
-    case VE: return v < x.v || (v == x.v && e < x.e);
-    case VF: return v < x.v || (v == x.v && fa < x.fa);
-    case EE: return e < x.e || (e == x.e && f < x.f);
-    default: assert(0); return 0;
+    case VV: return v < x.v || v == x.v && w < x.w;
+    case VE: return v < x.v || v == x.v && e < x.e;
+    case VF: return v < x.v || v == x.v && fa < x.fa;
+    case EE: return e < x.e || e == x.e && f < x.f;
+    case EF: return e < x.e || e == x.e && fa < x.fa;
+    default: assert(0);
     }
   }
   
   bool point (Point *a) const {
-    VertexSet vs;
+    set<Vertex *> vs;
     vertices(vs);
-    for (VertexSet::iterator i = vs.begin(); i != vs.end(); ++i)
+    for (set<Vertex *>::iterator i = vs.begin(); i != vs.end(); ++i)
       if (a == (*i)->getP())
 	return true;
     return false;
   }
   
-  void vertices (VertexSet &vs) const {
+  void vertices (set<Vertex *> &vs) const {
     if (type == EE) {
       vs.insert(e->getT());
       vs.insert(e->getH());
@@ -244,7 +226,8 @@ FeatureSet smallFeatures (Polyhedron *a, double d, VPMap *vpmap);
 
 class TData {
  public:
-  FOctree *octree;
+  unsigned int i;
+  Octree<Face *> *octree;
   double d;
   VPMap *vpmap;
   FeatureSet fs;
@@ -274,9 +257,9 @@ void simplify2s (Polyhedron *a, double d, FeatureSet &fs, VPMap &vpmap,
 		 bool vobj = true, double vbound = 1.0);
 
 Expander2 * solveLP (const FeatureSet &fs, double d, const VPMap &vpmap,
-		     bool vobj, double vbound, VertexSet &vs);
+		     bool vobj, double vbound, set<Vertex *> &vs);
 
-void setupLP (const FeatureSet &fs, double d, VertexSet &vs, Expander2 *exp);
+void setupLP (const FeatureSet &fs, double d, set<Vertex *> &vs, Expander2 *exp);
 
 Feature minimalFeature (const Feature &f, PTR<Point> &p, PTR<Point> &q);
 
@@ -290,14 +273,11 @@ PV3 orthogonal (const PV3 &u);
 
 class SeparatorData {
  public:
-  SeparatorData () {}
-  
-  SeparatorData (const PV3 &p, const PV3 &q, const PV3 &u, const PV3 &v,
-		 const PV3 &w, const Parameter &pq)
-    : p(p), q(q), u(u), v(v), w(w), pq(pq) {}
+  PV3 p, q, u, v, w;
+  Parameter pq;
   
   int size () const { return 16; }
-  
+
   Parameter & operator[](int i) {
     if (i < 6)
       return i < 3 ? p[i] : q[i-3];
@@ -305,9 +285,19 @@ class SeparatorData {
       return i < 9 ? u[i-6] : v[i-9];
     return i < 15 ? w[i-12] : pq;
   }
-  
-  PV3 p, q, u, v, w;
-  Parameter pq;
+
+  const Parameter & operator[](int i) const {
+    if (i < 6)
+      return i < 3 ? p[i] : q[i-3];
+    if (i < 12)
+      return i < 9 ? u[i-6] : v[i-9];
+    return i < 15 ? w[i-12] : pq;
+  }
+
+  SeparatorData () {}
+  SeparatorData (const PV3 &p, const PV3 &q, const PV3 &u, const PV3 &v,
+		 const PV3 &w, const Parameter &pq)
+    : p(p), q(q), u(u), v(v), w(w), pq(pq) {}
 };
 
 class Separator : public Object<SeparatorData> {
@@ -317,11 +307,11 @@ class Separator : public Object<SeparatorData> {
 
   SeparatorData calculate () {
     PV3 p = ac->get(), q = bc->get(), u = f.flag ? q - p : p - q,
-      v = f.type == VE ? f.e->getU() : orthogonal(u),
-      w = u.cross(v);
+      v = f.type == VE ? f.e->getU() : orthogonal(u), w = u.cross(v);
     Parameter pq = u.dot(u);
     return SeparatorData(p, q, u, v, w, pq);
   }
+  
  public:
   Separator (const Feature &fin, double d) : d(d) {
     f = minimalFeature(fin, ac, bc);
@@ -339,10 +329,10 @@ class Separator : public Object<SeparatorData> {
     VWR (Separator *s, Point *a, bool flag) : s(s), a(a), flag(flag) {}
     PV3 calculate () {
       if (a == s->ac || a == s->bc)
-	return PV3::constant(0, 0, 0);
-      PV3 p = a->getP() - (flag ? s->get().p : s->get().q);
+	return PV3::constant(0.0, 0.0, 0.0);
+      PV3 p = a->get() - (flag ? s->get().p : s->get().q);
       double d = s->d;
-      Parameter zero(0.0);
+      Parameter zero = Parameter::constant(0.0);
       PV3 vwr(s->get().v.dot(p)/d, 
 	      s->f.type == VE && s->f.point(a) ? zero : s->get().w.dot(p)/d,
 	      s->f.point(a) ? zero : s->get().u.dot(p)/d);
@@ -362,7 +352,7 @@ class Separator : public Object<SeparatorData> {
 
 void getDV (Vertex *v, double d, const VPMap &vpmap, double *dv);
 
-void moveVertices (Polyhedron *a, double d, VPMap &vpmap, const VertexSet &vs,
+void moveVertices (Polyhedron *a, double d, VPMap &vpmap, const set<Vertex *> &vs,
 		   Expander2 *exp);
 
 FeatureSet smallFeatures (Polyhedron *a, double d, const FeatureSet &fs,
@@ -378,23 +368,19 @@ bool intersects (Expander2 *e, Expander2::Pair *p);
 
 bool intersects (const Points &pts, const Points &dsp, bool vf);
 
-bool intersectsVF (const Points &p);
-
-bool intersectsEE (const Points &p);
-
-class FIPoly : public Object<PPoly<Parameter>> {
+class FIPoly : public Object<PPoly> {
   Points pts, dsp;
 
-  PPoly<Parameter> calculate () {
-    PPoly<Parameter> p;
+  PPoly calculate () {
+    PPoly p;
     addTerms(p, 0, 1, 2);
     addTerms(p, 0, 2, 3);
     addTerms(p, 0, 3, 1);
     addTerms(p, 2, 1, 3);
     return p;
   }
-
-  void addTerms (PPoly<Parameter> &p, int i, int j, int k) {
+  
+  void addTerms (PPoly &p, int i, int j, int k) {
     p.add(pts[i]->get().tripleProduct(pts[j]->get(), pts[k]->get()), 0);
     p.add(dsp[i]->get().tripleProduct(pts[j]->get(), pts[k]->get()), 1);
     p.add(pts[i]->get().tripleProduct(dsp[j]->get(), pts[k]->get()), 1);
@@ -409,40 +395,97 @@ class FIPoly : public Object<PPoly<Parameter>> {
   FIPoly (const Points &pts, const Points &dsp) : pts(pts), dsp(dsp) {}
 };
 
-class TranslatedPoint : public Point {
-  PTR<Point> p, u;
-  ObjPTR<Parameter> t;
-  PV3 calculate () { return p->get() + t->get()*u->get(); }
+bool intersectsVF (const Points &pts, const Points &dsp, Root *r);
+
+bool intersectsEE (const Points &pts, const Points &dsp, Root *r);
+
+int LeftTurnR (Point *a, Point *b, Point *c, Point *da, Point *db, Point *dc,
+	       Root *r, int pc);
+
+class LTPoly : public Object<PPoly> {
+  Point *a, *b, *c, *da, *db, *dc;
+  int pc;
+
+  PPoly calculate () {
+    PV3 u = c->get() - b->get(), v = a->get() - b->get(),
+      du = dc->get() - db->get(), dv = da->get() - db->get();
+    PPoly p;
+    p.add(cross(u, v, pc), 0);
+    p.add(cross(du, v, pc) + cross(u, dv, pc), 1);
+    p.add(cross(du, dv, pc), 2);
+    return p;
+  }
+
  public:
-  TranslatedPoint (Point *p, Point *u, Object<Parameter> *t) : p(p), u(u), t(t) {}
+  LTPoly (Point *a, Point *b, Point *c, Point *da, Point *db, Point *dc,
+	  int pc) : a(a), b(b), c(c), da(da), db(db), dc(dc), pc(pc) {}
 };
 
-typedef pair<Vertex *, Vertex *> VVPair;
+bool onLineR (Point *a, Point *t, Point *h, Point *da, Point *dt, Point *dh,
+	      Root *r);
 
-typedef map<Vertex *, Vertex *> VVMap;
+class OLPoly : public Object<PPoly> {
+  Point *a, *t, *h, *da, *dt, *dh;
+
+  PPoly calculate () {
+    PV3 u = a->get() - t->get(), v = h->get() - t->get(),
+      du = da->get() - dt->get(), dv = dh->get() - dt->get(), r = Rdir->get();
+    PPoly p;
+    p.add(r.tripleProduct(u, v), 0);
+    p.add(r.tripleProduct(u, dv) + r.tripleProduct(du, v), 1);
+    p.add(r.tripleProduct(du, dv), 2);
+    return p;
+  }
+
+ public:
+  OLPoly (Point *a, Point *t, Point *h, Point *da, Point *dt, Point *dh)
+    : a(a), t(t), h(h), da(da), dt(dt), dh(dh) {}
+};
+
+bool onEdgeR (Point *a, Point *t, Point *h, Point *da, Point *dt, Point *dh,
+	      Root *r);
+
+int OrderR (Point *a, Point *t, Point *h, Point *da, Point *dt, Point *dh,
+	    Root *r);
+
+class ORPoly : public Object<PPoly> {
+  Point *a, *t, *h, *da, *dt, *dh;
+
+  PPoly calculate () {
+    PV3 u = a->get() - t->get(), v = h->get() - t->get(),
+      du = da->get() - dt->get(), dv = dh->get() - dt->get();
+    PPoly p;
+    p.add(u.dot(v), 0);
+    p.add(u.dot(dv) + du.dot(v), 1);
+    p.add(du.dot(dv), 2);
+    return p;
+  }
+
+ public:
+  ORPoly (Point *a, Point *t, Point *h, Point *da, Point *dt, Point *dh)
+    : a(a), t(t), h(h), da(da), dt(dt), dh(dh) {}
+};
+
+class PrimitiveR : public Primitive {
+  Object<PPoly> *p;
+  Root *r;
+
+  int sign () {
+    PPoly f = p->get();
+    Parameter a = r->get(), v = f.value(a);
+    int s = v.sign(false);
+    if (s)
+      return s;
+    PPoly g = r->getPoly()->get(), b, c, h = g.gcd(f, b, c), e;
+    g.rem(h, e);
+    if (e.value(a).sign(false))
+      return 0;
+    throw signException;
+  };
+ public:
+  PrimitiveR (Object<PPoly> *p, Root *r) : p(p), r(r) {}
+};
 
 Polyhedron * round (Polyhedron *a);
 
-Polyhedron * roundD (Polyhedron *a);
-
-Vertex * getVertexD (Polyhedron *a, VVMap &vvmap, Vertex *v);
-
-VertexSet intersectionVertices (Polyhedron *a);
-
-FeatureSet intersections (Polyhedron *a);
-
-void intersectionsT (void *ptr);
-
-void intersectionCandidates (Face *f, Face *g, FeatureSet &fs);
-
-bool intersectsT (Face *f, Edge *e);
-
-Polyhedron * roundF (Polyhedron *a, const VertexSet &vs, VertexSet &nvs);
-
-Vertex * getVertexF (Polyhedron *a, const VertexSet &vs, VertexSet &nvs,
-		     Vertex *v);
-
-void intersectFF (Polyhedron *a, const VertexSet &vs);
-
-bool moved (Face *f, const VertexSet &vs);
 #endif

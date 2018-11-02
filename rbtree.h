@@ -57,6 +57,20 @@ class RBTree {
     return x;
   }
   
+  bool find (V v) const {
+    Node *x = r, *y = nil;
+    int s;
+    while (x != nil) {
+      s = v->order(x->v);
+      if (s == 0) {
+	return true;
+      }
+      y = x;
+      x = s == 1 ? x->l : x->r;
+    }
+    return false;
+  }
+
   Node * insert (V v) {
     Node *x = r, *y = nil;
     int s;

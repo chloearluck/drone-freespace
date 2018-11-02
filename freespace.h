@@ -6,7 +6,7 @@
 
 class InputParameter : public Object<Parameter> {
 public:
-  InputParameter (double x) { set(Parameter::input(x)); }
+  InputParameter (double x) : Object<Parameter>(Parameter::input(x)) {}
 };
 
 class SinCosAlpha : public Point {

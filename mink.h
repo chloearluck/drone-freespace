@@ -7,11 +7,11 @@ class Convolution : public Polyhedron {
   EFVMap efvmap;
   FFFVMap fffvmap;
  public:
-  Convolution (bool perturbed) : Polyhedron(perturbed) { oneWayInt = true; }
-  Face * minkowskiInit (FaceSet &fdone, Octree<Face *> *octree,
+  Convolution (bool perturbed, bool oneway) : Polyhedron(perturbed) { oneWayInt = oneway; }
+  Face * minkowskiInit (set<Face *> &fdone, Octree<Face *> *octree,
 			Polyhedron *a, PVMap &pvmap);
   Face * rmaxFace (Vertex *&v);
-  void subdivide (Face *f, FaceSet &fdone, Octree<Face *> *octree,
+  void subdivide (Face *f, set<Face *> &fdone, Octree<Face *> *octree,
 		  Polyhedron *a, PVMap &pvmap);
   void intersectFF (Face *f, const FaceSet &fdone, Octree<Face *> *octree);
   void expand (FaceSet &fdone, Octree<Face *> *octree,
@@ -27,22 +27,25 @@ void sortHEdges (Polyhedron *a, int nf);
 
 class UnitVector : public Point {
   Point *a;
-  PV3 calculate () { return a->getP().unit(); }
+
+  PV3 calculate () { return a->get().unit(); }
  public:
   UnitVector (Point *a) : a (a) {}
 };
 
 class GreatCircleN : public Point {
   Point *t, *h;
-  PV3 calculate () { return t->getP().cross(h->getP()); }
+
+  PV3 calculate () { return t->get().cross(h->get()); }
  public:
   GreatCircleN (Point *t, Point *h) : t(t), h(h) {}
 };
 
 class GreatCircleMinX : public Point {
   Point *n;
+  
   PV3 calculate () {
-    PV3 p = n->getP();
+    PV3 p = n->get();
     return PV3(- p.y*p.y - p.z*p.z, p.y*p.x, p.z*p.x);
   }
  public:
@@ -51,8 +54,9 @@ class GreatCircleMinX : public Point {
 
 class GreatCircleMinY : public Point {
   Point *n;
+  
   PV3 calculate () {
-    PV3 p = n->getP();
+    PV3 p = n->get();
     return PV3(p.x*p.y, - p.x*p.x - p.z*p.z, p.z*p.y);
   }
  public:
@@ -61,8 +65,9 @@ class GreatCircleMinY : public Point {
 
 class GreatCircleMinZ : public Point {
   Point *n;
+  
   PV3 calculate () {
-    PV3 p = n->getP();
+    PV3 p = n->get();
     return PV3(p.x*p.z, p.y*p.z, - p.x*p.x - p.y*p.y);
   }
  public:
@@ -71,6 +76,7 @@ class GreatCircleMinZ : public Point {
 
 class EENormal : public Point {
   HEdge *e, *f;
+
   PV3 calculate () { return e->getU().cross(f->getU()); }
  public:
   EENormal (HEdge *e, HEdge *f) : e(e), f(f) {}
@@ -78,10 +84,13 @@ class EENormal : public Point {
 
 class FNormal : public Point {
   Face *f;
-  PV3 calculate () { return f->getP()->getN(); }
+  
+  PV3 calculate () { return f->getP()->get().n; }
  public:
   FNormal (Face *f) : f(f) {}
 };
+
+Primitive3(TripleProduct, Point *, a, Point *, b, Point *, c);
 
 void sphereBBox (Edge *e, double *bbox);
 
@@ -95,8 +104,8 @@ void merge (double *bbox1, double *bbox2);
 
 class BSPElt {
  public:
-  BSPElt (Vertex *v, const HEdges &ed);
-  BSPElt (Edge *e);
+  BSPElt (Vertex *v, const HEdges &ed, bool convex = true);
+  BSPElt (Edge *e, bool convex = true);
   BSPElt (Face *f);
   BSPElt (const BSPElt &x);
   bool compatible (const BSPElt &e) const { return (l & e.l) == 0u; }
@@ -110,6 +119,7 @@ class BSPElt {
   HEdges ed;
   ID l;
   double bbox[6];
+  bool convex;
 };
 
 typedef vector<BSPElt> BSPElts;
@@ -188,8 +198,6 @@ int convexEdge (Edge *e);
 Primitive2(ConvexEdge, HEdge *, e1, HEdge *, e2);
 
 bool compatibleEE (Edge *e, Edge *f, bool &aflag);
-
-Primitive2(CompatibleEdge, Edge *, e, Face *, f);
 
 void sumEE (Edge *e, Edge *f, bool aflag, FaceDescSet &fds,
 	    VVPairVMap &vmap, Polyhedron *con);
