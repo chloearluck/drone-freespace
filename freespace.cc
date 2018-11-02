@@ -56,7 +56,9 @@ public:
   PTR<Point> r;
   PTR<Point> t;
   OuterApproxVertex(PTR<Point> p) {
-    this->p = p; r = 0; t = 0;
+    this->p = p;
+    r = new RotationPoint(p, sin_cos_alpha);
+    t = new TangentIntersectionPoint(p, sin_cos_alpha);
   }
 };
 
@@ -80,6 +82,27 @@ class OuterApproxFace {
     this->top1 = pvmap[top1];
     this->top2 = (top2 == NULL? NULL: pvmap[top2]);
     isTrapazoid = (top2 != NULL) && (bottom2 != NULL);
+    setInnerOuter();
+  }
+  OuterApproxFace(OuterApproxVertex* bottom1, OuterApproxVertex* bottom2, OuterApproxVertex* top1, OuterApproxVertex* top2) {
+    this->bottom1 = bottom1;
+    this->bottom2 = (bottom1 != bottom2? bottom2 : NULL);
+    this->top1 = top1;
+    this->top2 = (top1 != top2? top2 : NULL);
+    isTrapazoid = (this->top2 != NULL) && (this->bottom2 != NULL);
+    setInnerOuter();
+  }
+  void setInnerOuter() {
+    if (top2 != NULL && DiffLength(top1->p, top2->p) > 0) {
+      OuterApproxVertex * tmp = top1;
+      top1 = top2;
+      top2 = tmp;
+    }
+    if (bottom2 != NULL && DiffLength(bottom1->p, bottom2->p) > 0) {
+      OuterApproxVertex * tmp = bottom1;
+      bottom1 = bottom2;
+      bottom2 = tmp;
+    }
   }
 };
 
@@ -176,52 +199,192 @@ void saveTriangulation(const char * filename, std::vector<OuterApproxFace> & spl
   out.close();
 }
 
-//generate 3 outer approximation points from rotate point p around the origin, add them to pList
-void pointOuterApprox(Points &pList, OuterApproxVertex * p) {
-  pList.push_back(p->p);
-  if (p->r == NULL)
-    p->r = new RotationPoint(p->p, sin_cos_alpha);
-  pList.push_back(p->r);
-  if (p->t == NULL)
-    p->t = new TangentIntersectionPoint(p->p, sin_cos_alpha);
-  pList.push_back(p->t);
+Primitive5(FrontDiagonal, Vertex*,top1,Vertex*,top2,Vertex*,bottom1,Vertex*,bottom2,Vertex*,bottom3);
+int FrontDiagonal::sign() {
+  //return -1 if the front diagonal is top2 bottom1
+  //return  1 if the front diagonal is top1 bottom2
+  //bottom3 is the following point on the bottom pentagon 
+  PV3 t1 = top1->getP()->getP();
+  PV3 t2 = top2->getP()->getP();
+  PV3 b1 = bottom1->getP()->getP();
+  PV3 b2 = bottom2->getP()->getP();
+  PV3 b3 = bottom3->getP()->getP();
+  //if b2 is on the same side of triangle t1 t2 b1 as b3, return -1
+  if ( vol(t1, t2, b1, b2).sign() == vol(t1, t2, b1, b3).sign() )
+    return -1;
+  else 
+    return 1;
 }
 
-// generate the 5 out approximation points from rotating a segment around the origin (assuming the nearest point on the segment is an endpoint)
-void segmentOuterApprox(Points &pList, OuterApproxVertex * p1, OuterApproxVertex * p2) {
-  OuterApproxVertex * outer;
-  OuterApproxVertex * inner;
+Primitive3(Area2D, PTR<Point>, a, PTR<Point>, b, PTR<Point>, c);
+int Area2D::sign() {
+  PV3 v1 = b->getP()-a->getP();
+  PV3 v2 = c->getP()-a->getP();
+  return (v1.getX()*v2.getY() - v1.getY() * v2.getX()).sign();
+}
 
-  if (DiffLength(p1->p,p2->p) > 0) { 
-    outer = p1;
-    inner = p2;
+//find the top and bottom pentagon's for trapezoid 2 and connect each of the sides by their convex hulls 
+Polyhedron * trapezoidOuterApprox(OuterApproxFace t) {
+  bool topIsTriangle = (t.top2 == NULL);
+  bool bottomIsTriangle = (t.bottom2 == NULL);
+
+  Polyhedron *a = new Polyhedron(true);
+
+  Vertex * tp = a->getVertex(t.top1->p);
+  Vertex * tq = topIsTriangle? tp : a->getVertex(t.top2->p);
+  Vertex * tq_tanint = topIsTriangle? a->getVertex(t.top1->t) : a->getVertex(t.top2->t);
+  Vertex * tp_rot = a->getVertex(t.top1->r);
+  Vertex * tq_rot = topIsTriangle? tp_rot : a->getVertex(t.top2->r);
+
+  Vertex * bp = a->getVertex(t.bottom1->p);
+  Vertex * bq = bottomIsTriangle? bp : a->getVertex(t.bottom2->p);
+  Vertex * bq_tanint = bottomIsTriangle? a->getVertex(t.bottom1->t) : a->getVertex(t.bottom2->t);
+  Vertex * bp_rot = a->getVertex(t.bottom1->r);
+  Vertex * bq_rot = bottomIsTriangle? bp_rot : a->getVertex(t.bottom2->r);
+
+  //TO DO: remove this old code
+  /*
+  //top pentagon, triangulated
+  a->addTriangle(tq, tq_tanint, tq_rot);
+  if (!topIsTriangle)
+    if (Area2D(tp_rot->getP(), tq->getP(), tq_rot->getP()) != Area2D(tp_rot->getP(), tq->getP(), tp->getP())) {
+      //drop diagonal p' q
+      a->addTriangle(tp_rot, tp, tq); 
+      a->addTriangle(tp_rot, tq, tq_rot); 
+    } else {
+      //drop diagonal p q'
+      a->addTriangle(tp, tq_rot, tp_rot); 
+      a->addTriangle(tq, tq_rot, tp); 
+      assert(Area2D(tp->getP(), tq_rot->getP(), tq_rot->getP()) != Area2D(tp->getP(), tq_rot->getP(), tq->getP()));
+    }
+
+  //bottom pentagon, triangulated
+  a->addTriangle(bq, bq_tanint, bq_rot);
+  if (!bottomIsTriangle)
+    if (Area2D(bp_rot->getP(), bq->getP(), bq_rot->getP()) != Area2D(bp_rot->getP(), bq->getP(), bp->getP())) {
+      //drop diagonal p' q
+      a->addTriangle(bp_rot, bp, bq); 
+      a->addTriangle(bp_rot, bq, bq_rot); 
+    } else {
+      //drop diagonal p q'
+      a->addTriangle(bp, bq_rot, bp_rot); 
+      a->addTriangle(bq, bq_rot, bp); 
+      assert(Area2D(bp->getP(), bq_rot->getP(), bq_rot->getP()) != Area2D(bp->getP(), bq_rot->getP(), bq->getP()));
+    }
+  */
+
+  //top pentagon, triangulated
+  if (topIsTriangle) {
+    a->addTriangle(tq, tq_tanint, tq_rot);
   } else {
-    outer = p2;
-    inner = p1;
+    Vertices polygon; 
+    polygon.push_back(tp); polygon.push_back(tq); polygon.push_back(tq_tanint); polygon.push_back(tq_rot); polygon.push_back(tp_rot);
+    while (polygon.size() > 3) {
+      int n=polygon.size();
+      for (int i=0; i<n; i++) {
+        bool isEar = Area2D(polygon[i]->getP(), polygon[(i+1)%n]->getP(), polygon[(i+2)%n]->getP()) > 0;
+        if (isEar)
+          for (int j=3; j<n; j++)
+            if (Area2D(polygon[i]->getP(),       polygon[(i+1)%n]->getP(), polygon[(i+j)%n]->getP()) > 0  &&
+                Area2D(polygon[(i+1)%n]->getP(), polygon[(i+2)%n]->getP(), polygon[(i+j)%n]->getP()) > 0  &&
+                Area2D(polygon[(i+2)%n]->getP(), polygon[i]->getP(),       polygon[(i+j)%n]->getP()) > 0) {
+              isEar = false;
+              break;
+            }
+        if (isEar) {
+          a->addTriangle(polygon[i], polygon[(i+1)%n], polygon[(i+2)%n]);
+          polygon.erase(polygon.begin() + (i+1)%n ); 
+          break;     
+        }
+      }
+      assert(polygon.size() == n-1);
+    }
+    a->addTriangle(polygon[0], polygon[1], polygon[2]);
   }
 
-  pointOuterApprox(pList, outer);
-  pList.push_back(inner->p);
-  if (inner->r == NULL)
-    inner->r = new RotationPoint(inner->p, sin_cos_alpha);
-  pList.push_back(inner->r);
-}
+  //bottom pentagon, triangulated
+  if (bottomIsTriangle) {
+    a->addTriangle(bq_rot, bq_tanint, bq);
+  } else {
+    Vertices polygon;
+    polygon.push_back(bp); polygon.push_back(bq); polygon.push_back(bq_tanint); polygon.push_back(bq_rot); polygon.push_back(bp_rot);
+    while (polygon.size() > 3) {
+      int n=polygon.size();
+      for (int i=0; i<n; i++) {
+        bool isEar = Area2D(polygon[i]->getP(), polygon[(i+1)%n]->getP(), polygon[(i+2)%n]->getP()) > 0;
+        if (isEar)
+          for (int j=3; j<n; j++)
+            if (Area2D(polygon[i]->getP(),       polygon[(i+1)%n]->getP(), polygon[(i+j)%n]->getP()) > 0  &&
+                Area2D(polygon[(i+1)%n]->getP(), polygon[(i+2)%n]->getP(), polygon[(i+j)%n]->getP()) > 0  &&
+                Area2D(polygon[(i+2)%n]->getP(), polygon[i]->getP(),       polygon[(i+j)%n]->getP()) > 0) {
+              isEar = false;
+              break;
+            }
+        if (isEar) {
+          a->addTriangle(polygon[i], polygon[(i+2)%n], polygon[(i+1)%n]);
+          polygon.erase(polygon.begin() + (i+1)%n ); 
+          break;     
+        }
+      }
+      assert(polygon.size() == n-1);
+    }
+    a->addTriangle(polygon[0], polygon[2], polygon[1]);
+  }
 
-// generate the 8 o 10 convex hull points from rotating a triangle or trapezoid around the origin
-Polyhedron * triangleOuterApprox(OuterApproxFace t) { 
-  Points pList;
-  
-  if (t.isTrapazoid) {
-    segmentOuterApprox(pList, t.top1, t.top2);
-    segmentOuterApprox(pList, t.bottom1, t.bottom2);
-  } else if (t.top2 == NULL) {
-    pointOuterApprox(pList, t.top1);
-    segmentOuterApprox(pList, t.bottom1, t.bottom2);
-  } else if (t.bottom2 == NULL) {
-    segmentOuterApprox(pList, t.top1, t.top2);
-    pointOuterApprox(pList, t.bottom1);
-  } 
-  return convexHull(pList, true);
+
+  //p q side (is parallel, diagonal doesn't matter)
+  if (!bottomIsTriangle)
+    a->addTriangle(tp, bp, bq);
+  if (!topIsTriangle)
+    a->addTriangle(tp, bq, tq);
+
+  //q t side
+  if (FrontDiagonal(tq, tq_tanint, bq, bq_tanint, bq_rot) < 0) {
+    a->addTriangle(tq, bq, tq_tanint);
+    a->addTriangle(bq, bq_tanint, tq_tanint);
+  } else {
+    a->addTriangle(tq, bq, bq_tanint);
+    a->addTriangle(tq, bq_tanint, tq_tanint);
+  }
+
+  //t q' side
+  if (FrontDiagonal(tq_tanint, tq_rot, bq_tanint, bq_rot, bp_rot) < 0) {
+    a->addTriangle(tq_tanint, bq_tanint, tq_rot);
+    a->addTriangle(bq_tanint, bq_rot, tq_rot);
+  } else {
+    a->addTriangle(tq_tanint, bq_tanint, bq_rot);
+    a->addTriangle(tq_tanint, bq_rot, tq_rot);
+  }
+
+  //q' p' side (parallel, doesn't matter which diagonal)
+  if (!topIsTriangle)
+    a->addTriangle(tq_rot, bq_rot, tp_rot);
+  if (!bottomIsTriangle)
+    a->addTriangle(bq_rot, bp_rot, tp_rot);
+
+  //p' p side
+  if (FrontDiagonal(tp_rot, tp, bp_rot, bp, bq) < 0) {
+    a->addTriangle(tp_rot, bp_rot, tp);
+    a->addTriangle(bp_rot, bp, tp);
+  } else {
+    a->addTriangle(tp_rot, bp_rot, bp);
+    a->addTriangle(tp_rot, bp, tp);
+  }
+
+  //DEBUG ONLY
+  a->computeWindingNumbers();
+  if (a->cells.size() != 2) {
+    cout << "trapezoids outer approximation has "<<a->cells.size()<<" cells"<<endl;
+    //output the trapezoid t
+    std::vector<OuterApproxFace> tmp;
+    tmp.push_back(t);
+    saveTriangulation("trap.vtk", tmp);
+
+    //output the trapezoid approximation a
+    savePoly(a, "trapApprox"); 
+    assert(false);
+  }
+  return a;
 }
 
 void splitSimple(std::vector<OuterApproxFace> & tList, SimpleTriangle t, std::map<PTR<Point>, OuterApproxVertex*> & pvmap) {
@@ -336,6 +499,64 @@ Polyhedron * rotate(Polyhedron * p) {
   return a;
 }
 
+Primitive3(RequiresVerticalSplit, OuterApproxFace, f, PTR<Object<Parameter> >, sin2theta, PTR<Object<Parameter > >, Rtheta);
+int RequiresVerticalSplit::sign() {
+  Parameter dh = f.top1->p->getP().getZ() - f.bottom1->p->getP().getZ();
+  if (dh > Rtheta->get()) {
+    return 1;
+  }
+  //p p' side
+  PV3 t1 = f.top1->p->getP();
+  PV3 t2 = f.top1->r->getP();
+  PV3 b1 = f.bottom1->p->getP();
+  PV3 b2 = f.bottom1->r->getP();
+  PV3 vt = t2-t1;
+  PV3 vb = b2-b1;
+  Parameter vtxvb = vt.getX()*vb.getY() - vt.getY()*vb.getX();
+  Parameter sin2alpha = vtxvb*vtxvb / vt.dot(vt) / vb.dot(vb);
+  if (sin2alpha > sin2theta->get())
+    return 1;
+
+  //q t side
+  t1 = (f.top2 != NULL? f.top2->p->getP() : f.top1->p->getP());
+  t2 = (f.top2 != NULL? f.top2->t->getP() : f.top1->t->getP());
+  b1 = (f.bottom2 != NULL? f.bottom2->p->getP() : f.bottom1->p->getP());
+  b2 = (f.bottom2 != NULL? f.bottom2->t->getP() : f.bottom1->t->getP());
+  vt = t2-t1;
+  vb = b2-b1;
+  vtxvb = vt.getX()*vb.getY() - vt.getY()*vb.getX();
+  Parameter vt2 = vt.dot(vt);
+  Parameter vb2 = vb.dot(vb);
+  sin2alpha = vtxvb*vtxvb / vt2 / vb2;
+  if (sin2alpha > sin2theta->get()) 
+    return 1;
+
+  //q' t side (QUESTION: identical to q t? hence redundant)
+  t1 = (f.top2 != NULL? f.top2->r->getP() : f.top1->r->getP());
+  b1 = (f.bottom2 != NULL? f.bottom2->r->getP() : f.bottom1->r->getP());
+  vt = t2-t1;
+  vb = b2-b1;
+  vtxvb = vt.getX()*vb.getY() - vt.getY()*vb.getX();
+  sin2alpha = vtxvb*vtxvb / vt.dot(vt) / vb.dot(vb);
+  if (sin2alpha > sin2theta->get())
+    return 1;
+
+  return 0;
+}
+
+void splitVertically(OuterApproxFace f, std::vector<OuterApproxFace> & list, PTR<Object<Parameter> > sin2theta, PTR<Object<Parameter> > Rtheta) {
+  if (RequiresVerticalSplit(f, sin2theta, Rtheta) == 1) {
+    OuterApproxVertex* mid1 = new OuterApproxVertex(new MidPoint(f.top1->p, f.bottom1->p));
+    OuterApproxVertex* mid2 = new OuterApproxVertex(new MidPoint((f.top2 != NULL? f.top2->p : f.top1->p), (f.bottom2 != NULL? f.bottom2->p : f.bottom1->p)));
+
+    OuterApproxFace top(mid1, mid2, f.top1, f.top2);
+    OuterApproxFace bottom(f.bottom1, f.bottom2, mid1, mid2);
+    splitVertically(top, list, sin2theta, Rtheta);
+    splitVertically(bottom, list, sin2theta, Rtheta);
+  } else
+    list.push_back(f);
+}
+
 FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, PTR<Object<Parameter> > tan_half_angle, int numRotations, bool inner_approximation) {
   this->robot = robot->triangulate();
   this->obstacle = obstacle;
@@ -350,25 +571,51 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, PTR<Object<Param
     PTR<Point> r = es[0]->getNext()->getNext()->tail()->getP();
     tList.push_back(SimpleTriangle(p,q,r));
   }
-
   cout<<"loaded triangles"<<endl;
 
   std::map<PTR<Point>, OuterApproxVertex*> pvmap;
   std::vector<OuterApproxFace> splitTList;
-  for (int i=0; i< tList.size(); i++) 
+  for (int i=0; i< tList.size(); i++)
     split(splitTList, tList[i], pvmap);
   tList.clear();
 
   cout<<"split triangles"<<endl;
   saveTriangulation("triangulation.vtk", splitTList);
 
-  std::vector<Polyhedron *> polyList;
-  for (int i=0; i<splitTList.size(); i++) {
-    polyList.push_back(triangleOuterApprox(splitTList[i]));
+  //find R * theta and sin2theta
+  PTR<Point> furthestVertex = robot->vertices[0]->getP();
+  for (int i=1; i<robot->vertices.size(); i++) {
+    if (DiffLength(robot->vertices[i]->getP(), furthestVertex) > 0)
+      furthestVertex = robot->vertices[i]->getP();
   }
-  cout<<"found triangle polyhedrons"<<endl;
+  double r2 = furthestVertex->getApprox().getX().mid() * furthestVertex->getApprox().getX().mid() 
+            + furthestVertex->getApprox().getY().mid() * furthestVertex->getApprox().getY().mid() 
+            + furthestVertex->getApprox().getZ().mid() * furthestVertex->getApprox().getZ().mid();
+  Parameter::disable();
+  double rt = sqrt(r2) * 2 * M_PI / numRotations;
+  double sin2t = sin(2 * M_PI / numRotations) * sin(2 * M_PI / numRotations);
+  Parameter::enable();
+  PTR<Object<Parameter> > Rtheta = new InputParameter(rt);
+  PTR<Object<Parameter> > sin2theta = new InputParameter(sin2t);
+
+
+  //split trapezoid horizontally to ensure excess is O(theta^2)
+  std::vector<OuterApproxFace> splitTList2;
+  for (std::vector<OuterApproxFace>::iterator f = splitTList.begin(); f != splitTList.end(); f++) {
+    splitVertically(*f, splitTList2, sin2theta, Rtheta);
+  }
+  cout <<splitTList2.size() << " trapezoids" << endl;
+
+  saveTriangulation("triangulation2.vtk", splitTList2);
+
+  std::vector<Polyhedron *> polyList;
+  for (int i=0; i<splitTList2.size(); i++) {
+    polyList.push_back(trapezoidOuterApprox(splitTList2[i]));
+  }
+  cout<<"found polyhedral outer approximations of each trapezoid"<<endl;
 
   Polyhedron * outerApproxShell = multiUnion(&polyList[0], polyList.size());
+  cout <<"done multiUnion"<<endl;
   Polyhedron * robotApprox;
   if (inner_approximation)
     robotApprox = robot->boolean(outerApproxShell, Union);
