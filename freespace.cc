@@ -199,21 +199,18 @@ void saveTriangulation(const char * filename, std::vector<OuterApproxFace> & spl
   out.close();
 }
 
-Primitive5(FrontDiagonal, Vertex*,top1,Vertex*,top2,Vertex*,bottom1,Vertex*,bottom2,Vertex*,bottom3);
+Primitive4(FrontDiagonal, Vertex*,top1,Vertex*,top2,Vertex*,bottom1,Vertex*,bottom2);
 int FrontDiagonal::sign() {
   //return -1 if the front diagonal is top2 bottom1
   //return  1 if the front diagonal is top1 bottom2
-  //bottom3 is the following point on the bottom pentagon 
+  //note: top1 top2 and bottom1 bottom2 are in coutnerclockwise order around their respective pentagons
   PV3 t1 = top1->getP()->get();
   PV3 t2 = top2->getP()->get();
+  PV2 vt(t2.getX()-t1.getX(), t2.getY()-t1.getY());
   PV3 b1 = bottom1->getP()->get();
   PV3 b2 = bottom2->getP()->get();
-  PV3 b3 = bottom3->getP()->get();
-  //if b2 is on the same side of triangle t1 t2 b1 as b3, return -1
-  if ( vol(t1, t2, b1, b2).sign() == vol(t1, t2, b1, b3).sign() )
-    return -1;
-  else 
-    return 1;
+  PV2 vb(b2.getX()-b1.getX(), b2.getY()-b1.getY());
+  return vb.cross(vt).sign();
 }
 
 Primitive3(Area2D, PTR<Point>, a, PTR<Point>, b, PTR<Point>, c);
@@ -308,7 +305,7 @@ Polyhedron * trapezoidOuterApprox(OuterApproxFace t) {
     a->addTriangle(tp, bq, tq);
 
   //q t side
-  if (FrontDiagonal(tq, tq_tanint, bq, bq_tanint, bq_rot) < 0) {
+  if (FrontDiagonal(tq, tq_tanint, bq, bq_tanint) < 0) {
     a->addTriangle(tq, bq, tq_tanint);
     a->addTriangle(bq, bq_tanint, tq_tanint);
   } else {
@@ -317,7 +314,7 @@ Polyhedron * trapezoidOuterApprox(OuterApproxFace t) {
   }
 
   //t q' side
-  if (FrontDiagonal(tq_tanint, tq_rot, bq_tanint, bq_rot, bp_rot) < 0) {
+  if (FrontDiagonal(tq_tanint, tq_rot, bq_tanint, bq_rot) < 0) {
     a->addTriangle(tq_tanint, bq_tanint, tq_rot);
     a->addTriangle(bq_tanint, bq_rot, tq_rot);
   } else {
@@ -332,7 +329,7 @@ Polyhedron * trapezoidOuterApprox(OuterApproxFace t) {
     a->addTriangle(bq_rot, bp_rot, tp_rot);
 
   //p' p side
-  if (FrontDiagonal(tp_rot, tp, bp_rot, bp, bq) < 0) {
+  if (FrontDiagonal(tp_rot, tp, bp_rot, bp) < 0) {
     a->addTriangle(tp_rot, bp_rot, tp);
     a->addTriangle(bp_rot, bp, tp);
   } else {
