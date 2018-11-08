@@ -341,12 +341,9 @@ Polyhedron * trapezoidOuterApprox(OuterApproxFace t) {
   a->computeWindingNumbers();
   if (a->cells.size() != 2) {
     cout << "trapezoids outer approximation has "<<a->cells.size()<<" cells"<<endl;
-    //output the trapezoid t
     std::vector<OuterApproxFace> tmp;
     tmp.push_back(t);
     saveTriangulation("trap.vtk", tmp);
-
-    //output the trapezoid approximation a
     savePoly(a, "trapApprox"); 
     assert(false);
   }
@@ -523,9 +520,53 @@ void splitVertically(OuterApproxFace f, std::vector<OuterApproxFace> & list, PTR
     list.push_back(f);
 }
 
+Polyhedron * FreeSpace::generateSweep(std::vector<OuterApproxFace> & trapezoids) {
+  std::vector<Polyhedron *> polyList;
+  for (int i=0; i<trapezoids.size(); i++)
+    polyList.push_back(trapezoidOuterApprox(trapezoids[i]));
+
+  cout<<"found polyhedral outer approximations of "<<polyList.size()<<" trapezoids"<<endl;
+  Polyhedron * outerApproxShell = multiUnion(&polyList[0], polyList.size());
+  cout <<"done multiUnion"<<endl;
+  Polyhedron * robotApprox = inner_approximation? robot->boolean(outerApproxShell, Union) : robot->boolean(outerApproxShell, Complement);
+  for (int i=0; i<polyList.size(); i++)
+    delete polyList[i];
+  polyList.clear();
+
+  Polyhedron * reflectedRobotApprox = robotApprox->negative();
+  delete robotApprox, outerApproxShell;
+  return reflectedRobotApprox;
+}
+
+void FreeSpace::generateFreeSpaces(std::vector<Polyhedron*> & spaces, Polyhedron * sweep, const char * basename) {
+  std::vector<Polyhedron *> allRotations;
+  allRotations.push_back(sweep);
+  for (int i=0; i< numRotations; i++)
+    allRotations.push_back(rotate(allRotations[i]));
+  cout<<"found all rotations"<<endl;
+
+  for (int i=0; i< allRotations.size(); i++) {
+    cout<<"minkowskiSum "<<i<<" of "<<allRotations.size()-1<<endl;
+    Polyhedron * mSum = minkowskiSumFull(allRotations[i], obstacle);
+    simplify(mSum, 1e-6, false);
+    char s[25];
+    sprintf(s, "%s%02d", basename, i); 
+    savePoly(mSum, s);
+    spaces.push_back(mSum);
+  }
+
+  cout<<"cspaces populated"<<endl;
+
+  for (int i=0; i< numRotations; i++)
+    delete allRotations[i];
+  allRotations.clear(); 
+}
+
 FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, PTR<Object<Parameter> > tan_half_angle, int numRotations, bool inner_approximation) {
   this->robot = robot->triangulate();
   this->obstacle = obstacle;
+  this->inner_approximation = inner_approximation;
+  this->numRotations = numRotations;
 
   sin_cos_alpha = new SinCosAlpha(tan_half_angle);
 
@@ -574,50 +615,14 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, PTR<Object<Param
 
   saveTriangulation("triangulation2.vtk", splitTList2);
 
-  std::vector<Polyhedron *> polyList;
-  for (int i=0; i<splitTList2.size(); i++) {
-    polyList.push_back(trapezoidOuterApprox(splitTList2[i]));
-  }
-  cout<<"found polyhedral outer approximations of "<<polyList.size()<<" trapezoids"<<endl;
+  Polyhedron * closeApprox = generateSweep(splitTList2);
+  // simplify(closeApprox, 1e-6);
+  savePoly(closeApprox, "closeApprox");
+  Polyhedron * roughApprox = generateSweep(splitTList);
+  // simplify(roughApprox, 1e-6);
+  savePoly(roughApprox, "roughApprox");
 
-  Polyhedron * outerApproxShell = multiUnion(&polyList[0], polyList.size());
-  cout <<"done multiUnion"<<endl;
-  Polyhedron * robotApprox;
-  if (inner_approximation)
-    robotApprox = robot->boolean(outerApproxShell, Union);
-  else
-    robotApprox = robot->boolean(outerApproxShell, Complement);
-  delete outerApproxShell;
-  simplify(robotApprox, 1e-6, false);
-  savePoly(robotApprox, "outerApprox");
-
-  for (int i=0; i<polyList.size(); i++)
-    delete polyList[i];
-  polyList.clear();
-
-  Polyhedron * reflectedRobotApprox = robotApprox->negative();
-  vector<Polyhedron *> allRotations;
-  allRotations.push_back(reflectedRobotApprox);
-  for (int i=0; i< numRotations; i++)
-    allRotations.push_back(rotate(allRotations[i]));
-  cout<<"found all rotations"<<endl;
-
-  for (int i=0; i< allRotations.size(); i++) {
-    cout<<"minkowskiSum "<<i<<" of "<<allRotations.size()-1<<endl;
-    Polyhedron * mSum = minkowskiSumFull(allRotations[i], obstacle);
-    simplify(mSum, 1e-6, false);
-    // bool selfInt = mSum->intersectsEdges(mSum);
-    // cout << "selfInt " << selfInt << endl;
-    char s[25];
-    sprintf(s, "sum%02d", i);
-    savePoly(mSum, s);
-    blockspaces.push_back(mSum);
-  }
-
-  cout<<"cspaces populated"<<endl;
-
-  for (int i=0; i< numRotations; i++)
-    delete allRotations[i];
-  allRotations.clear(); 
+  generateFreeSpaces(blockspaces_close, closeApprox, "close");
+  generateFreeSpaces(blockspaces_rough, roughApprox, "rough");
 
 }

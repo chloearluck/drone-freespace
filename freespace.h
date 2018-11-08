@@ -9,6 +9,8 @@ public:
   InputParameter (double x) : Object<Parameter>(Parameter::input(x)) {}
 };
 
+class OuterApproxFace;
+
 class SinCosAlpha : public Point {
   Object<Parameter> *tan_theta;
   PV3 calculate () {
@@ -28,8 +30,11 @@ void savePoly(Polyhedron * p, const char * filename);
 class FreeSpace {
 public:
   Polyhedron * robot, * obstacle;
-  std::vector<Polyhedron*> blockspaces;
+  std::vector<Polyhedron*> blockspaces_close, blockspaces_rough;
   int numRotations;
+  bool inner_approximation;
   FreeSpace(Polyhedron * robot, Polyhedron * obstacle, PTR<Object<Parameter> > tan_half_angle, int numRotations, bool inner_approximation = true);
+  Polyhedron * generateSweep(std::vector<OuterApproxFace> & trapezoids);
+  void generateFreeSpaces(std::vector<Polyhedron*> & spaces, Polyhedron * sweep, const char * basename);
 };
 
