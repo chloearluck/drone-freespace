@@ -121,11 +121,11 @@ ModP ModInt::modP2(ModInt::ps[1]);
 void ModInt::changePrime (unsigned int p) {
   if (p == p1) {
     p1 = ps[pIndex];
-    modP1 = ModP(p);
+    modP1 = ModP(p1);
   }
   else if (p == p2) {
     p2 = ps[pIndex];
-    modP2 = ModP(p);
+    modP2 = ModP(p2);
   }
   else
     assert(0);
