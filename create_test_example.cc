@@ -29,60 +29,58 @@ void savePoly(Polyhedron * p, const char * filename) {
   }
 }
 
-Primitive2(DiffZ, PTR<Point>, i, PTR<Point>, j);
-int DiffZ::sign() { return (i->getP().getZ() - j->getP().getZ()).sign(); }
-struct CompareZ {
-  bool operator()(PTR<Point> i, PTR<Point> j) {
-    return (DiffZ(i, j) < 0); 
+void corkscrewPath() {
+  double dtheta = M_PI / 20.0; //angle change at each step
+  double dh = 0.65; //height change at each step
+  double radius = 3.0; //radius of the corkscrew 
+  double radiusx = 1.3; //x thickness of the corkscrew thread
+  double radiusy = 0.85; //y thickness of the corkscrew thread
+  int nsteps = 20;
+
+  Polyhedron * corkscrew = new Polyhedron(true);
+  Vertex * verts[nsteps][4];
+
+  double theta=0.0, height = -dh * (nsteps/2);
+  for (int i=0; i<nsteps; i++) {
+    Parameter::disable();
+    double x = radius * sin(theta);
+    double y = radius * cos(theta);
+    Parameter::enable();
+
+    verts[i][0] = corkscrew->getVertex(new Point(x - radiusx, y - radiusy, height));
+    verts[i][1] = corkscrew->getVertex(new Point(x - radiusx, y + radiusy, height));
+    verts[i][2] = corkscrew->getVertex(new Point(x + radiusx, y + radiusy, height));
+    verts[i][3] = corkscrew->getVertex(new Point(x + radiusx, y - radiusy, height));
+
+    theta += dtheta;
+    height += dh;
   }
-};
+
+  corkscrew->addTriangle(verts[0][0], verts[0][1], verts[0][2]); //top
+  corkscrew->addTriangle(verts[0][0], verts[0][2], verts[0][3]);
+  for (int i=1; i<nsteps; i++) {
+    for (int j=0; j<4; j++) {
+      int k= (j+1)%4;
+      corkscrew->addTriangle(verts[i-1][k], verts[i-1][j], verts[i][j]);
+      corkscrew->addTriangle(verts[i-1][k], verts[i  ][j], verts[i][k]);
+    }
+  }
+  corkscrew->addTriangle(verts[nsteps-1][0], verts[nsteps-1][2], verts[nsteps-1][1]); //bottom
+  corkscrew->addTriangle(verts[nsteps-1][0], verts[nsteps-1][3], verts[nsteps-1][2]);
+
+  double d[6] = {-2*radius, 2*radius, -2*radius, 2*radius, -dh * (nsteps/2)-1.0, -dh * (nsteps/2)+1.0};
+  Polyhedron * room = box(d);
+  Polyhedron * room2 = room->translate(new Point(0.0, 0.0,  dh*nsteps));
+  double d2[6] = {-2.1*radius, 2.1*radius, -2.1*radius, 2.1*radius, -dh * (nsteps/2)-1.2, dh * (nsteps/2)+1.2};
+  Polyhedron * outer = box(d2);
+
+  Polyhedron * obstacle = outer->boolean(corkscrew, Complement); 
+  obstacle = obstacle->boolean(room, Complement);
+  obstacle = obstacle->boolean(room2, Complement);
+  savePoly(obstacle, "corkscrew.vtk");
+}
 
 int main (int argc, char *argv[]) {
   Parameter::enable();
-
-  PTR<Point> top1 = new InputPoint(-1,-1, 1); //top left
-  PTR<Point> top2 = new InputPoint(-1, 1, 1); //top right
-  PTR<Point> top3 = new InputPoint( 1, 1, 1); //bottom right
-  PTR<Point> top4 = new InputPoint( 1,-1, 1); //bottom left
-
-  PTR<Point> bottom1 = new InputPoint(-1,-1,-1); //top left
-  PTR<Point> bottom2 = new InputPoint(-1, 1,-1); //top right
-  PTR<Point> bottom3 = new InputPoint( 1, 1,-1); //bottom right
-  PTR<Point> bottom4 = new InputPoint( 1,-1,-1); //bottom left
-
-  //find the midpoint of the edges you want to split
-  PTR<Point> mid1 = new MidPoint(top1, top4);
-  PTR<Point> mid2 = new MidPoint(top1, top2);
-  //add a (0,0,.000001) to them
-  PTR<Point> p1 = new SumPoint(mid1, new InputPoint(0,0,0.0000001));
-  PTR<Point> p2 = new SumPoint(mid2, new InputPoint(0,0,0.0000001));
-
-  Points plist;
-  plist.push_back(top1);
-  plist.push_back(top3);
-  plist.push_back(top4);
-  plist.push_back(p1);
-  plist.push_back(bottom1);
-  plist.push_back(bottom2);
-  plist.push_back(bottom3);
-  plist.push_back(bottom4);
-  Polyhedron * hull1 = convexHull(plist, true);
-  assert(hull1 != NULL);
-
-  plist.clear();
-  plist.push_back(top1);
-  plist.push_back(top2);
-  plist.push_back(top3);
-  plist.push_back(p2);
-  plist.push_back(bottom1);
-  plist.push_back(bottom2);
-  plist.push_back(bottom3);
-  plist.push_back(bottom4);
-  Polyhedron * hull2 = convexHull(plist, true);
-  assert(hull2 != NULL);
-
-  Polyhedron * cube = hull1->boolean(hull2, Union);
-
-  savePoly(cube, "split-faces-cube.vtk");
-
+  corkscrewPath();
 }
