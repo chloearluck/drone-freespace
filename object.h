@@ -72,6 +72,7 @@ public:
   T *operator-> () const { return t; }
 };
 
+extern pthread_key_t idkey;
 extern pthread_key_t mikey;
 extern pthread_key_t cpkey;
 extern pthread_key_t hsekey;
@@ -80,6 +81,7 @@ class BaseObject : public RefCnt {
 protected:
   static unsigned int deltaPrecision;
   static unsigned int maxPrecision;
+  static unsigned int algebraicId;
   static bool throwSignExceptions[128];
 
   static unsigned int getPrecision () { return MInt::getPrecision(); }
@@ -95,14 +97,16 @@ public:
 
   BaseObject () {}
   virtual ~BaseObject () {}
-  
+
   static void addThread (unsigned int i) {
     assert(i < 128);
+    pthread_setspecific(idkey, (void *) (MInt::threadIds + i));
+    MInt::threadIds[i] = i;
     pthread_setspecific(mikey, (void *) (MInt::mints + i));
     pthread_setspecific(cpkey, (void *) (MInt::curPrecisions + i));
     pthread_setspecific(hsekey, (void *) (throwSignExceptions + i));
     MInt::curPrecisions[i] = 53u;
-  }    
+  }   
 };
 
 class PrecisionException : public std::exception {
@@ -115,10 +119,44 @@ public:
 extern PrecisionException precisionException;
 
 template<class P>
+bool checkAccuracy (const P &p, double acc)
+{
+  if (acc == 1.0) return true;
+  for (int i = 0; i < p.size(); i++) {
+    double l = p[i].lb(), u = p[i].ub();  
+    if ((l < 0.0 && u >= 0.0) || (l <= 0.0 && u > 0.0))
+      return false;
+    if ((l > 0.0 && u - l > l*acc) || (u < 0.0 && u - l > - u*acc)) {
+      double ln = nextafter(l, 1.0 + u);
+      if (ln < u) {
+	ln = nextafter(ln, 1.0 + u);
+	if (ln < u)
+	  return false;
+      }
+    }
+  }
+  return true;
+}
+
+template<class P>
 class Object :  public BaseObject {
+public:
+  template<class T> friend class PTR;
+  template<class T> friend class ObjPTR;
+
+  class PP {
+  public:
+    P p;
+    double t;
+    PP () : t(0) {}
+  };
+
+private:
   friend class Parameter;
   
   P p;
+
+  PP *pp;
 
   virtual P calculate () {
     if (!input())
@@ -126,28 +164,10 @@ class Object :  public BaseObject {
     assert(0);
   }
 
-  bool checkAccuracy (double acc) {
-    if (acc == 1.0) return true;
-    for (int i = 0; i < p.size(); i++) {
-      double l = p[i].lb(), u = p[i].ub();  
-      if ((l < 0.0 && u >= 0.0) || (l <= 0.0 && u > 0.0))
-	return false;
-      if ((l > 0.0 && u - l > l*acc) || (u < 0.0 && u - l > - u*acc)) {
-	double ln = nextafter(l, 1.0 + u);
-	if (ln < u) {
-	  ln = nextafter(ln, 1.0 + u);
-	  if (ln < u)
-	    return false;
-	}
-      }
-    }
-    return true;
-  }
-
 public:
-  Object () {}
+  Object () : pp(0) {}
   
-  Object (const P& q) : p(q) {
+  Object (const P& q, bool constant=false) : p(q), pp(0) {
     for (int i = 0; i < p.size(); i++) {
       if (p[i].high())
         p[i].decreasePrecision();
@@ -156,12 +176,17 @@ public:
         assert(0);
       }
     }
+
+    if (constant)
+      pp = (PP*)1;
   }
 
   ~Object () { 
     for (int i = 0; i < p.size(); i++)
       if (p[i].high())
         delete p[i].u.m;
+    if (pp != 0 && pp != (PP*)1)
+      delete pp;
   }
   
   int precision () const { return p.size() == 0 ? 0 : p[0].precision(); }
@@ -176,11 +201,19 @@ public:
     return true;
   }
 
-  P getCurrentP () const { 
+  P getCurrentP () const {
     P q = p;
-    if (precision() == 53u && MInt::getPrecision() > 53u)
-      for (int i = 0; i < q.size(); i++)
-        q[i].increasePrecision();
+    if (MInt::getPrecision() > 53u) {
+      if (precision() == 53u)
+        for (int i = 0; i < q.size(); i++)
+          q[i].increasePrecision();
+      else {
+        unsigned int precObject = precision();
+        for (int i = 0; i < q.size(); i++)
+          q[i].u.m = MInt::make(precObject, q[i].u.m);
+      }
+    }
+
     return q;
   }
 
@@ -203,16 +236,62 @@ public:
 
 private:
   P get1 () {
-    if (MInt::getPrecision() == 53u && p.size() > 0 && p[0].low() && !p[0].uninitialized())
-      return p;        
+    if (Parameter::algT > 0 && MInt::threadId() == algebraicId && pp != (PP*)1) {
+      if (input()) {
+        if (pp == 0 || 
+            (pp->t == -1 && Parameter::algR != -1) ||
+            pp->p[0].precision() < MInt::getPrecision()) {
+          if (pp == 0)
+            pp = new PP;
+          pp->p = p;
+          for (int i = 0; i < pp->p.size(); i++)
+            pp->p[i] = Parameter::constant(randomNumber(-1, 1));
+          pp->t = 0;
+        }
+
+        double algT = Parameter::algT;
+        Parameter::algT = 0;
+        P q = get1();
+        Parameter::algT = algT;
+        if (Parameter::algR != -1) {
+          for (int i = 0; i < p.size(); i++)
+            if (pp->p[i].sign() > 0)
+              q[i] = q[i].interval(q[i] + pp->p[i] * Parameter::algT);
+            else
+              q[i] = (q[i] + pp->p[i] * Parameter::algT).interval(q[i]);
+          pp->t = Parameter::algT;
+        }
+        else {
+          for (int i = 0; i < p.size(); i++)
+            q[i] = q[i] + pp->p[i] * Parameter::algT;
+          pp->t = -1;
+        }
+        return q;
+      }
+      else { // not input
+        if (pp != 0 && 
+            (Parameter::algR != -1 ? pp->t == Parameter::algT : pp->t == -1))
+          return pp->p;
+        if (pp == 0)
+          pp = new PP;
+        pp->p = calculate();
+        pp->t = Parameter::algR != -1 ? Parameter::algT : -1;
+        return pp->p;
+      }
+    }
 
     unsigned int precObject = precision();
     unsigned int precNeeded = MInt::getPrecision();
-
     if (precObject >= precNeeded && 
         (precObject == 53u || p[0].hasTheRightPrimes())) {
-      if (precObject == 53u || precNeeded > 53u)
+      if (precObject == 53u)
         return p;
+      if (precNeeded > 53u) {
+	P q = p;
+	for (int i = 0; i < q.size(); i++)
+	  q[i].u.m = MInt::make(precObject, q[i].u.m);
+	return q;
+      }
       P q = p;
       for (int i = 0; i < q.size(); i++)
         q[i].decreasePrecision();
@@ -226,43 +305,36 @@ private:
       return q;
     }
 
-    if (precNeeded == 53u)
-      return p = calculate();
-
     P q = calculate();
-    for (int i = 0; i < q.size(); i++)
-      if (q[i].zeroMod())
-        q[i] = Parameter::constant(0.0);
-
     if (precObject > 53u)
       for (int i = 0; i < p.size(); i++)
         delete p[i].u.m;
-
+    if (precNeeded == 53u)
+      return p = q;
+    for (int i = 0; i < q.size(); i++)
+      if (q[i].sign(false) == 0 && q[i].zeroMod())
+	q[i] = Parameter::constant(0.0);
     p = q;
-
     for (int i = 0; i < p.size(); i++)
       p[i].u.m = p[i].u.m->clone();
-
-    return p;
+    return q;
   }
 
 public:
   P getApprox (double acc = 1e-17) {
     try {
-      get();
-      assert(precision() > 0); // DEBUG
-      if (checkAccuracy(acc))
-        return get();
+      P q = get();
+      if (checkAccuracy(q, acc))
+        return q;
     }
     catch (SignException se) {}
     MInt::setPrecision(212u);
     while (MInt::getPrecision() <= maxPrecision) {
       try {
-        get();
-        assert(precision() > 0); // DEBUG
-        if (checkAccuracy(acc)) {	
+        P q = get();
+        if (checkAccuracy(q, acc)) {	
           MInt::setPrecision(53u);
-          return get();
+	  return get();
         }
       }
       catch (SignException se) {}
@@ -271,7 +343,6 @@ public:
     if (usePrecisionException || precision() == 0)
       throw precisionException;
     setPrecision(53u);
-    assert(precision() > 0); // DEBUG
     return get();
   }
 };
@@ -289,7 +360,15 @@ public:
 };
 
 class Primitive : public BaseObject {
-  virtual int sign () = 0;
+  virtual Parameter calculate () {
+    cerr << "Primitive::calculate not overridden" << endl;
+    assert(0);
+    return Parameter::constant(0);
+  }
+
+  static pthread_mutex_t algM;
+
+  virtual int sign () { return calculate().sign(); }
 public:
   operator int () {
     if (MInt::getPrecision() > 53u || throwSignException())
@@ -306,9 +385,23 @@ public:
         return s;
       }
       catch (unsigned int p) {
-        ModInt::changePrime(p);
+        Mods::changePrime(p);
       }
       catch (SignException se) {
+        if (MInt::getPrecision() == 106u && se.algebraic) {
+          pthread_mutex_lock(&algM);
+	  algebraicId = MInt::threadId();
+          bool a1 = algebraicIdentity();
+          bool a2 = algebraicIdentity();
+	  algebraicId = 0u;
+          pthread_mutex_unlock(&algM);
+          if (a1 != a2)
+            throw MixedHomotopyException();
+          if (a1) {
+	    MInt::setPrecision(53u);
+            return 0;
+          }
+        }
         if (getPrecision() == 106u)
           MInt::setPrecision(212u);
         else
@@ -319,6 +412,101 @@ public:
       throw precisionException;
     MInt::setPrecision(53u);
     return 0;
+  }
+
+  bool algebraicIdentity () {
+    bool fail106 = true;
+
+    if (!fail106) {
+      Parameter::algT = 1e-14;
+      Parameter::algR = 1e9;
+      throwSignException() = true;
+      try {
+        calculate();
+      } catch (SignException se) {
+        cerr << "signAlgebraic:  algT " << Parameter::algT << " failed." << endl;
+        Parameter::algT = 0;
+        Parameter::algR = 0;
+        fail106 = true;
+      }
+    }
+
+    if (!fail106) {
+      //cerr << "algR " << Parameter::algR << endl;
+      Parameter::algT *= Parameter::algR / 10;  // larger but conservative perturbation
+      //cerr << "algT " << Parameter::algT << endl;
+      while (true) // hopefully only once
+        try {
+          Parameter::algR = 1;
+          calculate();
+          break;
+        } catch (SignException se) {
+        cerr << "algT shrunk to " << Parameter::algT << endl;
+        Parameter::algT /= 10;
+      }
+      Parameter::algR = -1; // signal final get
+      Parameter p;
+      try {
+        p = calculate();
+      } catch (SignException se) {
+        cerr << "signAlgebraic:  impossible" << endl;
+        assert(0);
+      }
+      Parameter::algT = 0;
+      Parameter::algR = 0;
+      //cout << "interval " << p[0].intervalWidth() << " "
+      //   << p[0].lb() << " " << p[0].ub() << endl;
+      throwSignException() = false;
+      int sf = p.sign(false);
+      MInt::setPrecision(106u);
+      return sf == 0;
+    }
+
+    throwSignException() = false;
+    MInt::setPrecision(212u);
+    Parameter p = calculate();
+    int sf = p.sign(false);
+    if (sf != 0) {
+      MInt::setPrecision(106u);
+      return false;
+    }
+    Parameter::algT = 1e-62;
+    Parameter::algR = 1e56;
+    throwSignException() = true;
+    try {
+      calculate();
+    } catch (SignException se) {
+      cerr << "signAlgebraic:  algT " << Parameter::algT << " failed." << endl;
+      assert(false);
+    }
+    
+    //cerr << "algR " << Parameter::algR << endl;
+    Parameter::algT *= Parameter::algR / 10;  // larger but conservative perturbation
+    //cerr << "algT " << Parameter::algT << endl;
+    while (true) // hopefully only once
+      try {
+        Parameter::algR = 1;
+        calculate();
+        break;
+      } catch (SignException se) {
+      cerr << "algT shrunk to " << Parameter::algT << endl;
+      Parameter::algT /= 10;
+    }
+    Parameter::algR = -1; // signal final get
+    try {
+      p = calculate();
+    } catch (SignException se) {
+      cerr << "signAlgebraic:  impossible" << endl;
+      assert(0);
+    }
+    Parameter::algT = 0;
+    Parameter::algR = 0;
+    //cout << "interval " << p[0].intervalWidth() << " "
+    //   << p[0].lb() << " " << p[0].ub() << endl;
+    throwSignException() = false;
+    sf = p.sign(false);
+    MInt::setPrecision(106u);
+    return sf == 0;
   }
 };
 
@@ -363,6 +551,47 @@ public:
 #define Primitive5(P, t1, v1, t2, v2, t3, v3, t4, v4, t5, v5)	\
   class P : public acp::Primitive {				\
     int sign();							\
+    t1 v1; t2 v2; t3 v3; t4 v4; t5 v5;				\
+  public:							\
+    P (t1 v1, t2 v2, t3 v3, t4 v4, t5 v5)			\
+      : v1(v1), v2(v2), v3(v3), v4(v4), v5(v5) {}		\
+  };
+
+#define Primitive1c(P, t1, v1)		\
+  class P : public acp::Primitive {	\
+    Parameter calculate();				\
+    t1 v1;				\
+  public:				\
+    P (t1 v1) : v1(v1) {}		\
+  };
+
+#define Primitive2c(P, t1, v1, t2, v2)		\
+  class P : public acp::Primitive {		\
+    Parameter calculate();					\
+    t1 v1; t2 v2;				\
+  public:					\
+    P (t1 v1, t2 v2) : v1(v1), v2(v2) {}	\
+  };
+
+#define Primitive3c(P, t1, v1, t2, v2, t3, v3)		\
+  class P : public acp::Primitive {			\
+    Parameter calculate();						\
+    t1 v1; t2 v2; t3 v3;				\
+  public:						\
+    P (t1 v1, t2 v2, t3 v3) : v1(v1), v2(v2), v3(v3) {}	\
+  };
+
+#define Primitive4c(P, t1, v1, t2, v2, t3, v3, t4, v4)			\
+  class P : public acp::Primitive {					\
+    Parameter calculate();								\
+    t1 v1; t2 v2; t3 v3; t4 v4;						\
+  public:								\
+    P (t1 v1, t2 v2, t3 v3, t4 v4) : v1(v1), v2(v2), v3(v3), v4(v4) {}	\
+  };
+
+#define Primitive5c(P, t1, v1, t2, v2, t3, v3, t4, v4, t5, v5)	\
+  class P : public acp::Primitive {				\
+    Parameter calculate();							\
     t1 v1; t2 v2; t3 v3; t4 v4; t5 v5;				\
   public:							\
     P (t1 v1, t2 v2, t3 v3, t4 v4, t5 v5)			\

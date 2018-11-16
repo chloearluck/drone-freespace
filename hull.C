@@ -89,27 +89,27 @@ Polyhedron * hullInit (Points &pts, bool perturbed)
 
 ConflictGraph::~ConflictGraph ()
 {
-  for (map<Vertex *, FaceSet *>::iterator i = vcon.begin(); i != vcon.end(); ++i)
+  for (map<Vertex *, set<Face *> *>::iterator i = vcon.begin(); i != vcon.end(); ++i)
     delete i->second;
-  for (map<Face *, VertexSet *>::iterator i = fcon.begin(); i != fcon.end(); ++i)
+  for (map<Face *, set<Vertex *> *>::iterator i = fcon.begin(); i != fcon.end(); ++i)
     delete i->second;
 }
 
 void ConflictGraph::insert (Vertex *v, Face *f)
 {
-  map<Vertex *, FaceSet *>::iterator vi = vcon.find(v);
+  map<Vertex *, set<Face *> *>::iterator vi = vcon.find(v);
   if (vi == vcon.end()) {
-    FaceSet *fs = new FaceSet;
+    set<Face *> *fs = new set<Face *>;
     fs->insert(f);
-    vcon.insert(pair<Vertex *, FaceSet *>(v, fs));
+    vcon.insert(pair<Vertex *, set<Face *> *>(v, fs));
   }
   else
     vi->second->insert(f);
-  map<Face *, VertexSet *>::iterator fi = fcon.find(f);
+  map<Face *, set<Vertex *> *>::iterator fi = fcon.find(f);
   if (fi == fcon.end()) {
-    VertexSet *vs = new VertexSet;
+    set<Vertex *> *vs = new set<Vertex *>;
     vs->insert(v);
-    fcon.insert(pair<Face *, VertexSet *>(f, vs));
+    fcon.insert(pair<Face *, set<Vertex *> *>(f, vs));
   }
   else
     fi->second->insert(v);
@@ -117,27 +117,27 @@ void ConflictGraph::insert (Vertex *v, Face *f)
 
 void ConflictGraph::erase (Face *f)
 {
-  VertexSet *vs = fcon.find(f)->second;
-  for (VertexSet::iterator v = vs->begin(); v != vs->end(); ++v) 
+  set<Vertex *> *vs = fcon.find(f)->second;
+  for (set<Vertex *>::iterator v = vs->begin(); v != vs->end(); ++v) 
     vcon.find(*v)->second->erase(f);
 }
 
-FaceSet * ConflictGraph::conflicts (Vertex *v)
+set<Face *> * ConflictGraph::conflicts (Vertex *v)
 {
-  map<Vertex *, FaceSet *>::iterator i = vcon.find(v);
+  map<Vertex *, set<Face *> *>::iterator i = vcon.find(v);
   return i == vcon.end() || i->second->empty() ? 0 : i->second;
 }
 
-VertexSet * ConflictGraph::conflicts (Face *f)
+set<Vertex *> * ConflictGraph::conflicts (Face *f)
 {
-  map<Face *, VertexSet *>::iterator i = fcon.find(f);
+  map<Face *, set<Vertex *> *>::iterator i = fcon.find(f);
   return i == fcon.end() || i->second->empty() ? 0 : i->second;
 }
 
-void ConflictGraph::update (Vertex *v, Face *f, VertexSet *vs)
+void ConflictGraph::update (Vertex *v, Face *f, set<Vertex *> *vs)
 {
   if (vs)
-    for (VertexSet::iterator w = vs->begin(); w != vs->end(); ++w)
+    for (set<Vertex *>::iterator w = vs->begin(); w != vs->end(); ++w)
       if (*w != v && visible(*w, f))
 	insert(*w, f);
 }
@@ -160,7 +160,7 @@ bool visible (Vertex *v, Face *f)
 
 void expandHull (Polyhedron *a, Vertex *v, ConflictGraph &cg)
 {
-  FaceSet *fs = cg.conflicts(v);
+  set<Face *> *fs = cg.conflicts(v);
   if (!fs)
     return;
   HEdges he = horizon(*fs);
@@ -169,16 +169,15 @@ void expandHull (Polyhedron *a, Vertex *v, ConflictGraph &cg)
   Faces fa(fs->begin(), fs->end());
   for (Faces::iterator f = fa.begin(); f != fa.end(); ++f) {
     cg.erase(*f);
-    a->removeLoop((*f)->getBoundary(0));
+    a->removeLoop((*f)->getBoundary());
   }
 }
 
-HEdges horizon (const FaceSet &fs)
+HEdges horizon (const set<Face *> &fs)
 {
   HEdges he;
-  for (FaceSet::const_iterator f = fs.begin(); f != fs.end(); ++f) {
-    HEdges fe;
-    (*f)->boundaryHEdges(fe);
+  for (set<Face *>::const_iterator f = fs.begin(); f != fs.end(); ++f) {
+    HEdges fe = (*f)->getBoundary()->edgeLoop();
     for (HEdges::iterator g = fe.begin(); g != fe.end(); ++g)
       if (fs.find((*g)->ccw()->getF()) == fs.end())
 	he.push_back(*g);
@@ -188,10 +187,31 @@ HEdges horizon (const FaceSet &fs)
 
 void expandHull (Polyhedron *a, Vertex *v, ConflictGraph &cg, HEdge *h)
 {
-  VertexSet *vs1 = cg.conflicts(h->getF()), *vs2 = cg.conflicts(h->ccw()->getF());
+  set<Vertex *> *vs1 = cg.conflicts(h->getF()), *vs2 = cg.conflicts(h->ccw()->getF());
   Face *f = a->addTriangle(v, h->tail(), h->head());
   cg.update(v, f, vs1);
   cg.update(v, f, vs2);  
 }
 
+/*
 #include "io.h"
+
+int main (int argc, char *argv[])
+{
+  if (argc < 2)
+    return 0;
+  ifstream astr(argv[1]);
+  if (!astr.good())
+    return 0;
+  bool perturbed = argc == 2 ? true : *argv[2] != 't';
+  Parameter::enable();
+  Polyhedron *a = readPolyhedronVTK(astr, perturbed),
+    *b = convexHull(a);
+  b->formCells();
+  b->describe();
+  writePolyhedronVTK(b->faces, cout);
+  delete b;
+  delete a;
+  Parameter::disable();
+}
+*/

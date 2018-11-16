@@ -3,17 +3,71 @@
 
 #include "polyhedron.h"
 
-Primitive2(PlaneSide, Plane *, plane, Point *, point);
+class PlaneSide : public Primitive {
+  Plane *plane;
+  Point *point;
 
-Primitive2(DiffLength, Point *, i, Point *, j);
+  Parameter calculate () {
+    PV3 v = plane->get().n, p = point->get();
+    Parameter d = plane->get().k;
+    return v.dot(p) - d;
+  }
+ public:
+  PlaneSide (Plane *plane, Point *point) : plane(plane), point(point) {}
+};
 
-Primitive3(IsTangent, Point *, v0, Point *, v1, Point *, v2);
+class DiffLength : public Primitive {
+  Point *i, *j;
 
-Primitive4(Orient3D, Point *, a, Point *, b, Point *, c, Point *, d);
+  Parameter calculate () {
+    return i->get().dot(i->get()) - j->get().dot(j->get());
+  }
+ public:
+  DiffLength (Point *i, Point *j) : i(i), j(j) {}
+};
 
-Primitive4(SegmentIntersect, Point *, pa, Point *, pb, Point *, pc, Point *, pd);
+class IsTangent : public Primitive {
+  Point *v0, *v1, *v2;
 
-Primitive5(InSphere, Point *, a, Point *, b, Point *, c, Point *, d, Point *, e);
+  int sign () {
+    PV3 a = v0->get(), b = v1->get(), c = v2->get(),
+      n = (b - a).cross(c - a), nsplit(n.y, - n.x, Parameter::constant(0.0));
+    Parameter k = n.dot(a);
+    int psa = nsplit.dot(a).sign(), psb = nsplit.dot(b).sign(),
+      psc = nsplit.dot(c).sign();
+    return psa == psb && psb == psc ? 0 : 1;
+  }
+ public:
+  IsTangent (Point *v0, Point *v1, Point *v2) : v0(v0), v1(v1), v2(v2) {}
+};
+
+class Orient3D : public Primitive {
+  Point *a, *b, *c, *d;
+
+  Parameter calculate () {
+    PV3 dd = d->get(), da = a->get() - dd, db = b->get() - dd,
+      dc = c->get() - dd;
+    return da.cross(db).dot(dc);
+  }
+ public:
+  Orient3D (Point *a, Point *b, Point *c, Point *d) : a(a), b(b), c(c), d(d) {}
+};
+
+class InSphere : public Primitive {
+  Point *a, *b, *c, *d, *e;
+
+  Parameter calculate () {
+    PV3 ee = e->get(), ea = a->get() - ee, eb = b->get() - ee,
+      ec = c->get() - ee, ed = d->get() - ee;
+    return ea.cross(eb).dot(ec)*ed.dot(ed) -
+      eb.cross(ec).dot(ed)*ea.dot(ea) +
+      ec.cross(ed).dot(ea)*eb.dot(eb) -
+      ed.cross(ea).dot(eb)*ec.dot(ec);
+  }
+ public:
+  InSphere (Point *a, Point *b, Point *c, Point *d, Point *e)
+    : a(a), b(b), c(c), d(d), e(e) {}
+};
 
 class RotationPoint : public Point {
   PTR<Point> point, sca;

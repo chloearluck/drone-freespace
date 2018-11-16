@@ -3,27 +3,23 @@
 
 #include "polyhedron.h"
 
-class Convolution : public Polyhedron {
-  EFVMap efvmap;
-  FFFVMap fffvmap;
- public:
-  Convolution (bool perturbed, bool oneway) : Polyhedron(perturbed) { oneWayInt = oneway; }
-  Face * minkowskiInit (set<Face *> &fdone, Octree<Face *> *octree,
-			Polyhedron *a, PVMap &pvmap);
-  Face * rmaxFace (Vertex *&v);
-  void subdivide (Face *f, set<Face *> &fdone, Octree<Face *> *octree,
-		  Polyhedron *a, PVMap &pvmap);
-  void intersectFF (Face *f, const FaceSet &fdone, Octree<Face *> *octree);
-  void expand (FaceSet &fdone, Octree<Face *> *octree,
-	       Polyhedron *a, PVMap &pvmap, Face *f, Faces &st);
-  void neighborFaces (HEdge *e, Faces &fa) const;
-};
-
-Primitive2(NormalOrderR, Plane *, p, Plane *, q);
-
 Polyhedron * minkowskiSum (Polyhedron *a, Polyhedron *b);
 
-void sortHEdges (Polyhedron *a, int nf);
+Shells minkowskiShells (Polyhedron *a, Polyhedron *b, const Shells &sh);
+
+Shells minkowskiShellsAux (Polyhedron *a, Polyhedron *b, const Shells &sh);
+
+void minkowskiShellsT (void *ptr);
+
+class MSData {
+ public:
+  unsigned int i, is, ie;
+  Polyhedron *a, *b;
+  const Shells *sh;
+  Shells res;
+};
+
+bool minkowskiShell (Polyhedron *a, Polyhedron *b, Shell *s);
 
 class UnitVector : public Point {
   Point *a;
@@ -90,7 +86,15 @@ class FNormal : public Point {
   FNormal (Face *f) : f(f) {}
 };
 
-Primitive3(TripleProduct, Point *, a, Point *, b, Point *, c);
+class TripleProduct :public Primitive {
+  Point *a, *b, *c;
+
+  Parameter calculate () {
+    return a->get().tripleProduct(b->get(), c->get());
+  }
+ public:
+  TripleProduct (Point *a, Point *b, Point *c) : a(a), b(b), c(c) {}
+};
 
 void sphereBBox (Edge *e, double *bbox);
 
@@ -99,8 +103,6 @@ void sphereBBox (Point *t, Point *h, double *bbox);
 void sphereBBox (const HEdges &ed, double *bbox);
 
 int coordinate (Point *a, int c);
-
-void merge (double *bbox1, double *bbox2);
 
 class BSPElt {
  public:
@@ -147,7 +149,19 @@ class MinkHullFace {
   MinkHullFace *prev, *next;
 };
 
-Primitive4(DegenerateConflict, Point *, a, Point *, b, Point *, c, Point *, d);
+class DegenerateConflict : public Primitive {
+  Point *a, *b, *c, *d;
+
+  Parameter calculate () {
+    PV3 u = b->get() - a->get(), v = c->get() - a->get(),
+      w = d->get() - a->get(), x = u.cross(v);
+    Parameter k = x.tripleProduct(v, w);
+    return k.sign() == 1 ? k : x.tripleProduct(w, u);
+  }
+ public:
+  DegenerateConflict (Point *a, Point *b, Point *c, Point *d)
+    : a(a), b(b), c(c), d(d) {}
+};
 
 bool convexCone (Vertex *v, HEdges &hedges);
 
@@ -163,43 +177,51 @@ void deleteHull (MinkHullFace *hull);
 
 bool convexOrder (const HEdges &hedges);
 
-Polyhedron * triangulate (const FaceSet &fs, bool perturbed);
+typedef map<pair<Vertex *, Vertex *>, Vertex *> VVVMap;
 
-Polyhedron * minkowskiSumFull (Polyhedron *a, Polyhedron *b);
+Polyhedron * convolution (Polyhedron *a, Polyhedron *b);
 
-bool minkowskiShell (Polyhedron *a, Polyhedron *b, Shell *s);
-
-typedef map<VVPair, Vertex *> VVPairVMap;
-
-Convolution * convolution (Polyhedron *a, Polyhedron *b);
-
-void sumVF (Polyhedron *a, Polyhedron *b, bool avflag, FaceDescSet &fds,
-	    VVPairVMap &vmap, Polyhedron *con);
+void sumVF (Polyhedron *a, Polyhedron *b, bool avflag, VVVMap &vmap,
+	    Polyhedron *con);
 
 void convexVertices (Polyhedron *a, BSPElts &elts);
 
 bool compatibleVF (HEdges &ed, Face *f);
 
-void sumVF (Vertex *v, Face *f, bool avflag, FaceDescSet &fds,
-	    VVPairVMap &vmap, Polyhedron *con);
+void sumVF (Vertex *v, Face *f, bool avflag, VVVMap &vmap, Polyhedron *con);
 
-Primitive2(InnerProductEF, HEdge *, e, Face *, f);
+class InnerProductEF : public Primitive {
+  HEdge *e;
+  Face *f;
 
-Vertex * sumVV (Vertex *a, Vertex *b, bool aflag, VVPairVMap &vmap,
-		Polyhedron *con);
+  Parameter calculate () {
+    return e->getU().dot(f->getP()->get().n);
+  }
+ public:
+  InnerProductEF (HEdge *e, Face *f) : e(e), f(f) {}
+};
 
-void sumEE (Polyhedron *a, Polyhedron *b, FaceDescSet &fds,
-	    VVPairVMap &vmap, Polyhedron *con);
+Vertex * sumVV (Vertex *a, Vertex *b, bool aflag, VVVMap &vmap, Polyhedron *con);
+
+void sumEE (Polyhedron *a, Polyhedron *b, VVVMap &vmap, Polyhedron *con);
 
 void convexEdges (Polyhedron *a, BSPElts &elts);
 
 int convexEdge (Edge *e);
 
-Primitive2(ConvexEdge, HEdge *, e1, HEdge *, e2);
+class ConvexEdge : public Primitive {
+  HEdge *e1, *e2;
+
+  Parameter calculate () {
+    return e1->getU().tripleProduct(e1->getF()->getP()->get().n,
+				    e2->getF()->getP()->get().n);
+  }
+ public:
+  ConvexEdge (HEdge *e1, HEdge *e2) : e1(e1), e2(e2) {}
+};
 
 bool compatibleEE (Edge *e, Edge *f, bool &aflag);
 
-void sumEE (Edge *e, Edge *f, bool aflag, FaceDescSet &fds,
-	    VVPairVMap &vmap, Polyhedron *con);
+void sumEE (Edge *e, Edge *f, bool aflag, VVVMap &vmap, Polyhedron *con);
 
 #endif

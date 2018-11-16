@@ -69,8 +69,9 @@ Roots PolySolver::getRoots ()
   if (d == 2)
     return quadraticRoots();
   double b = CauchyBound(poly).getApprox(1.0).ub();
-  return getRoots(new Object<Parameter>(Parameter::constant(-b)), 
-                  new Object<Parameter>(Parameter::constant(b)));
+  // DEBUG
+  return getRoots(new Object<Parameter>(Parameter::constant(-b * 1.123456789)), 
+                  new Object<Parameter>(Parameter::constant(b * 1.2143645987)));
 }
 
 Roots PolySolver::getRoots (Object<Parameter>* l, Object<Parameter>* u)
@@ -149,8 +150,112 @@ Roots PolySolver::descartesRoots (Object<Parameter>* l, Object<Parameter>* u)
   }
   //cerr << "descartes iterations = " << k << endl;
   reverse(res.begin(), res.end());
+
+  if (res.size() == 0)
+    return res;
+
+#ifdef USE_STURM
+  Object<Parameter> *l_ub = new Object<Parameter>(Parameter::constant(l->get().ub()), true);
+  Object<Parameter> *u_lb = new Object<Parameter>(Parameter::constant(u->get().lb()), true);
+  Object<Parameter> *prev = l_ub;
+  Object<Parameter> *next;
+
+  for (int i = 0; i < res.size(); i++) {
+    if (i < res.size() - 1)
+      next = new Object<Parameter>(Parameter::constant((res[i]->get().ub() + res[i+1]->get().lb()) * 0.5), true);
+    else
+      next = u_lb;
+    dynamic_cast<PolyRoot*>((Root*)res[i])->updateKnots(prev, next);
+    prev = next;
+  }
+#else
+  for (int i = 0; i < res.size(); i++) {
+    dynamic_cast<PolyRoot*>((Root*)res[i])->updateKnots();
+  }
+#endif
+
   return res;
 }
+
+void PolyRoot::updateKnots () {
+  PTR<Object<Parameter>> l2 = 
+    new Object<Parameter>(Parameter::constant(l->get().mid()), true);
+  PTR<Object<Parameter>> u2 = 
+    new Object<Parameter>(Parameter::constant(u->get().mid()), true);
+  updateKnots(l2, u2);
+
+#ifdef BLEEN
+  double ld = l->get().mid();
+  double ud = u->get().mid();
+  double rd = getApprox().mid();
+
+  ld = ld - (ld - rd) / 7;
+  ud = ud - (ud - rd) / 7;
+
+  PTR<Object<Parameter>> lo = 
+    new Object<Parameter>(Parameter::constant(ld), true);
+  PTR<Object<Parameter>> uo = 
+    new Object<Parameter>(Parameter::constant(ud), true);
+
+  int des = 0;
+  assert(::BaseObject::throwSignException() == false);
+  ::BaseObject::throwSignException() = true;
+  try {
+    des = Descartes(p, lo, uo);
+  }
+  catch (SignException se) {}
+  ::BaseObject::throwSignException() = false;
+  assert(des == 1);
+
+  bool lStep = true, uStep = true;
+  while (lStep || uStep) {
+    if (lStep) {
+      double ld2 = ld + (ld - rd) / 2;
+      PTR<Object<Parameter>> lo2 = 
+        new Object<Parameter>(Parameter::constant(ld2), true);
+      des = 0;
+      ::BaseObject::throwSignException() = true;
+      try {
+        des = Descartes(p, lo2, uo);
+      }
+      catch (SignException se) {}
+      ::BaseObject::throwSignException() = false;
+      if (des == 1) {
+        ld = ld2;
+        lo = lo2;
+        cout << "lStep " << lo->get().mid() << " " << uo->get().mid() << endl;
+        if (ld < -1000)
+          lStep = false;
+      }
+      else
+        lStep = false;
+    }
+    if (uStep) {
+      double ud2 = ud + (ud - rd) / 2;
+      PTR<Object<Parameter>> uo2 = 
+        new Object<Parameter>(Parameter::constant(ud2), true);
+      des = 0;
+      ::BaseObject::throwSignException() = true;
+      try {
+        des = Descartes(p, lo, uo2);
+      }
+      catch (SignException se) {}
+      ::BaseObject::throwSignException() = false;
+      if (des == 1) {
+        ud = ud2;
+        uo = uo2;
+        cout << "uStep " << lo->get().mid() << " " << uo->get().mid() << endl;
+        if (ud2 > 1000)
+          uStep = false;
+      }
+      else
+        uStep = false;
+    }
+  }
+  cout << "updateKnots" << endl;
+  updateKnots(lo, uo);
+#endif
+}  
 
 bool PolySolver::descartes1 (vector<DInt> &st, const DInt &i, int v, bool lflag)
 {
@@ -192,20 +297,15 @@ int PolySolver::descartes2int (const DInt &i, int v)
   return k;
 }
 
-int QuadraticRoots::sign ()
+Parameter QuadraticRoots::calculate ()
 {
   const PPoly &q = p->get();
   Parameter d = q[1]*q[1] - 4.0*q[0]*q[2];
-  return d.sign();
-}
-
-int Order::sign ()
-{
-  return (b->get() - a->get()).sign();
+  return d;
 }
 
 int Descartes::sign ()
-{
+{ 
   PPoly q = p->get().moebius(l->get(), u->get());
   int v = 0u, d = q.deg();
   int s = q.a[d].sign();
@@ -215,6 +315,46 @@ int Descartes::sign ()
       s = - s;
     }
   return v;
+}
+
+int Sturm::sign () { 
+#ifdef BLEEN
+  static int count;
+  if (++count == 0)
+    cout << "this is it" << endl;
+#endif
+  vector<PPoly> ss;
+  ss.push_back(p->get());
+  ss.push_back(ss.back().der());
+  while (ss.back().deg() > 0) {
+    PPoly q;
+    ss.push_back(ss[ss.size()-2].rem(ss[ss.size()-1], q));
+    vector<Parameter> &a = ss.back().a;
+    for (int i = 0; i < a.size(); i++)
+      a[i] = -a[i];
+  }
+  assert(ss.back().deg() == 0);
+
+  Parameter a = l->get();
+  int na = 0;
+  int sa = ss[0].value(a).sign();
+  for (int i = 1; i < ss.size(); i++)
+    if (ss[i].value(a).sign() == -sa) {
+      na++;
+      sa = -sa;
+    }
+
+  Parameter b = u->get();
+  int nb = 0;
+  int sb = ss[0].value(b).sign();
+  for (int i = 1; i < ss.size(); i++)
+    if (ss[i].value(b).sign() == -sb) {
+      nb++;
+      sb = -sb;
+    }
+
+  assert(na >= nb);
+  return na - nb;
 }
 
 PV2 Root2::polish(PV2 p) {
@@ -527,6 +667,10 @@ Root2::RootBoundary Root2::splitVert(RootBoundary &rb, Parameter c) {
 
 }
 
+void foo () {
+  bool hse = BaseObject::throwSignException();
+}
+
 //subdivide the cell once along major axis
 bool Root2::subdivide(RootBoundary &rb) {
 
@@ -534,9 +678,9 @@ bool Root2::subdivide(RootBoundary &rb) {
 
   //printf("SUBDIVIDE\n\n");
 
-  bool hse = BaseObject::throwSignException();
-  BaseObject::throwSignException() = true;
-  unsigned int hp = MInt::getPrecision();
+  bool hse = ::BaseObject::throwSignException();
+  ::BaseObject::throwSignException() = true;
+  unsigned int hp = ::BaseObject::getPrecision();
 
   int even_count = 0;
   int odd_count  = 0;
@@ -594,12 +738,12 @@ bool Root2::subdivide(RootBoundary &rb) {
     }
 
   } catch(SignException e) {
-    BaseObject::setPrecision(hp);
-    BaseObject::throwSignException() = hse;
+    ::BaseObject::setPrecision(hp);
+    ::BaseObject::throwSignException() = hse;
     return false;
   }
   
-  BaseObject::throwSignException() = hse;
+  ::BaseObject::throwSignException() = hse;
 
   assert(odd_count >= 1);
   //if(odd_count < 1)

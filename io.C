@@ -78,8 +78,7 @@ void writePolyhedron (Polyhedron *a, ostream &ostr)
   Parameter::enable();
   ostr << endl;
   for (Faces::iterator f = a->faces.begin(); f != a->faces.end(); ++f) {
-    Vertices ve;
-    (*f)->getBoundary(0)->loop(ve);
+    Vertices ve = (*f)->getBoundary()->loop();
     ostr << vimap.find(ve[0])->second << " " << vimap.find(ve[1])->second
 	 << " " << vimap.find(ve[2])->second << endl;
   }
@@ -164,8 +163,7 @@ void writePolyhedronVTK (const Faces &fa, ostream &ostr)
   vector<ID> data;
   VIMap vimap;
   for (Faces::const_iterator f = fa.begin(); f != fa.end(); ++f) {
-    Vertices ve;
-    (*f)->getBoundary(0)->loop(ve);
+    Vertices ve = (*f)->getBoundary()->loop();
     data.push_back(ve.size());
     for (Vertices::iterator v = ve.begin(); v != ve.end(); ++v)
       data.push_back(getPoint(vimap, pts, *v));
@@ -287,8 +285,7 @@ void addTriangleOBJ (Polyhedron *a, Vertex *u, Vertex *v, Vertex *w)
 {
   if (u == v || u == w || v == w || u->getP()->onLine(v->getP(), w->getP()))
     return;
-  HEdges ue;
-  u->outgoingHEdges(ue);
+  HEdges ue = u->outgoingHEdges();
   for (HEdges::iterator h = ue.begin(); h != ue.end(); ++h)
     if ((*h)->head() == w && (*h)->getNext()->head() == v)
       return;
@@ -304,8 +301,7 @@ void writePolyhedronVTK (const HFaces &fa, ostream &ostr)
   VIMap vimap;
   for (HFaces::const_iterator f = fa.begin(); f != fa.end(); ++f) {
     Face *ff = (*f)->getF();
-    Vertices ve;
-    ff->getBoundary(0)->loop(ve);
+    Vertices ve = ff->getBoundary()->loop();
     if (!(*f)->pos())
       reverse(ve.begin(), ve.end());
     data.push_back(ve.size());

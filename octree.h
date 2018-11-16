@@ -195,22 +195,6 @@ class Octree {
     }
   }
   
-  void expand (int m, vector<Octree *> &res) {
-    ID nmax = n/m;
-    vector<Octree *> st;
-    st.push_back(this);
-    while (!st.empty()) {
-      Octree *o = st.back();
-      st.pop_back();
-      if (!o->l || o->n <= nmax)
-	res.push_back(o);
-      else {
-	st.push_back(o->l);
-	st.push_back(o->r);
-      }
-    }
-  }
-  
   void stats (vector<int> &ne) const {
     if (l) {
       l->stats(ne);

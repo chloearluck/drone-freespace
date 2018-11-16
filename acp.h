@@ -25,7 +25,8 @@ pages 37-52, 2012
 #ifndef ACP
 #define ACP
 
-// #define NO_MODE
+#define NO_MODE
+//#define USE_ASSERT
 
 #include <gmp.h>
 #include <mpfr.h>
@@ -63,14 +64,30 @@ inline double prevD (double x) {
 }
 
 class SignException : public std::exception {
- public:
+public:
+  const bool algebraic;
+  SignException (bool algebraic=false) : algebraic(algebraic) {}
   virtual const char* what() const throw() {
     return "Not enough precision";
   }
 };
 
-extern SignException signException;
- 
+class MixedModException : public std::exception {
+public:
+  MixedModException () {}
+  virtual const char* what() const throw() {
+    return "Zero modulo some but not all primes";
+  }
+};
+
+class MixedHomotopyException : public std::exception {
+public:
+  MixedHomotopyException () {}
+  virtual const char* what() const throw() {
+    return "Some but not all homotopies are zero";
+  }
+};
+
 enum RoundMode { RoundUp=1, RoundDown=-1, RoundNearest=0 };
 
 class MValue {
@@ -127,6 +144,8 @@ class MValue {
     return res;
   }
   int sign () const { return mpfr_sgn(m); }
+  bool operator== (const MValue &b)  const { return mpfr_equal_p(m, b.m) != 0; }
+  bool operator!= (const MValue &b)  const { return mpfr_equal_p(m, b.m) == 0; }
   bool operator< (const MValue &b)  const { return mpfr_less_p(m, b.m); }
   MValue sqrt (mpfr_rnd_t round) const {
     MValue res(p);
@@ -152,7 +171,38 @@ unsigned int inverse (unsigned int a, unsigned int n);
 
 #define ulong(a) ((unsigned long)(a))
  
-class ModP {
+class Mod {
+ public:
+  Mod (unsigned int a=0, unsigned int p=0) : a(a), p(p) {}
+  
+  Mod operator- () const {
+    long l = (-long(a))%p;
+    return Mod(l < 0 ? l + p : l, p);
+  }
+  
+  Mod operator+ (const Mod &x) const {
+    return Mod((long(a) + long(x.a))%p, p);
+  }
+
+  Mod operator- (const Mod &x) const {
+    long l = (long(a) - long(x.a))%p;
+    return Mod(l < 0 ? l + p : l, p);
+  }
+
+  Mod operator* (const Mod &x) const {
+    return Mod((ulong(a)*ulong(x.a))%p, p);
+  }
+
+  Mod operator/ (const Mod &x) const {
+    if (x.a == 0)
+      throw p;
+    return Mod((ulong(a)*ulong(inverse(x.a, p)))%p, p);
+  }
+
+  unsigned int a, p;
+};
+
+class Modder {
   static const int eShift;
   static const int eMax;
   static const int eMin;
@@ -162,7 +212,8 @@ class ModP {
   unsigned int p;
 
 public:
-  ModP (unsigned int p) : p(p), pow2v(eMax - eMin + 1) {
+  Modder () : pow2v(0), pow2(0), p(0) {}
+  Modder (unsigned int p) : p(p), pow2v(eMax - eMin + 1) {
     pow2 = &pow2v[0] - eMin;
     pow2[0] = 1;
     unsigned long x = 1;
@@ -178,9 +229,9 @@ public:
     }
   }
 
-  unsigned int mod (double x) {
+  Mod mod (double x) {
     if (x == (long) x)
-      return x >= 0 ? ((long) x) % p : p + ((long) x) % p;
+      return Mod((x >= 0 ? ((long) x) % p : p + ((long) x) % p), p);
     int e;
     double m = frexp(x, &e) * (1l << eShift);
     assert(m == (long) m);
@@ -189,74 +240,123 @@ public:
     if (mp < 0)
       mp += p;
     assert(eMin <= e && e <= eMax);
-    return ((unsigned long) mp * pow2[e]) % p;
+    return Mod(((unsigned long) mp * pow2[e]) % p, p);
   }
 };
 
-class ModInt {
+class Parameter;
+class EInt;
+
+#define NPrimes 7
+#define NMods 2
+
+class Mods {
  public:
-  static unsigned int ps[7];
-  static int pIndex;
-  static unsigned int p1, p2;
-  static ModP modP1, modP2;
+  static unsigned int primes[NPrimes];
+  static int primeIndex;
+  static unsigned int ps[NMods];
+  static Modder modder[NMods];
 
   static void changePrime (unsigned int p);
 
-  ModInt () {}
+  Mod mod[NMods];
+  const bool algebraic;
+
+  Mods (int start, int up) : algebraic(false) {
+    for (int i = 0; i < NMods; i++) {
+      assert(ps[i] == 0);
+      ps[i] = primes[i];
+      modder[i] = Modder(ps[i]);
+    }
+  }
+
+  Mods (bool algebraic) : algebraic(algebraic) {}
+
+  Mods (double r) : algebraic(false) {
+    for (int i = 0; i < NMods; i++)
+      mod[i] = modder[i].mod(r);
+  }
+
+  Mods (const Parameter &p);
+  Mods (const MValue &l, const MValue &u);
   
-  ModInt (double r, unsigned int ip) : p(ip) {
-    if (p == p1)
-      a = modP1.mod(r);
-    else if (p == p2)
-      a = modP2.mod(r);
-    else
-      assert(0);
+  bool hasTheRightPrimes () const {
+    for (int i = 0; i < NMods; i++)
+      if (mod[i].p != ps[i])
+        return false;
+    return true;
   }
 
-  ModInt operator- () const {
-    long l = (-long(a))%p;
-    return ModInt(l < 0 ? l + p : l, p);
+  bool mixed () const {
+    for (int i = 1; i < NMods; i++)
+      if ((mod[i].a == 0) != (mod[0].a == 0))
+        return true;
+    return false;
+  }
+
+  bool zero () const {
+    for (int i = 1; i < NMods; i++)
+      if (mod[i].a != 0)
+        return false;
+    return true;
+  }
+
+  Mods operator- () const {
+    Mods m(algebraic);
+    for (int i = 0; i < NMods; i++)
+      m.mod[i] = -mod[i];
+    return m;
   }
   
-  ModInt operator+ (const ModInt &x) const {
-
-    return ModInt((long(a) + long(x.a))%p, p);
+  Mods operator+ (const Mods &x) const {
+    Mods m(algebraic || x.algebraic);
+    for (int i = 0; i < NMods; i++)
+      m.mod[i] = mod[i] + x.mod[i];
+    return m;
   }
 
-  ModInt operator+ (double x) const {
-    return *this + ModInt(x, p);
+  Mods operator+ (double x) const {
+    return *this + Mods(x);
   }
 
-  ModInt operator- (const ModInt &x) const {
-    long l = (long(a) - long(x.a))%p;
-    return ModInt(l < 0 ? l + p : l, p);
+  Mods operator- (const Mods &x) const {
+    Mods m(algebraic || x.algebraic);
+    for (int i = 0; i < NMods; i++)
+      m.mod[i] = mod[i] - x.mod[i];
+    return m;
   }
 
-  ModInt operator- (double x) const {
-    return *this - ModInt(x, p);
+  Mods operator- (double x) const {
+    return *this - Mods(x);
   }
 
-  ModInt operator* (const ModInt &x) const {
-    return ModInt((ulong(a)*ulong(x.a))%p, p);
+  Mods operator* (const Mods &x) const {
+    Mods m(algebraic || x.algebraic);
+    for (int i = 0; i < NMods; i++)
+      m.mod[i] = mod[i] * x.mod[i];
+    return m;
   }
 
-  ModInt operator* (double x) const {
-    return *this*ModInt(x, p);
-  }
-  
-  ModInt operator/ (const ModInt &x) const {
-    if (x.a == 0)
-      throw p;
-    return ModInt((ulong(a)*ulong(inverse(x.a, p)))%p, p);
+  Mods operator* (double x) const {
+    return *this * Mods(x);
   }
 
-  unsigned int a, p;
+  Mods operator/ (const Mods &x) const {
+    Mods m(algebraic || x.algebraic);
+    for (int i = 0; i < NMods; i++)
+      m.mod[i] = mod[i] / x.mod[i];
+    return m;
+  }
+
+  Mods operator/ (double x) const {
+    return *this / Mods(x);
+  }
 };
 
+extern pthread_key_t idkey;
 extern pthread_key_t mikey;
 extern pthread_key_t cpkey;
-
-class Parameter;
+extern pthread_key_t hsekey;
 
 class MInt {
   static unsigned int & curPrecision () {
@@ -284,15 +384,25 @@ public:
     return v ? *(vector<MInt*>*) v : mints[0];
   }
 
-  const ModInt m1, m2;
+  static unsigned int threadIds[128];
 
-  MInt ()
-    : m1(ModInt(random(), ModInt::p1)), m2(ModInt(random(), ModInt::p2)) {
+  static unsigned int threadId () {
+    void *i = pthread_getspecific(idkey);
+    return i ? *(unsigned int *) i : 0;
+  }
+
+  const Mods mods;
+
+  /*
+  MInt () : m1(Mod(random(), Mod::p1)), m2(Mod(random(), Mod::p2)),
+            algebraic(true) {
     getMInts().push_back(this);
   }
-  MInt (const ModInt &m1, const ModInt &m2) : m1(m1), m2(m2) {
+  */
+  MInt (const Mods &mods) : mods(mods) {
     getMInts().push_back(this);
   }
+
   virtual ~MInt () {}
 
   static void clearMInts () {
@@ -302,7 +412,7 @@ public:
     mints.clear();
   }
 
-  bool zeroMod () { return m1.a == 0u && m2.a == 0u; }
+  bool zeroMod () { assert(!mods.mixed()); return mods.zero(); }
 
   static MInt* make (unsigned int precision, const Parameter &p);
   static MInt* make (unsigned int precision, const MInt *m);
@@ -346,6 +456,10 @@ class Parameter {
   static double no_optimize (volatile double x) { return x; }
   
   static const double sentinel;
+
+public:  // DEBUG
+  static double algT, algR;
+private:
 
   static Parameter sqrt (double);
   static Parameter root (double a, unsigned int n);
@@ -408,11 +522,9 @@ private:
   static bool isEnabled () { return enabled; }
 
   static void enable () {
-    extern pthread_key_t mikey;
-    extern pthread_key_t cpkey;
-    extern pthread_key_t hsekey;
     if (!penabled) {
       penabled = true;
+      pthread_key_create(&idkey, NULL);
       pthread_key_create(&mikey, NULL);
       pthread_key_create(&cpkey, NULL);
       pthread_key_create(&hsekey, NULL);
@@ -429,9 +541,7 @@ private:
   }
 
   static void exit () {
-    extern pthread_key_t mikey;
-    extern pthread_key_t cpkey;
-    extern pthread_key_t hsekey;
+    pthread_key_delete(idkey);
     pthread_key_delete(mikey);
     pthread_key_delete(cpkey);
     pthread_key_delete(hsekey);
@@ -462,8 +572,7 @@ private:
   bool high () const { return l == sentinel; }
 
   bool hasTheRightPrimes () {
-    // assert(u.m->m1.p == ModInt::p1 || u.m->m2.p == ModInt::p2);
-    return u.m->m1.p == ModInt::p1 && u.m->m2.p == ModInt::p2;
+    return u.m->mods.hasTheRightPrimes();
   }
 
   unsigned int precision () const { 
@@ -488,7 +597,7 @@ private:
       return -1;
     if (!fail || (l == 0.0 && u.r == 0.0))
       return 0;
-    throw signException;
+    throw SignException();
   }
 
   double mid () const { return 0.5 * (lb() + ub()); }
@@ -802,10 +911,7 @@ class PInt : public MInt {
   Parameter p;
   friend class Parameter;
  public:
-  PInt (const Parameter &p) { this->p = p; }
-  
-  PInt (const Parameter &p, const ModInt &m1, const ModInt &m2) 
-    : MInt(m1, m2) { this->p = p; }
+  PInt (const Parameter &p, const Mods &mods) : MInt(mods), p(p) {}
 
   unsigned int precision () const { return 106u; }
 
@@ -815,54 +921,80 @@ class PInt : public MInt {
   
   double ub () const { return p.ub(); }
   
-  MInt* lbP () const { return new PInt(p.lbP()); }
+  MInt* lbP () const { return new PInt(p.lbP(), Mods(p.lbP())); }
 
-  MInt* ubP () const { return new PInt(p.ubP()); }
+  MInt* ubP () const { return new PInt(p.ubP(), Mods(p.ubP())); }
+
+  MInt* mid () const { return new PInt(p.midP(), Mods(p.midP())); }
 
   MInt* plus (const MInt* that) const {
-    return new PInt(p + that->par(), m1 + that->m1, m2 + that->m2);
+    return new PInt(p + that->par(), mods + that->mods);
   }
   
-  MInt* plus (double b) const { return new PInt(p + Parameter(b), m1 + b, m2 + b); }
+  MInt* plus (double b) const { 
+    return new PInt(p + Parameter(b), mods + b);
+  }
   
   MInt* minus (const MInt* that) const {
-    return new PInt(p - that->par(), m1 - that->m1, m2 - that->m2);
+    return new PInt(p - that->par(), mods - that->mods);
   }
   
-  MInt* minus () const { return new PInt(- p, - m1, - m2); }
+  MInt* minus () const { return new PInt(-p, -mods); }
   
   MInt* times (const MInt* that) const {
-    return new PInt(p * that->par(), m1*that->m1, m2*that->m2);
+    return new PInt(p * that->par(), mods *that->mods);
   }
   
-  MInt* times (double b) const { return new PInt(p * Parameter(b), m1*b, m2*b); }
+  MInt* times (double b) const { 
+    return new PInt(p * Parameter(b), mods * b);
+  }
 
   MInt* divide (const MInt* that) const {
-    return new PInt(p / that->par(), m1/that->m1, m2/that->m2); 
+    return new PInt(p / that->par(), mods / that->mods);
   }
 
   int sign (bool fail = true) const {
-    if (p.u.r < 0.0)
-      return -1;
-    if (p.l > 0.0)
+    if (p.l > 0.0) {
+      if (fail && Parameter::algT > 0) {
+        double rat = p.l == p.u.r ? Parameter::algR : p.l/(p.u.r-p.l);
+        if (rat < Parameter::algR) {
+          // cerr << "rat " << rat << endl;
+          Parameter::algR = rat;
+        }
+      }
       return 1;
-    if (!fail || (p.l == 0.0 && p.u.r == 0.0) || (m1.a == 0u && m2.a == 0u))
+    }
+    if (p.u.r < 0.0) {
+      if (fail && Parameter::algT > 0) {
+        double rat = p.l == p.u.r ? Parameter::algR : p.u.r/(p.l-p.u.r);
+        if (rat < Parameter::algR) {
+          // cerr << "rat " << rat << endl;
+          Parameter::algR = rat;
+        }
+      }
+      return -1;
+    }
+    if (!fail || (p.l == 0 && p.u.r == 0))
       return 0;
-    throw signException;
+    if (mods.mixed())
+      throw MixedModException();
+    if (mods.zero())
+      return 0;
+    throw SignException(mods.algebraic);
   }
-
-  MInt* mid () const { return new PInt(p.midP()); }
 
   bool subset (const MInt* that) const {
     return p.subset(that->par());
   }
 
   MInt* interval (const MInt* that) const {
-    return new PInt(p.interval(that->par()));
+    Parameter q = p.interval(that->par());
+    return new PInt(q, Mods(q));
   }
 
   MInt* innerInterval (const MInt* that) const {
-    return new PInt(p.innerInterval(that->par()));
+    Parameter q = p.innerInterval(that->par());
+    return new PInt(q, Mods(q));
   }
 
   bool intersects (const MInt* that) const {
@@ -870,90 +1002,116 @@ class PInt : public MInt {
   }
 
   MInt* intersect (const MInt* that) const {
-    return new PInt(p.intersect(that->par()));
+    Parameter q = p.intersect(that->par());
+    return new PInt(q, Mods(q));
   }
 
-  MInt* sqrt () const { return new PInt(p.sqrt()); }
+  MInt* sqrt () const {
+    Parameter q = p.sqrt();
+    return new PInt(q, Mods(q));
+  }
 
-  MInt* root (unsigned long int k) const { assert(0); return new PInt(p.root(k)); }
-
+  MInt* root (unsigned long int k) const { 
+    assert(0);
+    Parameter q = p.root(k);
+    return new PInt(q, Mods(q));
+  }
 };
 
- class EInt : public MInt {
-   int prec;
- public:
-   EInt (const MValue &l, const MValue &u, int prec) : lm(l), um(u), prec(prec) {}
-   EInt (const MValue &l, const MValue &u, const ModInt &m1, const ModInt &m2, int prec)
-     : MInt(m1, m2), lm(l), um(u), prec(prec) {}
+class EInt : public MInt {
+  int prec;
+public:
+  EInt (const MValue &l, const MValue &u, int prec) 
+    : MInt(Mods(l, u)), lm(l), um(u), prec(prec) {}
+  EInt (const MValue &l, const MValue &u, const Mods &mods, int prec)
+    : MInt(mods), lm(l), um(u), prec(prec) {}
   ~EInt () {}
 
-  PInt *pInt () const { return new PInt(Parameter(lb(), ub()), m1, m2); }
+  PInt *pInt () const { return new PInt(Parameter(lb(), ub()), mods); }
  
   unsigned int precision () const { return lm.p; }
-
+   
   double intervalWidth () const { return um.minus(lm, GMP_RNDN).value(); }
-
+   
   double lb () const { return mpfr_get_d(lm.m, GMP_RNDD); }
-
+   
   double ub () const { return mpfr_get_d(um.m, GMP_RNDU); }
-
+   
   MInt* lbP () const { return new EInt(lm, lm, prec); }
-
+   
   MInt* ubP () const { return new EInt(um, um, prec); }
-
+   
   MInt* plus (const MInt* that) const {
     const EInt *b = dynamic_cast<const EInt*>(that);
     if (!b) return pInt()->plus(that);
     return new EInt(lm.plus(b->lm, GMP_RNDD), um.plus(b->um, GMP_RNDU),
-		    m1 + b->m1, m2 + b->m2, min(prec, b->prec));
+		    mods + b->mods, min(prec, b->prec));
   }
 
   MInt* plus (double b) const {
     return new EInt(lm.plus(b, GMP_RNDD), um.plus(b, GMP_RNDU),
-		    m1 + b, m2 + b, prec);
+		    mods + b, prec);
   }
 
   MInt* minus (const MInt* that) const {
     const EInt *b = dynamic_cast<const EInt*>(that);
     if (!b) return pInt()->minus(that);
     return new EInt(lm.minus(b->um, GMP_RNDD), um.minus(b->lm, GMP_RNDU),
-		    m1 - b->m1, m2 - b->m2, min(prec, b->prec));
+		    mods - b->mods, min(prec, b->prec));
   }
 
   MInt* minus () const { 
-    return new EInt(um.minus(), lm.minus(), - m1, - m2, prec);
+    return new EInt(um.minus(), lm.minus(), -mods, prec);
   }
 
   MInt* times (const MInt* that) const;
 
   MInt* times (double b) const {
     return b > 0.0 ? new EInt(lm.times(b, GMP_RNDD), um.times(b, GMP_RNDU),
-			      m1*b, m2*b, prec)
+			      mods*b, prec)
       : new EInt(um.times(b, GMP_RNDD), lm.times(b, GMP_RNDU),
-		 m1*b, m2*b, prec);
+		 mods*b, prec);
   }
 
   MInt* divide (const MInt* b) const;
-
+   
   int sign (bool fail = true) const {
-    if (m1.a == 0u && m2.a == 0u)
-      return 0;
     int su = um.sign();
-    if (su == -1)
+    if (su == -1) {
+      if (fail && Parameter::algT > 0) {
+        double rat = mpfr_get_d(um.divide(lm.minus(um, GMP_RNDD), GMP_RNDU).m, GMP_RNDU);
+        if (rat < Parameter::algR) {
+          // cerr << "rat " << rat << endl;
+          Parameter::algR = rat;
+        }
+      }
       return -1;
+    }
     int sl = lm.sign();
-    if (sl == 1)
+    if (sl == 1) {
+      if (fail && Parameter::algT > 0) {
+        double rat = mpfr_get_d(lm.divide(um.minus(lm, GMP_RNDU), GMP_RNDU).m, GMP_RNDU);
+        if (rat < Parameter::algR) {
+          // cerr << "rat " << rat << endl;
+          Parameter::algR = rat;
+        }
+      }
       return 1;
+    }
     if (!fail || (sl == 0 && su == 0))
       return 0;
-    throw signException;
+    if (mods.mixed())
+      throw MixedModException();
+    if (mods.zero())
+      return 0;
+    throw SignException(mods.algebraic);
   }
-
+   
   MInt* mid () const {
     MValue m = lm.plus(um, GMP_RNDN).times(0.5, GMP_RNDN);
     return new EInt(m, m, prec);
   }
-
+   
   bool subset (const MInt* that) const {
     const EInt *b = dynamic_cast<const EInt*>(that);
     if (!b) return pInt()->subset(that);
@@ -1000,24 +1158,49 @@ class PInt : public MInt {
 
 inline MInt* MInt::make (unsigned int precision, const Parameter &p) {
   double l = p.lb(), u = p.ub();
-  ModInt m1 = l == u ? ModInt(l, ModInt::p1) : ModInt(random(), ModInt::p1);
-  ModInt m2 = l == u ? ModInt(l, ModInt::p2) : ModInt(random(), ModInt::p2);
   if (precision == 106u)
-    return new PInt(p, m1, m2);
+    return new PInt(p, Mods(p));
   else
-    return new EInt(MValue(l, precision), MValue(u, precision), m1, m2, precision);
+    return new EInt(MValue(l, precision), MValue(u, precision), Mods(p), precision);
 }
 
 inline MInt* MInt::make (unsigned int precision, const MInt *m) {
   if (m->precision() == 106u)
     return new EInt(MValue(m->lb(), precision), MValue(m->ub(), precision), 
-                    m->m1, m->m2, precision);
+                    m->mods, precision);
   else {
     const EInt* e = dynamic_cast<const EInt*>(m);
     return new EInt(MValue(e->lm, precision, GMP_RNDD),
 		    MValue(e->um, precision, GMP_RNDU),
-                    m->m1, m->m2, precision);
+                    m->mods, precision);
   }
+}
+
+inline Mods::Mods (const Parameter &p) : algebraic(p.lb()<p.ub()) {
+  double l = p.lb(), u = p.ub();
+  if (l == u)
+    for (int i = 0; i < NMods; i++)
+      mod[i] = modder[i].mod(l);
+  else
+    for (int i = 0; i < NMods; i++)
+      mod[i] = Mod(random() % ps[i], ps[i]);
+}
+
+inline Mods::Mods (const MValue &l, const MValue &u) : algebraic(l != u) {
+  if (l != u)
+    for (int i = 0; i < NMods; i++)
+      mod[i] = Mod(random() % ps[i], ps[i]);
+  else
+    for (int i = 0; i < NMods; i++) {
+      MValue m = l; 
+      unsigned int ret = 0;
+      while (m.sign() != 0) {
+        double x = m.value();
+        m = m.minus(MValue(x, m.p), GMP_RNDN);
+        ret = (ret + modder[i].mod(x).a) % ps[i];
+      }
+      mod[i] = Mod(ret, ps[i]);
+    }
 }
 
 template <class T>

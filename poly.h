@@ -28,6 +28,8 @@ pages 37-52, 2012
 #include "object.h"
 #include "ppoly.h"
 
+//#define USE_STURM
+
 namespace acp {
 
 class SubKnot : public Object<Parameter> {
@@ -109,6 +111,10 @@ class QuadraticRoot : public Root {
   QuadraticRoot (Object<PPoly> *p, bool flag) : Root(p), flag(flag) {}
 };
 
+Primitive3(Descartes, Object<PPoly> *, p, Object<Parameter> *, l, Object<Parameter> *, u);
+
+Primitive3(Sturm, Object<PPoly> *, p, Object<Parameter> *, l, Object<Parameter> *, u);  
+
 class PolyRoot : public Root {
   PTR<Object<Parameter>> l, u;
   Parameter calculate () {
@@ -117,8 +123,17 @@ class PolyRoot : public Root {
     int sub = q.value(u->get()).sign();
     Parameter lu = l->get().ubP();
     Parameter ul = u->get().lbP();
-    if (uninitialized())
+    if (uninitialized() || Parameter::algT > 0) {
+#ifdef USE_STURM
+      if (Parameter::algT > 0 && Sturm(p, l, u) != 1) {
+#else
+      if (Parameter::algT > 0 && Descartes(p, l, u) != 1) {
+#endif
+        cerr << "Root interval test failed." << endl;
+        throw SignException();
+      }
       return q.shrinkBracket(lu.interval(ul), sub);
+    }
     Parameter x = getCurrentP();
     Parameter xl(x.lbP());
     Parameter xu(x.ubP());
@@ -126,8 +141,19 @@ class PolyRoot : public Root {
     return q.shrinkBracket(Parameter((xl-lu).sign(false) > 0 ? xl : ul,
                              (xu-ul).sign(false) < 0 ? xu : lu), sub);
   }
- public:
-  PolyRoot (Object<PPoly> *p, Object<Parameter>* l, Object<Parameter>* u) : Root(p), l(l), u(u) {}
+public:
+  PolyRoot (Object<PPoly> *p, Object<Parameter>* l, Object<Parameter>* u) 
+    : Root(p), l(l), u(u) {} 
+  Object<Parameter> *getL () { return l; }
+  Object<Parameter> *getU () { return u; }
+  void updateKnots (Object<Parameter>* l, Object<Parameter>* u) {
+    int s;
+    assert((s = Sturm(p, this->l, this->u)) == 1);
+    this->l = l;
+    this->u = u;
+    assert((s = Sturm(p, l, u)) == 1);
+  }
+  void updateKnots ();
 };   
 
 class CauchyBound : public Object<Parameter> {
@@ -149,11 +175,12 @@ class CauchyBound : public Object<Parameter> {
   CauchyBound (Object<PPoly> *p) : p(p) {}
 };
 
-Primitive1(QuadraticRoots, Object<PPoly> *, p);
+Primitive1c(QuadraticRoots, Object<PPoly> *, p);
 
-Primitive2(Order, Object<Parameter> *, a, Object<Parameter> *, b);
-
-Primitive3(Descartes, Object<PPoly> *, p, Object<Parameter> *, l, Object<Parameter> *, u);
+Primitive2c(Order, Object<Parameter> *, a, Object<Parameter> *, b);
+inline Parameter Order::calculate () {
+  return b->get() - a->get();
+}
 
 typedef PTR<Root> RootPTR;
 

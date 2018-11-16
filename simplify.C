@@ -57,7 +57,7 @@ Octree<Face *> * faceOctree (Polyhedron *a, double s)
 {
   Faces fa;
   for (Faces::iterator f = a->faces.begin(); f != a->faces.end(); ++f)
-    if (!(*f)->getBoundary().empty())
+    if ((*f)->getBoundary())
       fa.push_back(*f);
   return Octree<Face *>::octree(fa, a->bbox, s);
 }
@@ -123,9 +123,7 @@ bool collapsible (Edge *e)
     return false;
   Vertex *t = e->getT(), *h = e->getH(), *v = e->getHEdge(0)->getNext()->head(),
     *w = e->getHEdge(1)->getNext()->head();
-  HEdges et, eh;
-  t->outgoingHEdges(et);
-  h->outgoingHEdges(eh);
+  HEdges et = t->outgoingHEdges(), eh = h->outgoingHEdges();
   set<Vertex *> vs;
   for (HEdges::iterator f = et.begin(); f != et.end(); ++f) {
     Vertex *x = (*f)->head();
@@ -142,8 +140,7 @@ bool badCollapse (Vertex *v, Octree<Face *> *octree)
 {
   Faces fv = v->incidentFaces();
   for (Faces::iterator f = fv.begin(); f != fv.end(); ++f) {
-    Vertices ve;
-    (*f)->boundaryVertices(ve);
+    Vertices ve = (*f)->getBoundary()->loop();
     if (ve[0]->getP()->onLine(ve[1]->getP(), ve[2]->getP()))
       return true;
   }
@@ -151,9 +148,9 @@ bool badCollapse (Vertex *v, Octree<Face *> *octree)
     Faces fa;
     octree->find((*f)->getBBox(), fa);
     for (Faces::iterator g = fa.begin(); g != fa.end(); ++g)
-      if (!(*g)->getBoundary().empty() &&
+      if ((*g)->getBoundary() &&
 	  find(fv.begin(), fv.end(), *g) == fv.end() &&
-	  (*f)->intersects(*g))
+	  (*f)->intersects(*g, false))
 	return true;
   }
   return false;
@@ -161,13 +158,11 @@ bool badCollapse (Vertex *v, Octree<Face *> *octree)
 
 void addStar (Vertex *v, double d, IFeatureQ &fq)
 {
-  HEdges vout;
-  v->outgoingHEdges(vout);
+  HEdges vout = v->outgoingHEdges();
   for (HEdges::iterator e = vout.begin(); e != vout.end(); ++e) {
     if (DistancePP((*e)->tail()->getP(), (*e)->head()->getP(), d) == 1)
       fq.push(IFeature((*e)->getE()));
-    HEdges ev;
-    (*e)->loop(ev);
+    HEdges ev = (*e)->edgeLoop();
     for (HEdges::iterator h = ev.begin(); h != ev.end(); ++h)
       if (closeVE((*h)->getNext()->head(), (*h)->tail(), (*h)->head(), d))
 	fq.push(IFeature(*h));
@@ -224,11 +219,8 @@ HEdge * flip (Polyhedron *a, HEdge *e)
     *w = e->ccw()->getNext()->head();
   a->removeLoop(e->ccw());
   a->removeLoop(e);
-  Vertex *vwh[] = {v, w, h}, *wvt[] = {w, v, t};
-  HEdge *vw = a->addLoop(vwh, 3), *wv = a->addLoop(wvt, 3);
-  a->addFace(vw);
-  a->addFace(wv);
-  return vw;
+  Face *f = a->addTriangle(v, w, h), *g = a->addTriangle(w, v, t);
+  return f->getBoundary();
 }
 
 bool badFlip (HEdge *e, Octree<Face *> *octree)
@@ -238,8 +230,7 @@ bool badFlip (HEdge *e, Octree<Face *> *octree)
     Faces fa;
     octree->find(f->getBBox(), fa);
     for (Faces::iterator g = fa.begin(); g != fa.end(); ++g)
-      if (!(*g)->getBoundary().empty() &&
-	  f->intersects(*g))
+      if ((*g)->getBoundary() && f->intersects(*g, false))
 	return true;
   }
   return false;
@@ -335,56 +326,55 @@ void simplify2 (Polyhedron *a, double d, bool opt2)
 FeatureSet smallFeatures (Polyhedron *a, double d, VPMap *vpmap)
 {
   for (Faces::iterator f = a->faces.begin(); f != a->faces.end(); ++f)
-    if (!(*f)->getBoundary().empty())
+    if ((*f)->getBoundary())
       (*f)->getPC();
   Octree<Face *> *octree = faceOctree(a, d);
-  int m = 16;
-  vector<Octree<Face *> *> nodes;
-  octree->expand(m, nodes);
-  int n = nodes.size();
-  TData *td = new TData [n];
+  vector<pair<Face *, Face *>> ff;
+  octree->pairs(ff, d);  
+  delete octree;
+  static unsigned int n = 8;
+  unsigned int k = ff.size(), m = k/n, is = 0;
+  SFData sfd[n];
   for (int i = 0; i < n; ++i) {
-    td[i].i = i;
-    td[i].octree = nodes[i];
-    td[i].d = d;
-    td[i].vpmap = vpmap;
+    sfd[i].i = i;
+    sfd[i].is = is;
+    is = i + 1 == n ? k : is + m;
+    sfd[i].ie = is;
+    sfd[i].ff = &ff;
+    sfd[i].d = d;
+    sfd[i].vpmap = vpmap;
   }
-  pthread_t *threads = new pthread_t [n];
+  pthread_t threads[n];
   for (int i = 0; i < n; ++i)
     pthread_create(threads + i, 0,
-		   (void* (*)(void*)) smallCandidatesT, (void *) (td + i));
+		   (void* (*)(void*)) smallFeaturesT, (void *) (sfd + i));
   for (int i = 0; i < n; ++i)
     pthread_join(threads[i], 0);
-  delete [] threads;
   FeatureSet fs;
   for (int i = 0; i < n; ++i)
-    fs.insert(td[i].fs.begin(), td[i].fs.end());
-  delete [] td;
-  delete octree;
+    fs.insert(sfd[i].fs.begin(), sfd[i].fs.end());
   return fs;
 }
 
-void smallCandidatesT (void *ptr)
+void smallFeaturesT (void *ptr)
 {
-  TData *td = (TData *) ptr;
-  BaseObject::addThread(td->i);
-  FFPairs ff;
-  td->octree->pairs(ff, td->d);
-  VPMap *vpmap = td->vpmap;
+  SFData *sfd = (SFData *) ptr;
+  BaseObject::addThread(sfd->i);
+  VPMap *vpmap = sfd->vpmap;
   FeatureSet fs;
-  for (FFPairs::iterator i = ff.begin(); i != ff.end(); ++i)
-    if (!i->first->getBoundary().empty() && !i->second->getBoundary().empty() &&
-	(!vpmap || moved(i->first, *vpmap) || moved(i->second, *vpmap)))
-      smallCandidates(i->first, i->second, td->d, fs);
+  vector<pair<Face *, Face *>>::iterator x = sfd->ff->begin() + sfd->is;
+  for (int i = sfd->is; i < sfd->ie; ++i, ++x)
+    if (x->first->getBoundary() && x->second->getBoundary() &&
+	(!vpmap || moved(x->first, *vpmap) || moved(x->second, *vpmap)))
+      smallCandidates(x->first, x->second, sfd->d, fs);
   for (FeatureSet::iterator f = fs.begin(); f != fs.end(); ++f)
-    if (small(*f, td->d))
-      td->fs.insert(*f);
+    if (small(*f, sfd->d))
+      sfd->fs.insert(*f);
 }
 
 bool moved (Face *f, const VPMap &vpmap)
 {
-  Vertices ve;
-  f->boundaryVertices(ve);
+  Vertices ve = f->getBoundary()->loop();
   for (Vertices::iterator v = ve.begin(); v != ve.end(); ++v)
     if (vpmap.find(*v) != vpmap.end())
       return true;
@@ -393,7 +383,7 @@ bool moved (Face *f, const VPMap &vpmap)
 
 void smallCandidates (Face *f, Face *g, double d, FeatureSet &fs)
 {
-  HEdge *fb = f->getBoundary(0), *gb = g->getBoundary(0);
+  HEdge *fb = f->getBoundary(), *gb = g->getBoundary();
   Vertex *vf[] = {fb->tail(), fb->head(), fb->getNext()->head()};
   Vertex *vg[] = {gb->tail(), gb->head(), gb->getNext()->head()};
   HEdge *ef[] = {fb, fb->getNext(), fb->getNext()->getNext()};
@@ -456,7 +446,7 @@ bool closeVET (Vertex *v, Edge *e, double d)
 
 bool closeVFT (Vertex *v, Face *f, double d)
 {
-  HEdge *fb = f->getBoundary(0), *fbn = fb->getNext(), *fbnn = fbn->getNext();
+  HEdge *fb = f->getBoundary(), *fbn = fb->getNext(), *fbnn = fbn->getNext();
   Vertex *ve[] = {fb->tail(), fb->head(), fbn->head()};
   if (v == ve[0] || v == ve[1] || v == ve[2])
     return false;
@@ -557,7 +547,7 @@ void setupLP (const FeatureSet &fs, double d, set<Vertex *> &vs, Expander2 *exp)
     Vertices ve[2];
     if (f->v) {
       ve[0].push_back(f->v);
-      f->fa->boundaryVertices(ve[1]);
+      ve[1] = f->fa->getBoundary()->loop();
     }
     else {
       ve[0].push_back(f->e->getT());
@@ -594,11 +584,10 @@ Feature minimalFeature (Vertex *v, Face *f, PTR<Point> &p, PTR<Point> &q)
   p = v->getP();
   if (p->side(f->getP()) != 0) {
     q = new PlanePoint(f->getP(), p);
-    if (f->containsConvex(q, true))
+    if (f->contains(q, true))
       return Feature(v, f);
   }
-  HEdges ed;
-  f->boundaryHEdges(ed);
+  HEdges ed = f->getBoundary()->edgeLoop();
   q = 0;
   Edge *e = 0;
   for (int i = 0; i < 3; ++i) {
@@ -792,67 +781,26 @@ bool intersects (const Points &pts, const Points &dsp, bool vf)
   PTR<Object<PPoly>> p = new FIPoly(pts, dsp);
   Roots rts = PolySolver(p).getRoots(0, 1);
   for (Roots::iterator r = rts.begin(); r != rts.end(); ++r) {
-    Object<Parameter> *rr = *r;
-    Root *rrr = dynamic_cast<Root *>(rr);
-    if (vf ? intersectsVF(pts, dsp, rrr) : intersectsEE(pts, dsp, rrr))
+    Points rpts;
+    for (int i = 0; i < 4; ++i)
+      rpts.push_back(new DisplacedPoint(pts[i], dsp[i], *r));
+    if (vf ? intersectsVF(rpts) : intersectsEE(rpts))
       return true;
   }
   return false;
 }
 
-bool intersectsVF (const Points &pts, const Points &dsp, Root *r)
+bool intersectsVF (const Points &pts)
 {
-  TrianglePlane pl(pts[1], pts[2], pts[3]);
-  int c = pl.projectionCoordinate();
-  return LeftTurnR(pts[0], pts[1], pts[2], dsp[0], dsp[1], dsp[2], r, c) != -1 &&
-    LeftTurnR(pts[0], pts[2], pts[3], dsp[0], dsp[2], dsp[3], r, c) != -1 &&
-    LeftTurnR(pts[0], pts[3], pts[1], dsp[0], dsp[3], dsp[1], r, c) != -1;
+  Face f(pts[1], pts[2], pts[3]);
+  return f.contains(pts[0], false);
 }
 
-bool intersectsEE (const Points &pts, const Points &dsp, Root *r)
+bool intersectsEE (const Points &pts)
 {
-  if (onLineR(pts[2], pts[0], pts[1], dsp[2], dsp[0], dsp[1], r) &&
-      onLineR(pts[3], pts[0], pts[1], dsp[3], dsp[0], dsp[1], r))
-    return onEdgeR(pts[2], pts[0], pts[1], dsp[2], dsp[0], dsp[1], r) ||
-      onEdgeR(pts[3], pts[0], pts[1], dsp[3], dsp[0], dsp[1], r) ||
-      onEdgeR(pts[0], pts[2], pts[3], dsp[0], dsp[2], dsp[3], r) ||
-      onEdgeR(pts[1], pts[2], pts[3], dsp[1], dsp[2], dsp[3], r);
-  TrianglePlane pl(pts[0], pts[1], pts[2]);
-  int c = pl.projectionCoordinate();
-  if (c == 0) c = 1;
-  return
-    LeftTurnR(pts[0], pts[2], pts[3], dsp[0], dsp[2], dsp[3], r, c)*
-    LeftTurnR(pts[1], pts[2], pts[3], dsp[1], dsp[2], dsp[3], r, c) < 1 &&
-    LeftTurnR(pts[2], pts[0], pts[1], dsp[2], dsp[0], dsp[1], r, c)*
-    LeftTurnR(pts[3], pts[0], pts[1], dsp[3], dsp[0], dsp[1], r, c) < 1;
-}
-
-int LeftTurnR (Point *a, Point *b, Point *c, Point *da, Point *db, Point *dc,
-	       Root *r, int pc)
-{
-  LTPoly p(a, b, c, da, db, dc, pc);
-  return PrimitiveR(&p, r);
-}  
-
-bool onLineR (Point *a, Point *t, Point *h, Point *da, Point *dt, Point *dh,
-	      Root *r)
-{
-  OLPoly p(a, t, h, da, dt, dh);
-  return PrimitiveR(&p, r) == 0;
-}  
-
-bool onEdgeR (Point *a, Point *t, Point *h, Point *da, Point *dt, Point *dh,
-	      Root *r)
-{
-  return OrderR(a, t, h, da, dt, dh, r) == 1 &&
-    OrderR(a, h, t, da, dh, dt, r) == 1;
-}
-
-int OrderR (Point *a, Point *t, Point *h, Point *da, Point *dt, Point *dh,
-	    Root *r)
-{
-  ORPoly p(a, t, h, da, dt, dh);
-  return PrimitiveR(&p, r);
+  EEPoint p(pts[0], pts[1], pts[2], pts[3], 3);
+  return onEdge(&p, pts[0], pts[1], false) &&
+    onEdge(&p, pts[2], pts[3], false);
 }
 
 Polyhedron * round (Polyhedron *a)
@@ -865,6 +813,6 @@ Polyhedron * round (Polyhedron *a)
     pvmap.insert(PVPair(p, b->getVertex(new Point(q.x.lb(), q.y.lb(), q.z.lb()))));
   }
   for (Faces::const_iterator f = a->faces.begin(); f != a->faces.end(); ++f)
-    b->getTriangle(*f, pvmap);
+    b->addTriangle(*f, pvmap);
   return b;
 }

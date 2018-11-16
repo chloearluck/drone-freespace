@@ -458,7 +458,7 @@ Polyhedron * rotate(Polyhedron * p) {
   for (Vertices::const_iterator v = p->vertices.begin(); v != p->vertices.end(); ++v)
     pvmap.insert(PVPair((*v)->getP(), a->getVertex(new RotationPoint((*v)->getP(), sin_cos_alpha))));
   for (Faces::const_iterator f = p->faces.begin(); f != p->faces.end(); ++f)
-    a->getTriangle(*f, pvmap);
+    a->addTriangle(*f, pvmap);
   return a;
 }
 
@@ -547,7 +547,7 @@ void FreeSpace::generateFreeSpaces(std::vector<Polyhedron*> & spaces, Polyhedron
 
   for (int i=0; i< allRotations.size(); i++) {
     cout<<"minkowskiSum "<<i<<" of "<<allRotations.size()-1<<endl;
-    Polyhedron * mSum = minkowskiSumFull(allRotations[i], obstacle);
+    Polyhedron * mSum = minkowskiSum(allRotations[i], obstacle);
     simplify(mSum, 1e-6, false);
     char s[25];
     sprintf(s, "%s%02d", basename, i); 
@@ -563,7 +563,7 @@ void FreeSpace::generateFreeSpaces(std::vector<Polyhedron*> & spaces, Polyhedron
 }
 
 FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, PTR<Object<Parameter> > tan_half_angle, int numRotations, bool inner_approximation) {
-  this->robot = robot->triangulate();
+  this->robot = robot;
   this->obstacle = obstacle;
   this->inner_approximation = inner_approximation;
   this->numRotations = numRotations;
@@ -572,10 +572,10 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, PTR<Object<Param
 
   std::vector<SimpleTriangle> tList;
   for (int i=0; i<this->robot->faces.size(); i++) {
-    HEdges es = this->robot->faces[i]->getBoundary();
-    PTR<Point> p = es[0]->tail()->getP();
-    PTR<Point> q = es[0]->getNext()->tail()->getP();
-    PTR<Point> r = es[0]->getNext()->getNext()->tail()->getP();
+    HEdge *es = this->robot->faces[i]->getBoundary();
+    PTR<Point> p = es->tail()->getP();
+    PTR<Point> q = es->getNext()->tail()->getP();
+    PTR<Point> r = es->getNext()->getNext()->tail()->getP();
     tList.push_back(SimpleTriangle(p,q,r));
   }
   cout<<"loaded triangles"<<endl;

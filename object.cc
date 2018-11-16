@@ -25,13 +25,16 @@ pages 37-52, 2012
 #include "object.h"
 
 namespace acp {
+  pthread_mutex_t Primitive::algM = PTHREAD_MUTEX_INITIALIZER;
+  pthread_key_t idkey;
   pthread_key_t mikey;
   pthread_key_t cpkey;
   pthread_key_t hsekey;
   PrecisionException precisionException;
   bool BaseObject::usePrecisionException = true;
   unsigned int BaseObject::deltaPrecision = 53u;
-  unsigned int BaseObject::maxPrecision = 848u;
+  unsigned int BaseObject::maxPrecision = 424u;
+  unsigned int BaseObject::algebraicId = 0u;
   bool BaseObject::throwSignExceptions[128];
 }
 

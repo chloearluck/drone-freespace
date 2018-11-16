@@ -36,9 +36,12 @@ const double Parameter::sentinel = 1e300;
 double Parameter::delta = ::pow(2.0, -27);
 bool Parameter::enabled = false;
 bool Parameter::penabled = false;
-SignException signException;
 unsigned int MInt::curPrecisions[128] = { 53u };
+unsigned int MInt::threadIds[128];
 vector<MInt*> MInt::mints[128];
+
+double Parameter::algT;
+double Parameter::algR;
 
 Parameter Parameter::sqrt () const
 {
@@ -107,29 +110,27 @@ unsigned int inverse (unsigned int a, unsigned int n)
   return t < 0 ? t + n : t;
 }
 
-const int ModP::eShift = 53;
-const int ModP::eMax = 1024 - eShift;
-const int ModP::eMin = -1073 - eShift;
+const int Modder::eShift = 53;
+const int Modder::eMax = 1024 - eShift;
+const int Modder::eMin = -1073 - eShift;
 
-unsigned int ModInt::ps[7] = { 4294967291u, 4294967279u, 4228232747u, 4197064799u, 3691300979u, 3116510503u, 4278467023u };
-int ModInt::pIndex = 2;
-unsigned int ModInt::p1 = ps[0];
-unsigned int ModInt::p2 = ps[1];
-ModP ModInt::modP1(ModInt::ps[0]);
-ModP ModInt::modP2(ModInt::ps[1]);
+  //unsigned int Mods::primes[NPrimes] = { 4294967291u, 4294967279u, 4228232747u, 4197064799u, 3691300979u, 3116510503u, 4278467023u };
+  unsigned int Mods::primes[NPrimes] = { 4228232747u, 4197064799u, 3691300979u, 3116510503u, 4278467023u, 4294967291u, 4294967279u };
+int Mods::primeIndex = NMods;
+unsigned int Mods::ps[NMods];
+Modder Mods::modder[NMods];
 
-void ModInt::changePrime (unsigned int p) {
-  if (p == p1) {
-    p1 = ps[pIndex];
-    modP1 = ModP(p1);
-  }
-  else if (p == p2) {
-    p2 = ps[pIndex];
-    modP2 = ModP(p2);
-  }
-  else
-    assert(0);
-  pIndex = (pIndex + 1) % 7;
+Mods initializeMods(0, 0);
+
+void Mods::changePrime (unsigned int p) {
+  for (int i = 0; i < NMods; i++)
+    if (p == ps[i]) {
+      ps[i] = primes[primeIndex];
+      modder[i] = Modder(ps[i]);
+      primeIndex = (primeIndex + 1) % NPrimes;
+      return;
+    }
+  assert(0);
 }
 
 MInt* EInt::times (const MInt* that) const
@@ -142,18 +143,18 @@ MInt* EInt::times (const MInt* that) const
   if (sl.sign() == 1) {
     MValue &l1 = tl.sign() == 1 ? sl : su, &u1 = tu.sign() == 1 ? su : sl;
     return new EInt(l1.times(tl, GMP_RNDD), u1.times(tu, GMP_RNDU),
-		    m1*b->m1, m2*b->m2, min(prec, b->prec));
+		    mods*b->mods, min(prec, b->prec));
   }
   if (tl.sign() == 1)
     return new EInt(sl.times(tu, GMP_RNDD), su.times(tu, GMP_RNDU),
-		    m1*b->m1, m2*b->m2, min(prec, b->prec));
+		    mods*b->mods, min(prec, b->prec));
   if (tu.sign() == -1)
     return new EInt(su.times(tl, GMP_RNDD), sl.times(tl, GMP_RNDU),
-		    m1*b->m1, m2*b->m2, min(prec, b->prec));
+		    mods*b->mods, min(prec, b->prec));
   MValue cl1 = sl.times(tu, GMP_RNDD), cl2 = su.times(tl, GMP_RNDD),
     cu1 = sl.times(tl, GMP_RNDU), cu2 = su.times(tu, GMP_RNDU);
   return new EInt(cl1 < cl2 ? cl1 : cl2, cu1 < cu2 ? cu2 : cu1,
-		  m1*b->m1, m2*b->m2, min(prec, b->prec));
+		  mods*b->mods, min(prec, b->prec));
 }
 
 MInt* EInt::divide (const MInt* that) const
@@ -165,24 +166,24 @@ MInt* EInt::divide (const MInt* that) const
     switch (as) {
     case 1:
       return new EInt(lm.divide(b->um, GMP_RNDD), um.divide(b->lm, GMP_RNDU),
-		      m1/b->m1, m2/b->m2, min(prec, b->prec));
+		      mods/b->mods, min(prec, b->prec));
     case 0:
       return new EInt(lm.divide(b->lm, GMP_RNDD), um.divide(b->lm, GMP_RNDU),
-		      m1/b->m1, m2/b->m2, min(prec, b->prec));
+		      mods/b->mods, min(prec, b->prec));
     case -1:
       return new EInt(lm.divide(b->lm, GMP_RNDD), um.divide(b->um, GMP_RNDU),
-		      m1/b->m1, m2/b->m2, min(prec, b->prec));
+		      mods/b->mods, min(prec, b->prec));
     }
   switch (as) {
   case 1:
     return new EInt(um.divide(b->um, GMP_RNDD), lm.divide(b->lm, GMP_RNDU),
-		    m1/b->m1, m2/b->m2, min(prec, b->prec));
+		    mods/b->mods, min(prec, b->prec));
   case 0:
     return new EInt(um.divide(b->um, GMP_RNDD), lm.divide(b->um, GMP_RNDU),
-		    m1/b->m1, m2/b->m2, min(prec, b->prec));
+		    mods/b->mods, min(prec, b->prec));
   case -1:
     return new EInt(um.divide(b->lm, GMP_RNDD), lm.divide(b->um, GMP_RNDU),
-		    m1/b->m1, m2/b->m2, min(prec, b->prec));
+		    mods/b->mods, min(prec, b->prec));
   }
   return 0;
 }

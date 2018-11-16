@@ -15,9 +15,9 @@ class DistancePP : public Primitive {
   Point *a, *b;
   double d;
 
-  int sign () {
+  Parameter calculate () {
     PV3 u = a->get() - b->get();
-    return (d*d - u.dot(u)).sign();
+    return (d*d - u.dot(u));
   }
  public:
   DistancePP (Point *a, Point *b, double d) : a(a), b(b), d(d) {}
@@ -27,10 +27,10 @@ class DistancePL : public Primitive {
   Point *a, *t, *h;
   double d;
 
-  int sign () {
+  Parameter calculate () {
     PV3 tp = t->get(), u = h->get() - tp,
       p = tp + ((a->get() - tp).dot(u)/u.dot(u))*u, w = a->get() - p;
-    return (d*d - w.dot(w)).sign();
+    return d*d - w.dot(w);
   }
  public:
   DistancePL (Point *a, Point *t, Point *h, double d) : a(a), t(t), h(h), d(d) {}
@@ -206,8 +206,7 @@ class Feature {
 	vs.insert(e->getH());
       }
       else {
-	Vertices ve;
-	fa->boundaryVertices(ve);
+	Vertices ve = fa->getBoundary()->loop();
 	vs.insert(ve.begin(), ve.end());
       }
     }
@@ -224,16 +223,16 @@ typedef set<Feature> FeatureSet;
 
 FeatureSet smallFeatures (Polyhedron *a, double d, VPMap *vpmap);
 
-class TData {
+void smallFeaturesT (void *ptr);
+
+class SFData {
  public:
-  unsigned int i;
-  Octree<Face *> *octree;
+  unsigned int i, is, ie;
+  vector<pair<Face *, Face *>> *ff;
   double d;
   VPMap *vpmap;
   FeatureSet fs;
 };
-
-void smallCandidatesT (void *ptr);
 
 bool moved (Face *f, const VPMap &vpmap);
 
@@ -395,96 +394,20 @@ class FIPoly : public Object<PPoly> {
   FIPoly (const Points &pts, const Points &dsp) : pts(pts), dsp(dsp) {}
 };
 
-bool intersectsVF (const Points &pts, const Points &dsp, Root *r);
+class DisplacedPoint : public Point {
+  PTR<Point> a, u;
+  Object<Parameter> *s;
 
-bool intersectsEE (const Points &pts, const Points &dsp, Root *r);
-
-int LeftTurnR (Point *a, Point *b, Point *c, Point *da, Point *db, Point *dc,
-	       Root *r, int pc);
-
-class LTPoly : public Object<PPoly> {
-  Point *a, *b, *c, *da, *db, *dc;
-  int pc;
-
-  PPoly calculate () {
-    PV3 u = c->get() - b->get(), v = a->get() - b->get(),
-      du = dc->get() - db->get(), dv = da->get() - db->get();
-    PPoly p;
-    p.add(cross(u, v, pc), 0);
-    p.add(cross(du, v, pc) + cross(u, dv, pc), 1);
-    p.add(cross(du, dv, pc), 2);
-    return p;
+  PV3 calculate () {
+    return a->get() + s->get()*u->get();
   }
-
  public:
-  LTPoly (Point *a, Point *b, Point *c, Point *da, Point *db, Point *dc,
-	  int pc) : a(a), b(b), c(c), da(da), db(db), dc(dc), pc(pc) {}
+  DisplacedPoint (Point *a, Point *u, Object<Parameter> *s) : a(a), u(u), s(s) {}
 };
 
-bool onLineR (Point *a, Point *t, Point *h, Point *da, Point *dt, Point *dh,
-	      Root *r);
+bool intersectsVF (const Points &pts);
 
-class OLPoly : public Object<PPoly> {
-  Point *a, *t, *h, *da, *dt, *dh;
-
-  PPoly calculate () {
-    PV3 u = a->get() - t->get(), v = h->get() - t->get(),
-      du = da->get() - dt->get(), dv = dh->get() - dt->get(), r = Rdir->get();
-    PPoly p;
-    p.add(r.tripleProduct(u, v), 0);
-    p.add(r.tripleProduct(u, dv) + r.tripleProduct(du, v), 1);
-    p.add(r.tripleProduct(du, dv), 2);
-    return p;
-  }
-
- public:
-  OLPoly (Point *a, Point *t, Point *h, Point *da, Point *dt, Point *dh)
-    : a(a), t(t), h(h), da(da), dt(dt), dh(dh) {}
-};
-
-bool onEdgeR (Point *a, Point *t, Point *h, Point *da, Point *dt, Point *dh,
-	      Root *r);
-
-int OrderR (Point *a, Point *t, Point *h, Point *da, Point *dt, Point *dh,
-	    Root *r);
-
-class ORPoly : public Object<PPoly> {
-  Point *a, *t, *h, *da, *dt, *dh;
-
-  PPoly calculate () {
-    PV3 u = a->get() - t->get(), v = h->get() - t->get(),
-      du = da->get() - dt->get(), dv = dh->get() - dt->get();
-    PPoly p;
-    p.add(u.dot(v), 0);
-    p.add(u.dot(dv) + du.dot(v), 1);
-    p.add(du.dot(dv), 2);
-    return p;
-  }
-
- public:
-  ORPoly (Point *a, Point *t, Point *h, Point *da, Point *dt, Point *dh)
-    : a(a), t(t), h(h), da(da), dt(dt), dh(dh) {}
-};
-
-class PrimitiveR : public Primitive {
-  Object<PPoly> *p;
-  Root *r;
-
-  int sign () {
-    PPoly f = p->get();
-    Parameter a = r->get(), v = f.value(a);
-    int s = v.sign(false);
-    if (s)
-      return s;
-    PPoly g = r->getPoly()->get(), b, c, h = g.gcd(f, b, c), e;
-    g.rem(h, e);
-    if (e.value(a).sign(false))
-      return 0;
-    throw signException;
-  };
- public:
-  PrimitiveR (Object<PPoly> *p, Root *r) : p(p), r(r) {}
-};
+bool intersectsEE (const Points &pts);
 
 Polyhedron * round (Polyhedron *a);
 
