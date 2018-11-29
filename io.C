@@ -316,12 +316,12 @@ string outi (int i)
   return string("out") + std::to_string(i) + ".vtk";
 }
 
-void plines (const vector<vector<PV3>> &lines, int i)
+void plines (const vector<vector<PV3> > &lines, int i)
 {
   vector<PV3> pts;
   vector<ID> data;
   int k = 0;
-  for (vector<vector<PV3>>::const_iterator l = lines.begin(); l != lines.end(); ++l) {
+  for (vector<vector<PV3> >::const_iterator l = lines.begin(); l != lines.end(); ++l) {
     data.push_back(l->size());
     for (vector<PV3>::const_iterator p = l->begin(); p != l->end(); ++p, ++k) {
       pts.push_back(*p);

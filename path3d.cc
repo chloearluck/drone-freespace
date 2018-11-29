@@ -4,48 +4,48 @@ const bool DEBUG = false;
 const bool VERBOSE = false;
 
 void save(Points path, const char * filename) {
-  ofstream ostr;
-  ostr.open(filename);
-  if (ostr.is_open()) { 
-    ostr << setprecision(20) << "# vtk DataFile Version 3.0" << endl
-         << "vtk output" << endl << "ASCII" << endl
-         << "DATASET POLYDATA" << endl 
-         << "POINTS " << path.size() << " double" << endl;
-    for (int i=0; i<path.size(); i++)
-      ostr << path[i]->getApprox(1e-16).getX().mid() << " " << path[i]->getApprox(1e-16).getY().mid() << " " << path[i]->getApprox(1e-16).getZ().mid() << endl;
-    ostr<<endl<<"LINES 1 "<<path.size()+1<<endl<<path.size()<<" ";
-    for (int i=0; i<path.size(); i++)
-      ostr<<i<<" ";
-    ostr.close();
-  } else {
-    cout<<"could not write to file"<<endl;
-  }
+  // ofstream ostr;
+  // ostr.open(filename);
+  // if (ostr.is_open()) { 
+  //   ostr << setprecision(20) << "# vtk DataFile Version 3.0" << endl
+  //        << "vtk output" << endl << "ASCII" << endl
+  //        << "DATASET POLYDATA" << endl 
+  //        << "POINTS " << path.size() << " double" << endl;
+  //   for (int i=0; i<path.size(); i++)
+  //     ostr << path[i]->getApprox(1e-16).getX().mid() << " " << path[i]->getApprox(1e-16).getY().mid() << " " << path[i]->getApprox(1e-16).getZ().mid() << endl;
+  //   ostr<<endl<<"LINES 1 "<<path.size()+1<<endl<<path.size()<<" ";
+  //   for (int i=0; i<path.size(); i++)
+  //     ostr<<i<<" ";
+  //   ostr.close();
+  // } else {
+  //   cout<<"could not write to file"<<endl;
+  // }
 }
 
 void savePivots(Points path1, const char * filename) {
-  Points path;
-  for (int i=0; i<path1.size(); i++) {
-    Point * p = path1[i];
-    if ((dynamic_cast<InputPoint *> (p)) != NULL)
-      path.push_back(path1[i]);
-  }
+  // Points path;
+  // for (int i=0; i<path1.size(); i++) {
+  //   Point * p = path1[i];
+  //   if ((dynamic_cast<InputPoint *> (p)) != NULL)
+  //     path.push_back(path1[i]);
+  // }
 
-  ofstream ostr;
-  ostr.open(filename);
-  if (ostr.is_open()) { 
-    ostr << setprecision(20) << "# vtk DataFile Version 3.0" << endl
-         << "vtk output" << endl << "ASCII" << endl
-         << "DATASET POLYDATA" << endl 
-         << "POINTS " << path.size() << " double" << endl;
-    for (int i=0; i<path.size(); i++)
-      ostr << path[i]->getApprox(1e-16).getX().mid() << " " << path[i]->getApprox(1e-16).getY().mid() << " " << path[i]->getApprox(1e-16).getZ().mid() << endl;
-    ostr<<endl<<"LINES 1 "<<path.size()+1<<endl<<path.size()<<" ";
-    for (int i=0; i<path.size(); i++)
-      ostr<<i<<" ";
-    ostr.close();
-  } else {
-    cout<<"could not write to file"<<endl;
-  }
+  // ofstream ostr;
+  // ostr.open(filename);
+  // if (ostr.is_open()) { 
+  //   ostr << setprecision(20) << "# vtk DataFile Version 3.0" << endl
+  //        << "vtk output" << endl << "ASCII" << endl
+  //        << "DATASET POLYDATA" << endl 
+  //        << "POINTS " << path.size() << " double" << endl;
+  //   for (int i=0; i<path.size(); i++)
+  //     ostr << path[i]->getApprox(1e-16).getX().mid() << " " << path[i]->getApprox(1e-16).getY().mid() << " " << path[i]->getApprox(1e-16).getZ().mid() << endl;
+  //   ostr<<endl<<"LINES 1 "<<path.size()+1<<endl<<path.size()<<" ";
+  //   for (int i=0; i<path.size(); i++)
+  //     ostr<<i<<" ";
+  //   ostr.close();
+  // } else {
+  //   cout<<"could not write to file"<<endl;
+  // }
 }
 
 class TransformationData {
@@ -54,6 +54,12 @@ class TransformationData {
   TransformationData () {}
   TransformationData (PV3 u, PV3 v, PV3 w, PV3 t) : u(u), v(v), w(w), t(t) {}
   Parameter & operator[](int i) { 
+    if (i < 3) return u[i];
+    if (i < 6) return v[i%3];
+    if (i < 9) return w[i%3];
+    return t[i%3];
+  }
+  const Parameter & operator[](int i) const { 
     if (i < 3) return u[i];
     if (i < 6) return v[i%3];
     if (i < 9) return w[i%3];
@@ -74,10 +80,10 @@ class Transformation : public Object<TransformationData> {
 class UnfoldTriangleTransformation : public Transformation {
   PTR<Point> pa, pb, pc, pd;
   TransformationData calculate () {
-    PV3 a = pa->getP();
-    PV3 b = pb->getP();
-    PV3 c = pc->getP();
-    PV3 d = pd->getP();
+    PV3 a = pa->get();
+    PV3 b = pb->get();
+    PV3 c = pc->get();
+    PV3 d = pd->get();
 
     PV3 u = (c-b).unit();
     PV3 uprime = u;
@@ -96,14 +102,14 @@ class UnfoldTriangleTransformation : public Transformation {
   UnfoldTriangleTransformation(PTR<Point> pa, PTR<Point> pb, PTR<Point> pc, PTR<Point> pd) : pa(pa), pb(pb), pc(pc), pd(pd) {}
   UnfoldTriangleTransformation(HFace * hf1, HFace * hf2) {
     PTR<Point> p1[3];
-    p1[0] = hf1->getF()->getBoundary(0)->tail()->getP();
-    p1[1] = hf1->getF()->getBoundary(0)->getNext()->tail()->getP();
-    p1[2] = hf1->getF()->getBoundary(0)->getNext()->getNext()->tail()->getP();
+    p1[0] = hf1->getF()->getBoundary()->tail()->getP();
+    p1[1] = hf1->getF()->getBoundary()->getNext()->tail()->getP();
+    p1[2] = hf1->getF()->getBoundary()->getNext()->getNext()->tail()->getP();
   
     PTR<Point> p2[3];
-    p2[0] = hf2->getF()->getBoundary(0)->tail()->getP();
-    p2[1] = hf2->getF()->getBoundary(0)->getNext()->tail()->getP();
-    p2[2] = hf2->getF()->getBoundary(0)->getNext()->getNext()->tail()->getP();
+    p2[0] = hf2->getF()->getBoundary()->tail()->getP();
+    p2[1] = hf2->getF()->getBoundary()->getNext()->tail()->getP();
+    p2[2] = hf2->getF()->getBoundary()->getNext()->getNext()->tail()->getP();
 
     int j1, j2;
     for (int i=0; i<3; i++)
@@ -125,9 +131,9 @@ class UnfoldTriangleTransformation : public Transformation {
 class XYPlaneTriangleTransfromation : public Transformation {
   PTR<Point> pa, pb, pc, pd;
   TransformationData calculate () {
-    PV3 a = pa->getP();
-    PV3 b = pb->getP();
-    PV3 c = pc->getP();
+    PV3 a = pa->get();
+    PV3 b = pb->get();
+    PV3 c = pc->get();
 
     PV3 u = (c-b).unit();
     PV3 w = (a-b).cross(u).unit();
@@ -172,7 +178,7 @@ class TransformedPoint : public Point {
   PTR<Point> point;
   PTR<Transformation> t;
   PV3 calculate () {
-    PV3 p = point->getP();
+    PV3 p = point->get();
     PV3 u = t->getU();
     PV3 v = t->getV();
     PV3 w = t->getW();
@@ -194,7 +200,7 @@ struct ComparePointOrder {
 class XYComponents : public Object<PV2> {
  protected:
   PTR<Point> p;
-  PV2 calculate () { return PV2(p->getP().getX(), p->getP().getY()); }
+  PV2 calculate () { return PV2(p->get().getX(), p->get().getY()); }
  public:
   XYComponents (PTR<Point> p) : p(p) {} 
 };
@@ -202,7 +208,7 @@ class XYComponents : public Object<PV2> {
 //returns 0 if a b and c lie on the same line
 Primitive3(Collinear, PTR<Point>, a, PTR<Point>, b, PTR<Point>, c)
 int Collinear::sign() {
-  PV3 s = (b->getP() - a->getP()).cross(c->getP() - a->getP());
+  PV3 s = (b->get() - a->get()).cross(c->get() - a->get());
   return s.dot(s).sign();
 }
 
@@ -217,23 +223,23 @@ class PathVertex {
 };
 
 void save(std::vector<PathVertex*> & vertPath, const char * filename) {
-  ofstream ostr;
-  ostr.open(filename);
-  if (ostr.is_open()) { 
-    ostr << setprecision(20) << "# vtk DataFile Version 3.0" << endl
-         << "vtk output" << endl << "ASCII" << endl
-         << "DATASET POLYDATA" << endl 
-         << "POINTS " << vertPath.size() << " double" << endl;
-    for (int i=0; i<vertPath.size(); i++) {
-      ostr << vertPath[i]->transformed2d->getApprox(1e-6).getX().mid()<<" "<<vertPath[i]->transformed2d->getApprox(1e-6).getY().mid()<<" 0"<<endl;
-    }
-    ostr<<endl<<"LINES 1 "<<vertPath.size()+1<<endl<<vertPath.size()<<" ";
-    for (int i=0; i<vertPath.size(); i++)
-      ostr<<i<<" ";
-    ostr.close();
-  } else {
-    cout<<"could not write to file"<<endl;
-  }
+  // ofstream ostr;
+  // ostr.open(filename);
+  // if (ostr.is_open()) { 
+  //   ostr << setprecision(20) << "# vtk DataFile Version 3.0" << endl
+  //        << "vtk output" << endl << "ASCII" << endl
+  //        << "DATASET POLYDATA" << endl 
+  //        << "POINTS " << vertPath.size() << " double" << endl;
+  //   for (int i=0; i<vertPath.size(); i++) {
+  //     ostr << vertPath[i]->transformed2d->getApprox(1e-6).getX().mid()<<" "<<vertPath[i]->transformed2d->getApprox(1e-6).getY().mid()<<" 0"<<endl;
+  //   }
+  //   ostr<<endl<<"LINES 1 "<<vertPath.size()+1<<endl<<vertPath.size()<<" ";
+  //   for (int i=0; i<vertPath.size(); i++)
+  //     ostr<<i<<" ";
+  //   ostr.close();
+  // } else {
+  //   cout<<"could not write to file"<<endl;
+  // }
 }
 
 Primitive3(AreaABC, PathVertex * , pva, PathVertex * , pvb, PathVertex * , pvc);
@@ -260,8 +266,8 @@ class ABintersectCDto3D : public Point {
     PV2 q = vq->transformed2d->get();
     PV2 c = vc->transformed2d->get();
     PV2 d = vd->transformed2d->get();
-    PV3 p3d = vp->original->getP();
-    PV3 q3d = vq->original->getP();
+    PV3 p3d = vp->original->get();
+    PV3 q3d = vq->original->get();
 
     Parameter t = -((p-c).cross(d-c)) / ((q-p).cross(d-c));
     assert(t>0);
@@ -286,9 +292,9 @@ class PathTriangle {
   }
   PathTriangle(HFace * hf,  PathTriangle prev) {
     PTR<Point> ps[3];
-    ps[0] = hf->getF()->getBoundary(0)->tail()->getP();
-    ps[1] = hf->getF()->getBoundary(0)->getNext()->tail()->getP();
-    ps[2] = hf->getF()->getBoundary(0)->getNext()->getNext()->tail()->getP();
+    ps[0] = hf->getF()->getBoundary()->tail()->getP();
+    ps[1] = hf->getF()->getBoundary()->getNext()->tail()->getP();
+    ps[2] = hf->getF()->getBoundary()->getNext()->getNext()->tail()->getP();
     
     int uncommon = -1;
     for (int i=0; i<3; i++)
@@ -308,25 +314,25 @@ class PathTriangle {
 };
 
 void savePathTriangles(std::vector<PathTriangle> & ts, const char * filename, bool saveTranformed) {
-  ofstream ostr;
-  ostr.open(filename);
-  if (ostr.is_open()) {
-    ostr << setprecision(20) << "# vtk DataFile Version 3.0" << endl
-         << "vtk output" << endl << "ASCII" << endl
-         << "DATASET POLYDATA" << endl 
-         << "POINTS " << ts.size()*3 << " double" << endl;
-    for (int i=0; i<ts.size(); i++)
-      for (int j=0; j<3; j++)
-        if (saveTranformed)
-          ostr << ts[i].p[j]->transformed2d->getApprox().getX().mid() << " " << ts[i].p[j]->transformed2d->getApprox().getY().mid() << " 0.0" << endl;
-        else
-          ostr << ts[i].p[j]->original->getApprox().getX().mid() << " " << ts[i].p[j]->original->getApprox().getY().mid() << " " << ts[i].p[j]->original->getApprox().getZ().mid() << endl;
+  // ofstream ostr;
+  // ostr.open(filename);
+  // if (ostr.is_open()) {
+  //   ostr << setprecision(20) << "# vtk DataFile Version 3.0" << endl
+  //        << "vtk output" << endl << "ASCII" << endl
+  //        << "DATASET POLYDATA" << endl 
+  //        << "POINTS " << ts.size()*3 << " double" << endl;
+  //   for (int i=0; i<ts.size(); i++)
+  //     for (int j=0; j<3; j++)
+  //       if (saveTranformed)
+  //         ostr << ts[i].p[j]->transformed2d->getApprox().getX().mid() << " " << ts[i].p[j]->transformed2d->getApprox().getY().mid() << " 0.0" << endl;
+  //       else
+  //         ostr << ts[i].p[j]->original->getApprox().getX().mid() << " " << ts[i].p[j]->original->getApprox().getY().mid() << " " << ts[i].p[j]->original->getApprox().getZ().mid() << endl;
 
-    ostr << endl << "POLYGONS " << ts.size() << " " << 4*ts.size() << endl;
-    for (int i=0; i<ts.size(); i++)
-      ostr << "3 " << 3*i << " " << 3*i+1 << " " << 3*i+2 << endl;
-    ostr.close();
-  } else { cout<<"could not open file"<<endl; return; }
+  //   ostr << endl << "POLYGONS " << ts.size() << " " << 4*ts.size() << endl;
+  //   for (int i=0; i<ts.size(); i++)
+  //     ostr << "3 " << 3*i << " " << 3*i+1 << " " << 3*i+2 << endl;
+  //   ostr.close();
+  // } else { cout<<"could not open file"<<endl; return; }
 }
 
 void flattenTriangles(std::vector<PathTriangle> & triangles, int n) {
@@ -365,9 +371,9 @@ class PathEdge {
 };
 
 bool hasVertexPoint(HFace * hf, PTR<Point> p) {
-  PTR<Point> p0 = hf->getF()->getBoundary(0)->tail()->getP();
-  PTR<Point> p1 = hf->getF()->getBoundary(0)->getNext()->tail()->getP();
-  PTR<Point> p2 = hf->getF()->getBoundary(0)->getNext()->getNext()->tail()->getP();
+  PTR<Point> p0 = hf->getF()->getBoundary()->tail()->getP();
+  PTR<Point> p1 = hf->getF()->getBoundary()->getNext()->tail()->getP();
+  PTR<Point> p2 = hf->getF()->getBoundary()->getNext()->getNext()->tail()->getP();
   return ((p0 == p) || (p1 == p) || (p2 == p));
 }
 
@@ -406,21 +412,21 @@ class State {
     nPath = n;
   }
   void save(const char * filename) {
-    ofstream ostr;
-    ostr.open(filename);
-    if (ostr.is_open()) {
-      ostr << setprecision(20)<< edges.size()<<" "<<nPath<<endl;
-      ostr << left.size()<<" "<<right.size()<<endl;
-      for (int i=0; i<edges.size(); i++) {
-        ostr<<edges[i].left->transformed2d->getApprox(1e-16).getX().mid()<<" "<<edges[i].left->transformed2d->getApprox(1e-16).getY().mid()<<endl;
-        ostr<<edges[i].right->transformed2d->getApprox(1e-16).getX().mid()<<" "<<edges[i].right->transformed2d->getApprox(1e-16).getY().mid()<<endl;
-      }
-      for (int i=0; i<left.size(); i++)
-        ostr<<left[i]->transformed2d->getApprox(1e-16).getX().mid()<<" "<<left[i]->transformed2d->getApprox(1e-16).getY().mid()<<endl;
-      for (int i=0; i<right.size(); i++)
-        ostr<<right[i]->transformed2d->getApprox(1e-16).getX().mid()<<" "<<right[i]->transformed2d->getApprox(1e-16).getY().mid()<<endl;
-      ostr.close();
-    } else { cout<<"could not open file"<<endl; }
+    // ofstream ostr;
+    // ostr.open(filename);
+    // if (ostr.is_open()) {
+    //   ostr << setprecision(20)<< edges.size()<<" "<<nPath<<endl;
+    //   ostr << left.size()<<" "<<right.size()<<endl;
+    //   for (int i=0; i<edges.size(); i++) {
+    //     ostr<<edges[i].left->transformed2d->getApprox(1e-16).getX().mid()<<" "<<edges[i].left->transformed2d->getApprox(1e-16).getY().mid()<<endl;
+    //     ostr<<edges[i].right->transformed2d->getApprox(1e-16).getX().mid()<<" "<<edges[i].right->transformed2d->getApprox(1e-16).getY().mid()<<endl;
+    //   }
+    //   for (int i=0; i<left.size(); i++)
+    //     ostr<<left[i]->transformed2d->getApprox(1e-16).getX().mid()<<" "<<left[i]->transformed2d->getApprox(1e-16).getY().mid()<<endl;
+    //   for (int i=0; i<right.size(); i++)
+    //     ostr<<right[i]->transformed2d->getApprox(1e-16).getX().mid()<<" "<<right[i]->transformed2d->getApprox(1e-16).getY().mid()<<endl;
+    //   ostr.close();
+    // } else { cout<<"could not open file"<<endl; }
   }
 };
 
@@ -507,10 +513,9 @@ void shortestPath(std::vector<PathTriangle> & triangles, PathVertex * start, Pat
 //populate newPath with a sequence of PathTriangles from oldPath[startIndex] to oldPathpendIndex] with goes
 //the other way around pv
 void otherWay(vector<PathTriangle> & oldPath, vector<PathTriangle> & newPath, int startIndex, int endIndex, PathVertex * pv) {
-  std::vector<HFace*> neighbors;
   HFace * nextHF = NULL;
   HFace * hfaceStart = oldPath[startIndex].hface;
-  hfaceStart->neighbors(neighbors);
+  std::vector<HFace*> neighbors = hfaceStart->neighbors();
   assert(neighbors.size() == 3);
   
   if (endIndex != startIndex+1 && (neighbors[0] == oldPath[endIndex].hface || neighbors[1] == oldPath[endIndex].hface || neighbors[2] == oldPath[endIndex].hface))
@@ -525,7 +530,7 @@ void otherWay(vector<PathTriangle> & oldPath, vector<PathTriangle> & newPath, in
   while (true) {
     neighbors.clear();
     HFace * prev = ((newPath.size()==1)? oldPath[startIndex].hface : newPath[newPath.size()-2].hface);
-    newPath[newPath.size()-1].hface->neighbors(neighbors);
+    neighbors = newPath[newPath.size()-1].hface->neighbors();
     assert(neighbors.size() == 3);
     for (int i=0; i<neighbors.size(); i++)
       if (neighbors[i] != prev && hasVertexPoint(neighbors[i],pv->original))
@@ -541,18 +546,18 @@ void localPath(PTR<Point> a, PTR<Point> b, HFaces & pathfaces, Points & path) {
   std::vector<PathTriangle> triangles;
   std::vector<PTR<Transformation> > transformations;
   HFace * hf = pathfaces[0];
-  PathVertex * v0 = new PathVertex(hf->getF()->getBoundary(0)->tail()->getP());
-  PathVertex * v1 = new PathVertex(hf->getF()->getBoundary(0)->getNext()->tail()->getP());
-  PathVertex * v2 = new PathVertex(hf->getF()->getBoundary(0)->getNext()->getNext()->tail()->getP());
+  PathVertex * v0 = new PathVertex(hf->getF()->getBoundary()->tail()->getP());
+  PathVertex * v1 = new PathVertex(hf->getF()->getBoundary()->getNext()->tail()->getP());
+  PathVertex * v2 = new PathVertex(hf->getF()->getBoundary()->getNext()->getNext()->tail()->getP());
   triangles.push_back(PathTriangle(v0,v1,v2,hf));
   for (int i=1; i<pathfaces.size(); i++) {
     PathTriangle prev= triangles[i-1];
     hf = pathfaces[i];
 
     PTR<Point> p[3];
-    p[0] = hf->getF()->getBoundary(0)->tail()->getP();
-    p[1] = hf->getF()->getBoundary(0)->getNext()->tail()->getP();
-    p[2] = hf->getF()->getBoundary(0)->getNext()->getNext()->tail()->getP();
+    p[0] = hf->getF()->getBoundary()->tail()->getP();
+    p[1] = hf->getF()->getBoundary()->getNext()->tail()->getP();
+    p[2] = hf->getF()->getBoundary()->getNext()->getNext()->tail()->getP();
 
     int uncommon1 = -1;
     for (int j=0; j<3; j++)
@@ -757,8 +762,7 @@ void bfs(HFace * fa, HFace * fb, HFaces & pathfaces) {
       break;
     }
 
-    HFaces hfaces;
-    current->neighbors(hfaces);
+    HFaces hfaces = current->neighbors();
     for (int i=(hfaces.size()-1); i>=0; i--) {
       HFace * hf = hfaces[i];
       if (parents.find(hf) == parents.end()) {
@@ -788,8 +792,8 @@ void testBoundaryCondition(Polyhedron * poly, int mode) {
   while(start == 0) {
     std::vector<PTR<FaceIntersectionPoint> > points;
     //choose a random 2 points, they define a ray
-    PTR<Point> p = new InputPoint(random()/double(RAND_MAX), random()/double(RAND_MAX),random()/double(RAND_MAX));
-    PTR<Point> q = new InputPoint(random()/double(RAND_MAX), random()/double(RAND_MAX),random()/double(RAND_MAX));
+    PTR<Point> p = new Point(random()/double(RAND_MAX), random()/double(RAND_MAX),random()/double(RAND_MAX));
+    PTR<Point> q = new Point(random()/double(RAND_MAX), random()/double(RAND_MAX),random()/double(RAND_MAX));
     PTR<Point> r =  new DiffPoint(p, q);
     //choose a random and shell
     int cell_index = floor(random()/double(RAND_MAX) * poly->cells.size());
@@ -824,26 +828,26 @@ void testBoundaryCondition(Polyhedron * poly, int mode) {
   if (mode == START_ON_VERTEX) {
     //replace start with one of its face's vertices
     HFace * hface = start->getHFace();
-    PTR<Point> newStart = hface->getF()->getBoundary(0)->tail()->getP();
+    PTR<Point> newStart = hface->getF()->getBoundary()->tail()->getP();
     localPath(newStart, (PTR<Point>) end, bfsPath, path);
   } else if (mode  == START_ON_EDGE) {
     //replace start with a point on one of its face's edges
     HFace * hface = start->getHFace();
-    PTR<Point> a = hface->getF()->getBoundary(0)->tail()->getP();
-    PTR<Point> b = hface->getF()->getBoundary(0)->head()->getP();
+    PTR<Point> a = hface->getF()->getBoundary()->tail()->getP();
+    PTR<Point> b = hface->getF()->getBoundary()->head()->getP();
     PTR<Point> newStart = new MidPoint(a,b);
     assert(Collinear(a,b,newStart) == 0);
     localPath(newStart, (PTR<Point>) end, bfsPath, path);
   } else if (mode == END_ON_VERTEX) {
     //replace end with one of its face's vertices
     HFace * hface = end->getHFace();
-    PTR<Point> newEnd = hface->getF()->getBoundary(0)->tail()->getP();
+    PTR<Point> newEnd = hface->getF()->getBoundary()->tail()->getP();
     localPath((PTR<Point>) start, newEnd, bfsPath, path);
   } else if (mode  == END_ON_EDGE) {
     //replace end with a point on one of its face's edges
     HFace * hface = end->getHFace();
-    PTR<Point> a = hface->getF()->getBoundary(0)->tail()->getP();
-    PTR<Point> b = hface->getF()->getBoundary(0)->head()->getP();
+    PTR<Point> a = hface->getF()->getBoundary()->tail()->getP();
+    PTR<Point> b = hface->getF()->getBoundary()->head()->getP();
     PTR<Point> newEnd = new MidPoint(a,b);
     assert(Collinear(a,b,newEnd) == 0);
     localPath((PTR<Point>) start, newEnd, bfsPath, path);

@@ -142,7 +142,7 @@ Roots PolySolver::descartesRoots (Object<Parameter>* l, Object<Parameter>* u)
       res.push_back(new PolyRoot(poly, i.l, i.u));
     else if (v > 1 // && !descartes1(st, i, v, true) && !descartes1(st, i, v, false)
 	     && !descartes2(st, i, v)) {
-      PTR<Object<Parameter>> m = new SubKnot(i.l, i.u, 1, 2);
+      PTR<Object<Parameter> > m = new SubKnot(i.l, i.u, 1, 2);
       unsigned int n = max(4u, (unsigned int) sqrt(i.n));
       st.push_back(DInt(i.l, m, n));
       st.push_back(DInt(m, i.u, n));
@@ -178,9 +178,9 @@ Roots PolySolver::descartesRoots (Object<Parameter>* l, Object<Parameter>* u)
 }
 
 void PolyRoot::updateKnots () {
-  PTR<Object<Parameter>> l2 = 
+  PTR<Object<Parameter> > l2 = 
     new Object<Parameter>(Parameter::constant(l->get().mid()), true);
-  PTR<Object<Parameter>> u2 = 
+  PTR<Object<Parameter> > u2 = 
     new Object<Parameter>(Parameter::constant(u->get().mid()), true);
   updateKnots(l2, u2);
 
@@ -192,9 +192,9 @@ void PolyRoot::updateKnots () {
   ld = ld - (ld - rd) / 7;
   ud = ud - (ud - rd) / 7;
 
-  PTR<Object<Parameter>> lo = 
+  PTR<Object<Parameter> > lo = 
     new Object<Parameter>(Parameter::constant(ld), true);
-  PTR<Object<Parameter>> uo = 
+  PTR<Object<Parameter> > uo = 
     new Object<Parameter>(Parameter::constant(ud), true);
 
   int des = 0;
@@ -211,7 +211,7 @@ void PolyRoot::updateKnots () {
   while (lStep || uStep) {
     if (lStep) {
       double ld2 = ld + (ld - rd) / 2;
-      PTR<Object<Parameter>> lo2 = 
+      PTR<Object<Parameter> > lo2 = 
         new Object<Parameter>(Parameter::constant(ld2), true);
       des = 0;
       ::BaseObject::throwSignException() = true;
@@ -232,7 +232,7 @@ void PolyRoot::updateKnots () {
     }
     if (uStep) {
       double ud2 = ud + (ud - rd) / 2;
-      PTR<Object<Parameter>> uo2 = 
+      PTR<Object<Parameter> > uo2 = 
         new Object<Parameter>(Parameter::constant(ud2), true);
       des = 0;
       ::BaseObject::throwSignException() = true;
@@ -259,7 +259,7 @@ void PolyRoot::updateKnots () {
 
 bool PolySolver::descartes1 (vector<DInt> &st, const DInt &i, int v, bool lflag)
 {
-  PTR<Object<Parameter>> m = new SubKnot(i.l, i.u, lflag ? 1 : i.n - 1, i.n),
+  PTR<Object<Parameter> > m = new SubKnot(i.l, i.u, lflag ? 1 : i.n - 1, i.n),
     nl = lflag ? i.l : m, nu = lflag ? m : i.u;
   if (Descartes(poly, nl, nu) != v)
     return false;
@@ -273,7 +273,7 @@ bool PolySolver::descartes2 (vector<DInt> &st, const DInt &i, int v)
   int k = descartes2int(i, v);
   if (k == 0)
     return false;
-  PTR<Object<Parameter>> nl = new SubKnot(i.l, i.u, k - 2, 4*i.n),
+  PTR<Object<Parameter> > nl = new SubKnot(i.l, i.u, k - 2, 4*i.n),
     nu = new SubKnot(i.l, i.u, k + 2, 4*i.n);
   if (Descartes(poly, nl, nu) != v)
     return false;
@@ -394,7 +394,7 @@ int LessThan::sign() {
   return (a->get() - b->get()).sign();
 }
 
-vector<int> Root2::intersections(vector<vector<RootPTR>> &rbv) {
+vector<int> Root2::intersections(vector<vector<RootPTR> > &rbv) {
  
   vector< vector<RootPTR> > fv;
   vector< vector<RootPTR> > gv;
@@ -479,7 +479,7 @@ int Root2::parity(const vector<int> &alt) {
 
 class SubXPoly : public Object<PPoly> {
   PTR<Poly2> f;
-  PTR<Object<Parameter>> x;
+  PTR<Object<Parameter> > x;
   PPoly calculate () { return f->get().subX(x->get()); }
 public:
   SubXPoly (Poly2* f, Object<Parameter>* x) : f(f), x(x) {}
@@ -487,7 +487,7 @@ public:
 
 class SubYPoly : public Object<PPoly> {
   PTR<Poly2> f;
-  PTR<Object<Parameter>> y;
+  PTR<Object<Parameter> > y;
   PPoly calculate () { return f->get().subY(y->get()); }
 public:
   SubYPoly (Poly2* f, Object<Parameter>* y) : f(f), y(y) {}
@@ -498,25 +498,25 @@ void Root2::setRoots(RootBoundary &rb) {
 
   rb.v.clear();
 
-  PTR<Object<Parameter>> xl = new Object<Parameter>(b.x.lbP());
-  PTR<Object<Parameter>> xu = new Object<Parameter>(b.x.ubP());
-  PTR<Object<Parameter>> yl = new Object<Parameter>(b.y.lbP());
-  PTR<Object<Parameter>> yu = new Object<Parameter>(b.y.ubP());
+  PTR<Object<Parameter> > xl = new Object<Parameter>(b.x.lbP());
+  PTR<Object<Parameter> > xu = new Object<Parameter>(b.x.ubP());
+  PTR<Object<Parameter> > yl = new Object<Parameter>(b.y.lbP());
+  PTR<Object<Parameter> > yu = new Object<Parameter>(b.y.ubP());
   
-  PTR<Object<PPoly>> bot_f   = new SubYPoly(f, yl);
-  PTR<Object<PPoly>> right_f = new SubXPoly(f, xu);
-  PTR<Object<PPoly>> top_f   = new SubYPoly(f, yu);
-  PTR<Object<PPoly>> left_f  = new SubXPoly(f, xl);
+  PTR<Object<PPoly> > bot_f   = new SubYPoly(f, yl);
+  PTR<Object<PPoly> > right_f = new SubXPoly(f, xu);
+  PTR<Object<PPoly> > top_f   = new SubYPoly(f, yu);
+  PTR<Object<PPoly> > left_f  = new SubXPoly(f, xl);
 
   rb.v.push_back(PolySolver(bot_f).getRoots(xl, xu));
   rb.v.push_back(PolySolver(right_f).getRoots(yl, yu));
   rb.v.push_back(PolySolver(top_f).getRoots(xl, xu));
   rb.v.push_back(PolySolver(left_f).getRoots(yl, yu));
 
-  PTR<Object<PPoly>> bot_g   = new SubYPoly(g, yl);
-  PTR<Object<PPoly>> right_g = new SubXPoly(g, xu);
-  PTR<Object<PPoly>> top_g   = new SubYPoly(g, yu);
-  PTR<Object<PPoly>> left_g  = new SubXPoly(g, xl);
+  PTR<Object<PPoly> > bot_g   = new SubYPoly(g, yl);
+  PTR<Object<PPoly> > right_g = new SubXPoly(g, xu);
+  PTR<Object<PPoly> > top_g   = new SubYPoly(g, yu);
+  PTR<Object<PPoly> > left_g  = new SubXPoly(g, xl);
 
   rb.v.push_back(PolySolver(bot_g).getRoots(xl, xu));
   rb.v.push_back(PolySolver(right_g).getRoots(yl, yu));
@@ -533,7 +533,7 @@ void Root2::setRoots(RootBoundary &rb) {
 
 Root2::RootBoundary Root2::splitHoriz(RootBoundary &rb, Parameter c) {
 
-  PTR<Object<Parameter>> s = new Object<Parameter>(c);
+  PTR<Object<Parameter> > s = new Object<Parameter>(c);
   
   vector< vector<RootPTR> > bot(8);
   vector< vector<RootPTR> > top(8);
@@ -568,8 +568,8 @@ Root2::RootBoundary Root2::splitHoriz(RootBoundary &rb, Parameter c) {
 
   }
 
-  PTR<Object<Parameter>> xl = new Object<Parameter>(rb.I.x.lbP());
-  PTR<Object<Parameter>> xu = new Object<Parameter>(rb.I.x.ubP());
+  PTR<Object<Parameter> > xl = new Object<Parameter>(rb.I.x.lbP());
+  PTR<Object<Parameter> > xu = new Object<Parameter>(rb.I.x.ubP());
  
   PTR<Poly> mid_line_f = new SubYPoly(f, s);
   PTR<Poly> mid_line_g = new SubYPoly(g, s);
@@ -602,7 +602,7 @@ Root2::RootBoundary Root2::splitHoriz(RootBoundary &rb, Parameter c) {
 
 Root2::RootBoundary Root2::splitVert(RootBoundary &rb, Parameter c) {
 
-  PTR<Object<Parameter>> s = new Object<Parameter>(c);
+  PTR<Object<Parameter> > s = new Object<Parameter>(c);
   
   vector< vector<RootPTR> > left(8);
   vector< vector<RootPTR> > right(8);
@@ -635,8 +635,8 @@ Root2::RootBoundary Root2::splitVert(RootBoundary &rb, Parameter c) {
     left[i+2] = vector<RootPTR>(rb.v[i+2].begin()+ui, rb.v[i+2].end());
   }
 
-  PTR<Object<Parameter>> yl = new Object<Parameter>(rb.I.y.lbP());
-  PTR<Object<Parameter>> yu = new Object<Parameter>(rb.I.y.ubP());
+  PTR<Object<Parameter> > yl = new Object<Parameter>(rb.I.y.lbP());
+  PTR<Object<Parameter> > yu = new Object<Parameter>(rb.I.y.ubP());
  
   PTR<Poly> mid_line_f = new SubXPoly(f, s);
   PTR<Poly> mid_line_g = new SubXPoly(g, s);

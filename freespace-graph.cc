@@ -44,7 +44,7 @@ void savePoly(Polyhedron * p, const char * filename) {
 
 class InputParameter : public Object<Parameter> {
 public:
-  InputParameter (double x) { set(Parameter::input(x)); }
+  InputParameter (double x) : Object<Parameter>(Parameter::input(x)) {}
 };
 
 pair <PTR<Point>, PTR<Point> > nearestPointPair(Polyhedron * poly, int i, int j) {
@@ -67,7 +67,7 @@ pair <PTR<Point>, PTR<Point> > nearestPointPair(Polyhedron * poly, int i, int j)
   //populate vertex lists
   Vertices v1, v2;
   for (int k=0; k<hfs1.size(); k++) {
-    HEdge * heFirst = hfs1[k]->getF()->getBoundary(0);
+    HEdge * heFirst = hfs1[k]->getF()->getBoundary();
     HEdge * he = heFirst;
     v1.push_back(he->tail());
     do {
@@ -77,7 +77,7 @@ pair <PTR<Point>, PTR<Point> > nearestPointPair(Polyhedron * poly, int i, int j)
     } while (he != heFirst);
   }
   for (int k=0; k<hfs2.size(); k++) {
-    HEdge * heFirst = hfs2[k]->getF()->getBoundary(0);
+    HEdge * heFirst = hfs2[k]->getF()->getBoundary();
     HEdge * he = heFirst;
     v2.push_back(he->tail());
     do {
@@ -112,7 +112,7 @@ PTR<Point> nearestPoint(Polyhedron * poly, int cell_index, PTR<Point> p) {
   }
   Vertices v;
   for (int k=0; k<hfs1.size(); k++) {
-    HEdge * heFirst = hfs1[k]->getF()->getBoundary(0);
+    HEdge * heFirst = hfs1[k]->getF()->getBoundary();
     HEdge * he = heFirst;
     do {
       if (std::find(v.begin(), v.end(), he->tail()) == v.end())
@@ -504,7 +504,7 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, 
       Polyhedron * unit_ball = ball->scale(unit);
       unit = unit * 2;
       for (int i=0; i<prev_blockspaces.size(); i++) {
-        blockspaces.push_back(minkowskiSumFull(original_blockspaces[i], unit_ball));
+        blockspaces.push_back(minkowskiSum(original_blockspaces[i], unit_ball));
         simplify(blockspaces[i], 1e-6);
       }
       
@@ -718,8 +718,8 @@ FreeSpaceGraph::FreeSpaceGraph(const char * dir) {
         istringstream ss2(siblingPoints);
         double x1, y1, z1, x2, y2, z2;
         while (ss2 >> x1 >> y1 >> z1 >> x2 >> y2 >> z2) {
-          PTR<Point> a = new InputPoint(x1, y1, z1);
-          PTR<Point> b = new InputPoint(x2, y2, z2);
+          PTR<Point> a = new Point(x1, y1, z1);
+          PTR<Point> b = new Point(x2, y2, z2);
           n->siblingPoints.push_back(std::make_pair(a,b));
         }
       }

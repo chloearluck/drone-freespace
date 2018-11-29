@@ -123,7 +123,7 @@ class SplitPlane : public Plane {
 };
 
 class PointNormalPlane : public Plane {
-  PTR<Object<PV3>> point, normal;
+  PTR<Object<PV3> > point, normal;
   
   PlaneData calculate () {
     PV3 p = point->get(), n = normal->get();

@@ -76,8 +76,8 @@ int main (int argc, char *argv[]) {
 
   Polyhedron * blockspace = loadPoly(filename);
 
-  PTR<Point> start = new InputPoint(5, 5, 2);
-  PTR<Point> end = new InputPoint(15, 15, 2);
+  PTR<Point> start = new Point(5, 5, 2);
+  PTR<Point> end = new Point(15, 15, 2);
   
   Points path;
 

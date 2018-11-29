@@ -329,7 +329,7 @@ FeatureSet smallFeatures (Polyhedron *a, double d, VPMap *vpmap)
     if ((*f)->getBoundary())
       (*f)->getPC();
   Octree<Face *> *octree = faceOctree(a, d);
-  vector<pair<Face *, Face *>> ff;
+  vector<pair<Face *, Face *> > ff;
   octree->pairs(ff, d);  
   delete octree;
   static unsigned int n = 8;
@@ -362,7 +362,7 @@ void smallFeaturesT (void *ptr)
   BaseObject::addThread(sfd->i);
   VPMap *vpmap = sfd->vpmap;
   FeatureSet fs;
-  vector<pair<Face *, Face *>>::iterator x = sfd->ff->begin() + sfd->is;
+  vector<pair<Face *, Face *> >::iterator x = sfd->ff->begin() + sfd->is;
   for (int i = sfd->is; i < sfd->ie; ++i, ++x)
     if (x->first->getBoundary() && x->second->getBoundary() &&
 	(!vpmap || moved(x->first, *vpmap) || moved(x->second, *vpmap)))
@@ -778,7 +778,7 @@ bool intersects (Expander2 *e, Expander2::Pair *p)
 
 bool intersects (const Points &pts, const Points &dsp, bool vf)
 {
-  PTR<Object<PPoly>> p = new FIPoly(pts, dsp);
+  PTR<Object<PPoly> > p = new FIPoly(pts, dsp);
   Roots rts = PolySolver(p).getRoots(0, 1);
   for (Roots::iterator r = rts.begin(); r != rts.end(); ++r) {
     Points rpts;

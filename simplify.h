@@ -228,7 +228,7 @@ void smallFeaturesT (void *ptr);
 class SFData {
  public:
   unsigned int i, is, ie;
-  vector<pair<Face *, Face *>> *ff;
+  vector<pair<Face *, Face *> > *ff;
   double d;
   VPMap *vpmap;
   FeatureSet fs;

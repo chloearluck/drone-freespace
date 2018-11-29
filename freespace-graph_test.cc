@@ -62,8 +62,8 @@ int main (int argc, char *argv[]) {
 
   //--------------------------------
   // Test searching a freespace-graph
-  PTR<Point> start = new InputPoint(-2.5,0.0, -1.0);
-  PTR<Point> end = new InputPoint(6.0,0.0,0.0);
+  PTR<Point> start = new Point(-2.5,0.0, -1.0);
+  PTR<Point> end = new Point(6.0,0.0,0.0);
   int startRotationIndex = 0;
   int endRotationIndex = 0;
   

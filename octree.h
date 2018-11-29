@@ -113,7 +113,7 @@ class Octree {
       }
   }
 
-  void pairs (vector<pair<T, T>> &res, double s = 0.0) const {
+  void pairs (vector<pair<T, T> > &res, double s = 0.0) const {
     if (l) {
       l->pairs(res, s);
       r->pairs(res, s);
