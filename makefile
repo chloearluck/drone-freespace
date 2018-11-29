@@ -91,5 +91,15 @@ freespace_test: freespace_test.cc freespace.o hull.o polyhedron.o \
 	triangulate.o io.o object.o acp.o mink.o simplify.o expander2.o poly.o \
 	$(LFLAGS) -o freespace_test
 
+create_test_example.o: create_test_example.cc hull.h polyhedron.h octree.h rbtree.h object.h \
+  pv.h acp.h geometry3d.h simplify.h
+	$(COMPILE) create_test_example.cc
+
+create_test_example: create_test_example.o hull.o polyhedron.o \
+  triangulate.o io.o object.o acp.o mink.o simplify.o expander2.o poly.o
+	$(LINK) create_test_example.o hull.o polyhedron.o \
+  triangulate.o io.o object.o acp.o mink.o simplify.o expander2.o poly.o \
+	$(LFLAGS) -o create_test_example
+
 clean: 
 	rm -f *.o *~ mink hull delaunay pack cspace poly_test freespace_test *.lp
