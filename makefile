@@ -1,4 +1,4 @@
-CFLAGS = -O3 -std=c++11
+CFLAGS = -g -O3 -std=c++11
 
 COMPILE = g++ $(CFLAGS) -c
 
@@ -115,4 +115,4 @@ create_test_example: create_test_example.o hull.o polyhedron.o \
 	$(LFLAGS) -o create_test_example
 
 clean: 
-	rm -f *.o *~ mink hull delaunay pack cspace poly_test freespace_test *.lp
+	rm -f *.o *~ mink hull delaunay pack cspace poly_test freespace_test freespace-graph_test create_test_example *.lp
