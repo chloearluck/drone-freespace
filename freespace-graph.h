@@ -65,7 +65,7 @@ class FreeSpaceGraph {
   void getPath(Node * start, Node * end, PTR<Point> a, PTR<Point> b, std::vector<std::pair<PTR<Point>, double > > & path);
   double angle(int blockspace_index);
 
-  FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, double theta, double clearance_unit, int num_levels, const char * dir);
+  FreeSpaceGraph(std::vector<Polyhedron*> & close_blockspaces, std::vector<Polyhedron*> & rough_blockspaces, double theta, double clearance_unit, int num_levels, const char * dir);
   FreeSpaceGraph(const char * dir);
 };
 

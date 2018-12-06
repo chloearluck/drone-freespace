@@ -3,15 +3,22 @@
 void testCreateGraph(const char * blockspace_dir, const char * graph_dir, double theta, double clearance_unit, int num_levels) {
   int numRotations = floor(2*M_PI/theta);
   
-  std::vector<Polyhedron *> blockspaces;
+  std::vector<Polyhedron *> close_blockspaces;
   char s[50];
   for (int i=0; i<=40; i++) {
-    sprintf(s, "%s/sum%02d-out.vtk", blockspace_dir, i);
+    sprintf(s, "%s/close%02d-out.vtk", blockspace_dir, i);
     Polyhedron * p = loadPolyVTK(s);
-    blockspaces.push_back(p);
+    close_blockspaces.push_back(p);
   }
 
-  FreeSpaceGraph graph(blockspaces, theta, clearance_unit, num_levels, graph_dir);
+  std::vector<Polyhedron *> rough_blockspaces;
+  for (int i=0; i<=40; i++) {
+    sprintf(s, "%s/rough%02d-out.vtk", blockspace_dir, i);
+    Polyhedron * p = loadPolyVTK(s);
+    rough_blockspaces.push_back(p);
+  }
+
+  FreeSpaceGraph graph(close_blockspaces, rough_blockspaces, theta, clearance_unit, num_levels, graph_dir);
 }
 
 void testSearchGraph(const char * graph_dir, PTR<Point> start, PTR<Point> end, int startRotationIndex, int endRotationIndex) {
@@ -48,11 +55,11 @@ int main (int argc, char *argv[]) {
     srandom(seed);
   }
 
-  const char * graph_dir = "plus-graph";
+  const char * graph_dir = "droneRoomGraph";
 
   //--------------------------------
   // Test creating a freespace-graph
-  const char * blockspace_dir = "plus-output";
+  const char * blockspace_dir = "droneRoomOutput";
   double theta = M_PI / 20;
   double clearance_unit = 0.05;
   int num_levels = 3;

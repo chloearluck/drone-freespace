@@ -464,14 +464,14 @@ void FreeSpaceGraph::getPath(Node * start, Node * end, PTR<Point> a, PTR<Point> 
   }
 }
 
-FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, double theta, double clearance_unit, int num_levels, const char * dir) {
+FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & close_blockspaces, std::vector<Polyhedron*> & rough_blockspaces, double theta, double clearance_unit, int num_levels, const char * dir) {
   double unit = clearance_unit;
   this->theta = theta;
   this->num_levels = num_levels;
-  this->blockspaces_per_level = original_blockspaces.size();
+  this->blockspaces_per_level = close_blockspaces.size();
   this->dir = dir;
   std::vector<Polyhedron*> blockspaces;
-  blockspaces.insert(blockspaces.begin(), original_blockspaces.begin(), original_blockspaces.end());
+  blockspaces.insert(blockspaces.begin(), close_blockspaces.begin(), close_blockspaces.end());
 
   for (int i = 0; i<blockspaces.size(); i++)
     simplify(blockspaces[i], 1e-6);
@@ -504,7 +504,7 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & original_blockspaces, 
       Polyhedron * unit_ball = ball->scale(unit);
       unit = unit * 2;
       for (int i=0; i<prev_blockspaces.size(); i++) {
-        blockspaces.push_back(minkowskiSum(original_blockspaces[i], unit_ball));
+        blockspaces.push_back(minkowskiSum(rough_blockspaces[i], unit_ball));
         simplify(blockspaces[i], 1e-6);
       }
       
