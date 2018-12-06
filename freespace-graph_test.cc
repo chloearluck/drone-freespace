@@ -49,6 +49,7 @@ void testSearchGraph(const char * graph_dir, PTR<Point> start, PTR<Point> end, i
 
 int main (int argc, char *argv[]) {
   Parameter::enable();
+  time_t start_t,end_t;
 
   if (argc == 2) { 
     unsigned seed = atoi(argv[1]);
@@ -64,7 +65,10 @@ int main (int argc, char *argv[]) {
   double clearance_unit = 0.05;
   int num_levels = 3;
   
+  time(&start_t);
   testCreateGraph(blockspace_dir, graph_dir, theta, clearance_unit, num_levels);
+  time(&end_t);
+  cout << "Elapsed time: "<< difftime (end_t,start_t)/60.0 << " minutes" << endl;
   //--------------------------------
 
   //--------------------------------
@@ -74,6 +78,9 @@ int main (int argc, char *argv[]) {
   int startRotationIndex = 0;
   int endRotationIndex = 0;
   
+  time(&start_t);
   testSearchGraph(graph_dir, start, end, startRotationIndex, endRotationIndex);
+  time(&end_t);
+  cout << "Elapsed time: "<< difftime (end_t,start_t) << " seconds" << endl;
   //--------------------------------
 }

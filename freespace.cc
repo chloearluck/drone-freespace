@@ -616,13 +616,23 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, PTR<Object<Param
   saveTriangulation("triangulation2.vtk", splitTList2);
 
   Polyhedron * closeApprox = generateSweep(splitTList2);
-  // simplify(closeApprox, 1e-6);
   savePoly(closeApprox, "closeApprox");
   Polyhedron * roughApprox = generateSweep(splitTList);
-  // simplify(roughApprox, 1e-6);
   savePoly(roughApprox, "roughApprox");
 
-  generateFreeSpaces(blockspaces_close, closeApprox, "close");
-  generateFreeSpaces(blockspaces_rough, roughApprox, "rough");
 
+  time_t start,end;
+
+  time (&start);
+  generateFreeSpaces(blockspaces_close, closeApprox, "close");
+  time (&end);
+  double closetime = difftime (end,start);
+
+  time (&start);
+  generateFreeSpaces(blockspaces_rough, roughApprox, "rough");
+  time (&end);
+  double roughtime = difftime (end,start);
+
+  cout << "close approximate free spaces generated in " << closetime/60.0 << " minutes" << endl;
+  cout << "rough approximate free spaces generated in " << roughtime/60.0 << " minutes" << endl;
 }

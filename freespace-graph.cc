@@ -488,8 +488,10 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & close_blockspaces, std
       graph[i].push_back(new FreeSpaceGraph::BlockSpaceNode(i, j));
 
   std::vector<Polyhedron*> prev_blockspaces;
+  time_t start,end;
   for (int level = 0; level<num_levels; level++) {
     cout<<"level "<<level<<endl;
+    time(&start);
 
     if (level > 0) {
       if (level > 2)
@@ -599,6 +601,8 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & close_blockspaces, std
       cout<<"saving blockspace "<<i<<endl;
       savePoly(blockspaces[i], s.c_str());
     }
+    time(&end);
+    cout << difftime(end, start)/60.0 << " minutes elapsed on level " << level << endl;
   }
 
   for(int i=0; i<prev_blockspaces.size(); i++)
