@@ -2,24 +2,21 @@
 
 Polyhedron * minkowskiSum (Polyhedron *a, Polyhedron *b)
 {
-  double t0 = getTime();
   Polyhedron *con = convolution(a, b);
-  double t1 = getTime() - t0;
-  t0 = getTime();
   Polyhedron *c = subdivide(con, true), *d = new Polyhedron(a->perturbed);
-  double t2 = getTime() - t0;
-  t0 = getTime();
   Shells sh;
   c->formShells(sh);
   Shells msh = minkowskiShells(a, b, sh);
-  PVMap pvmap;
+  Faces fa;
   for (Shells::iterator s = msh.begin(); s != msh.end(); ++s) {
     const HFaces &hf = (*s)->getHFaces();
     for (HFaces::const_iterator f = hf.begin(); f != hf.end(); ++f)
-      d->addTriangle((*f)->getF(), pvmap);
+      fa.push_back((*f)->getF());
   }
-  double t3 = getTime() - t0;
-  cerr << "con = " << t1 << " ; arr = " << t2 << "; shells = " << t3 << endl;
+  Triangles tr = triangulate(fa);
+  PVMap pvmap;
+  for (Triangles::iterator t = tr.begin(); t != tr.end(); ++t)
+    d->addTriangle(t->a, t->b, t->c, pvmap);
   delete c;
   delete con;
   deleteShells(sh);

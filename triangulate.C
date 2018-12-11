@@ -39,12 +39,12 @@ Edge2 * Vertex2::findEdge (Vertex2 *h) const
 
 int Vertex2::yOrder (Vertex2 *b) const
 {
-  return PointOrderR(v->getP(), b->v->getP());
+  return PointOrderR(p, b->p);
 }
 
 int Vertex2::leftTurn (Vertex2 *b, Vertex2 *c) const
 {
-  return LeftTurn(v->getP(), b->v->getP(), c->v->getP(), coord);
+  return LeftTurn(p, b->p, c->p, coord);
 }
 
 bool Edge2::increasingY ()
@@ -70,7 +70,7 @@ Edge2 * getEdge (Vertex2 *tail, Vertex2 *head, bool flag, bool tflag)
   return e;
 }
 
-void triangulate (const VVertices &reg, int coord, Triangles &tr)
+void triangulate (const vector<Points *> &reg, int coord, Triangles &tr)
 {
   Vertices2 vertices;
   triangulateInit(reg, coord, vertices);
@@ -78,11 +78,11 @@ void triangulate (const VVertices &reg, int coord, Triangles &tr)
   deleteVertices(vertices);
 }
 
-void triangulateInit (const VVertices &reg, int coord, Vertices2 &vertices)
+void triangulateInit (const vector<Points *> &reg, int coord, Vertices2 &vertices)
 {
-  VV2Map vmap;
+  PV2Map vmap;
   for (int i = 0; i < reg.size(); ++i) {
-    const Vertices &b = *reg[i];
+    const Points &b = *reg[i];
     int n = b.size();
     for (int ie = 0; ie < n; ++ie) {
       int ien = ie + 1 == n ? 0 : ie + 1;
@@ -92,17 +92,17 @@ void triangulateInit (const VVertices &reg, int coord, Vertices2 &vertices)
       e->flag = false;
     }
   }
-  for (VV2Map::iterator x = vmap.begin(); x != vmap.end(); ++x)
+  for (PV2Map::iterator x = vmap.begin(); x != vmap.end(); ++x)
     vertices.push_back(x->second);
 }
 
-Vertex2 * getVertex2 (Vertex *v, int coord, VV2Map &vmap)
+Vertex2 * getVertex2 (Point *p, int coord, PV2Map &vmap)
 {
-  VV2Map::iterator x = vmap.find(v);
+  PV2Map::iterator x = vmap.find(p);
   if (x != vmap.end())
     return x->second;
-  Vertex2 *w = new Vertex2(v, coord);
-  vmap.insert(pair<Vertex *, Vertex2 *>(v, w));
+  Vertex2 *w = new Vertex2(p, coord);
+  vmap.insert(pair<Point *, Vertex2 *>(p, w));
   return w;
 }
 
@@ -206,7 +206,7 @@ void triangulateLoop (const Vertices2 &u, Triangles &tr)
     else
       triangulateOther(u[i], stack, tr);
   int m = stack.size() - 1;
-  if (u[n-1]->v->getP()->onLine(stack[m]->v->getP(), stack[m-1]->v->getP())) {
+  if (u[n-1]->p->onLine(stack[m]->p, stack[m-1]->p)) {
     stack.push_back(u[n-1]);
     for (int i = 1; i <= m; ++i)
       tr.push_back(triangle(stack[0], stack[i], stack[i+1], stack[0]->flag));
@@ -219,7 +219,7 @@ void triangulateSame (Vertex2 *v, Vertices2 &stack, Triangles &tr)
 {
   int n = stack.size() - 1;
   while (n > 0) {
-    if (v->v->getP()->onLine(stack[n-1]->v->getP(), stack[n]->v->getP()))
+    if (v->p->onLine(stack[n-1]->p, stack[n]->p))
       break;
     bool aflag = stack[n-1]->leftTurn(stack[n], v) == 1;
     if (v->flag ? aflag : !aflag)
@@ -247,7 +247,7 @@ void triangulateOther (Vertex2 *v, Vertices2 &stack, Triangles &tr)
 
 Triangle triangle (Vertex2 *a, Vertex2 *b, Vertex2 *c, bool flag)
 {
-  return flag ? Triangle(a->v, b->v, c->v) : Triangle(a->v, c->v, b->v);
+  return flag ? Triangle(a->p, b->p, c->p) : Triangle(a->p, c->p, b->p);
 }
 
 void deleteVertices (Vertices2 &vertices)

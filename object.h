@@ -121,7 +121,7 @@ extern PrecisionException precisionException;
 template<class P>
 bool checkAccuracy (const P &p, double acc)
 {
-  if (acc == 1.0) return true;
+  if (acc == 1.0) return true;  
   for (int i = 0; i < p.size(); i++) {
     double l = p[i].lb(), u = p[i].ub();  
     if ((l < 0.0 && u >= 0.0) || (l <= 0.0 && u > 0.0))
@@ -246,6 +246,9 @@ private:
           pp->p = p;
           for (int i = 0; i < pp->p.size(); i++)
             pp->p[i] = Parameter::constant(randomNumber(-1, 1));
+	  if (pp->p[0].high())
+	    for (int i = 0; i < pp->p.size(); ++i)
+	      pp->p[i].u.m = pp->p[i].u.m->clone();
           pp->t = 0;
         }
 
@@ -275,6 +278,9 @@ private:
         if (pp == 0)
           pp = new PP;
         pp->p = calculate();
+	if (pp->p[0].high())
+	  for (int i = 0; i < pp->p.size(); ++i)
+	    pp->p[i].u.m = pp->p[i].u.m->clone();
         pp->t = Parameter::algR != -1 ? Parameter::algT : -1;
         return pp->p;
       }
@@ -321,7 +327,33 @@ private:
   }
 
 public:
+  int sign (int i); // sign of i'th coordinate
+
   P getApprox (double acc = 1e-17) {
+    assert(MInt::getPrecision() == 53u);
+    if (acc > 1)
+      acc = 1;
+    if (acc < 1) {
+      getApprox(1); // make sure p is set so p.size() is correct
+      bool *z = new bool [p.size()];
+      for (int i = 0; i < p.size(); i++)
+	z[i] = sign(i) == 0;
+      pthread_mutex_lock(&mutex);
+      unsigned int prec = precision();
+      for (int i = 0; i < p.size(); ++i)
+	if (z[i])
+	  if (prec > 53u) {
+	    p[i].l = Parameter::sentinel;
+	    delete p[i].u.m;
+	    p[i].u.m = MInt::make(prec, Parameter::constant(0));
+	    MInt::getMInts().pop_back();
+	  }
+	  else
+	    p[i].l = p[i].u.r = 0.0;
+      pthread_mutex_unlock(&mutex);
+      delete [] z;
+    }
+
     try {
       P q = get();
       if (checkAccuracy(q, acc))
@@ -424,7 +456,7 @@ public:
       try {
         calculate();
       } catch (SignException se) {
-        cerr << "signAlgebraic:  algT " << Parameter::algT << " failed." << endl;
+        //cerr << "signAlgebraic:  algT " << Parameter::algT << " failed." << endl;
         Parameter::algT = 0;
         Parameter::algR = 0;
         fail106 = true;
@@ -441,7 +473,7 @@ public:
           calculate();
           break;
         } catch (SignException se) {
-        cerr << "algT shrunk to " << Parameter::algT << endl;
+        //cerr << "algT shrunk to " << Parameter::algT << endl;
         Parameter::algT /= 10;
       }
       Parameter::algR = -1; // signal final get
@@ -452,16 +484,16 @@ public:
         cerr << "signAlgebraic:  impossible" << endl;
         assert(0);
       }
+      int sf = p.sign(false);
       Parameter::algT = 0;
       Parameter::algR = 0;
-      //cout << "interval " << p[0].intervalWidth() << " "
-      //   << p[0].lb() << " " << p[0].ub() << endl;
-      throwSignException() = false;
-      int sf = p.sign(false);
-      MInt::setPrecision(106u);
-      return sf == 0;
+      if (sf) {
+	throwSignException() = false;
+	MInt::setPrecision(106u);
+	return false;
+      }
     }
-
+    
     throwSignException() = false;
     MInt::setPrecision(212u);
     Parameter p = calculate();
@@ -509,6 +541,20 @@ public:
     return sf == 0;
   }
 };
+
+template<class P>
+class IthCoordinate : public Primitive {
+  Object<P> *o;
+  int i;
+  Parameter calculate () { return o->get()[i]; }
+public:
+  IthCoordinate (Object<P> *o, int i) : o(o), i(i) {}
+};
+
+template<class P>
+int Object<P>::sign (int i) {
+  return IthCoordinate<P>(this, i);
+}
 
 }
 

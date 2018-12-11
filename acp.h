@@ -25,7 +25,7 @@ pages 37-52, 2012
 #ifndef ACP
 #define ACP
 
-#define NO_MODE
+//#define NO_MODE
 //#define USE_ASSERT
 
 #include <gmp.h>
@@ -44,6 +44,8 @@ using namespace std;
 namespace acp {
 
 double randomNumber (double rmin, double rmax);
+
+unsigned int random32bitPrime ();
 
 inline double nextD (double x) {
   static double p = 1.0/(1 << 26)/(1 << 26);
@@ -154,7 +156,7 @@ class MValue {
   }
   MValue root (unsigned long int k, mpfr_rnd_t round) const {
     MValue res(p);
-    //mpfr_rootn_ui(res.m, m, k, round);
+    // mpfr_rootn_ui(res.m, m, k, round);
     mpfr_root(res.m, m, k, round);
     return res;
   }
@@ -248,8 +250,9 @@ class Parameter;
 class EInt;
 
 #define NPrimes 7
-#define NMods 2
+#define NMods 3
 
+/*
 class Mods {
  public:
   static unsigned int primes[NPrimes];
@@ -352,6 +355,160 @@ class Mods {
     return *this / Mods(x);
   }
 };
+*/
+
+class Mods {
+ public:
+  static unsigned int primes[NPrimes];
+  static int primeIndex;
+  static unsigned int ps[NMods];
+  static Modder modder[NMods];
+  static unsigned long nMods;
+  static unsigned long nMixed;
+
+  static void changePrime (unsigned int p);
+
+  Mod mod[NMods];
+  const bool algebraic;
+  unsigned long bitsA, bitsB;
+
+  Mods (int start, int it, int up) : algebraic(false) {
+    for (int i = 0; i < NMods; i++) {
+      assert(ps[i] == 0);
+      ps[i] = primes[i]; // PRIMES
+      // ps[i] = random32bitPrime();
+      //cerr << "p[" << i << "] = " << ps[i] << endl;
+      modder[i] = Modder(ps[i]);
+    }
+    for (int i = 0; i < 45; i++)
+      random();
+  }
+
+  Mods (bool algebraic, unsigned long bitsA, unsigned long bitsB) : algebraic(algebraic), bitsA(bitsA), bitsB(bitsB) {
+    static unsigned long maxBits;
+    if (bitsA > maxBits) {
+      //cerr << "maxBits " << bitsA << endl;
+      maxBits = bitsA;
+    }
+  }
+
+  Mods (double r) : algebraic(false), bitsA(53), bitsB(0) {
+    for (int i = 0; i < NMods; i++)
+      mod[i] = modder[i].mod(r);
+  }
+
+  Mods (const Parameter &p);
+  Mods (const MValue &l, const MValue &u);
+  
+  bool hasTheRightPrimes () const {
+    for (int i = 0; i < NMods; i++)
+      if (mod[i].p != ps[i])
+        return false;
+    return true;
+  }
+
+  bool mixed () const {
+    for (int i = 1; i < NMods; i++)
+      if ((mod[i].a == 0) != (mod[0].a == 0))
+        return true;
+    return false;
+  }
+
+  void checkMixed () {
+    nMods++;
+    if (mixed()) {
+      nMixed++;
+      //cerr << (mod[1].a==0) << " nMods " << nMods << " nMixed " << nMixed
+      //   << " bits " << bitsA << endl;
+    }
+    //if (nMods % 1000000 == 0)
+    //cout << "nMods " << nMods << endl;
+  }
+
+  bool zero () const {
+    for (int i = 1; i < NMods; i++)
+      if (mod[i].a != 0)
+        return false;
+    return true;
+  }
+
+  Mods operator- () const {
+    Mods m(algebraic, bitsA, bitsB);
+    for (int i = 0; i < NMods; i++)
+      m.mod[i] = -mod[i];
+    return m;
+  }
+  
+  Mods operator+ (const Mods &x) const {
+    Mods m(algebraic || x.algebraic,
+	   std::max(bitsA + x.bitsB, bitsB + x.bitsA), bitsB + x.bitsB);
+    for (int i = 0; i < NMods; i++)
+      m.mod[i] = mod[i] + x.mod[i];
+    if (!(mixed() && x.mixed()))
+      m.checkMixed();
+    else
+      nMods++;
+    return m;
+  }
+
+  Mods operator+ (double x) const {
+    Mods ret = *this + Mods(x);
+    ret.bitsA = bitsA;
+    ret.bitsB = bitsB;
+    return ret;
+  }
+
+  Mods operator- (const Mods &x) const {
+    Mods m(algebraic || x.algebraic,
+	   std::max(bitsA + x.bitsB, bitsB + x.bitsA), bitsB + x.bitsB);
+    for (int i = 0; i < NMods; i++)
+      m.mod[i] = mod[i] - x.mod[i];
+    if (!(mixed() && x.mixed()))
+      m.checkMixed();
+    else
+      nMods++;
+    return m;
+  }
+
+  Mods operator- (double x) const {
+    Mods ret = *this - Mods(x);
+    ret.bitsA = bitsA;
+    ret.bitsB = bitsB;
+    return ret;
+  }
+
+  Mods operator* (const Mods &x) const {
+    Mods m(algebraic || x.algebraic, bitsA + x.bitsA, bitsB + x.bitsB);
+    for (int i = 0; i < NMods; i++)
+      m.mod[i] = mod[i] * x.mod[i];
+    // nMods++;
+    return m;
+  }
+
+  Mods operator* (double x) const {
+    Mods ret = *this * Mods(x);
+    ret.bitsA = bitsA;
+    ret.bitsB = bitsB;
+    return ret;
+  }
+
+  Mods operator/ (const Mods &x) const {
+    Mods m(algebraic || x.algebraic, bitsA + x.bitsB, bitsB + x.bitsA);
+    for (int i = 0; i < NMods; i++)
+      m.mod[i] = mod[i] / x.mod[i];
+    // nMods++;
+    return m;
+  }
+
+  Mods operator/ (double x) const {
+    Mods ret = *this / Mods(x);
+    ret.bitsA = bitsA;
+    ret.bitsB = bitsB;
+    return ret;
+  }
+};
+
+
 
 extern pthread_key_t idkey;
 extern pthread_key_t mikey;
@@ -589,6 +746,10 @@ private:
   }
 
   int sign (bool fail = true) const {
+    static unsigned long nSign;
+    nSign++;
+    //if (nSign % 1000000 == 0)
+    //cout << "nSign " << nSign << endl;
     if (high())
       return u.m->sign(fail);
     if (l > 0.0)
@@ -978,8 +1139,17 @@ class PInt : public MInt {
       return 0;
     if (mods.mixed())
       throw MixedModException();
-    if (mods.zero())
+    static int nAZ;
+    if (mods.zero()) {
+      nAZ++;
+      //if (nAZ % 10000 == 0)
+      //cout << "nAZ " << nAZ << endl;
       return 0;
+    }
+    static int nANZ;
+    nANZ++;
+    //if (nANZ % 100 == 0)
+    // cout << "nANZ " << nANZ << endl;
     throw SignException(mods.algebraic);
   }
 
@@ -1176,7 +1346,8 @@ inline MInt* MInt::make (unsigned int precision, const MInt *m) {
   }
 }
 
-inline Mods::Mods (const Parameter &p) : algebraic(p.lb()<p.ub()) {
+inline Mods::Mods (const Parameter &p) : algebraic(p.lb()<p.ub()), bitsA(53), bitsB(0) {
+  //inline Mods::Mods (const Parameter &p) : algebraic(p.lb()<p.ub()) {
   double l = p.lb(), u = p.ub();
   if (l == u)
     for (int i = 0; i < NMods; i++)
@@ -1186,7 +1357,8 @@ inline Mods::Mods (const Parameter &p) : algebraic(p.lb()<p.ub()) {
       mod[i] = Mod(random() % ps[i], ps[i]);
 }
 
-inline Mods::Mods (const MValue &l, const MValue &u) : algebraic(l != u) {
+inline Mods::Mods (const MValue &l, const MValue &u) : algebraic(l != u), bitsA(53), bitsB(0) {
+  //inline Mods::Mods (const MValue &l, const MValue &u) : algebraic(l != u) {
   if (l != u)
     for (int i = 0; i < NMods; i++)
       mod[i] = Mod(random() % ps[i], ps[i]);

@@ -332,7 +332,7 @@ FeatureSet smallFeatures (Polyhedron *a, double d, VPMap *vpmap)
   vector<pair<Face *, Face *> > ff;
   octree->pairs(ff, d);  
   delete octree;
-  static unsigned int n = 8;
+  const unsigned int n = 8;
   unsigned int k = ff.size(), m = k/n, is = 0;
   SFData sfd[n];
   for (int i = 0; i < n; ++i) {
@@ -508,7 +508,9 @@ double separation (const FeatureSet &fs)
   for (FeatureSet::const_iterator f = fs.begin(); f != fs.end(); ++f) {
     PTR<Point> p, q;
     minimalFeature(*f, p, q);
-    PV3 u = DiffPoint(p, q).getApprox(1e-8);
+    PTR<Point> pq = new DiffPoint(p, q);
+    PV3 u = pq->getApprox(1e-8);
+    //PV3 u = DiffPoint(p, q).getApprox(1e-8);
     Parameter k = u.dot(u);
     d = min(d, k.ub());
   }

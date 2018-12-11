@@ -17,7 +17,7 @@ class DistancePP : public Primitive {
 
   Parameter calculate () {
     PV3 u = a->get() - b->get();
-    return (d*d - u.dot(u));
+    return d*d - u.dot(u);
   }
  public:
   DistancePP (Point *a, Point *b, double d) : a(a), b(b), d(d) {}

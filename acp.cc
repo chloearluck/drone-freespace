@@ -115,17 +115,23 @@ const int Modder::eMax = 1024 - eShift;
 const int Modder::eMin = -1073 - eShift;
 
   //unsigned int Mods::primes[NPrimes] = { 4294967291u, 4294967279u, 4228232747u, 4197064799u, 3691300979u, 3116510503u, 4278467023u };
-  unsigned int Mods::primes[NPrimes] = { 4228232747u, 4197064799u, 3691300979u, 3116510503u, 4278467023u, 4294967291u, 4294967279u };
+  //  unsigned int Mods::primes[NPrimes] = { 4228232747u, 4197064799u, 3691300979u, 3116510503u, 4278467023u, 4294967291u, 4294967279u };
+  unsigned int Mods::primes[NPrimes] = { 4228232747u, 4197064799u, 3691300979u, 4228232747u, 4197064799u, 3691300979u, 3116510503u };
 int Mods::primeIndex = NMods;
 unsigned int Mods::ps[NMods];
 Modder Mods::modder[NMods];
+unsigned long Mods::nMods;
+unsigned long Mods::nMixed;
 
-Mods initializeMods(0, 0);
+  Mods initializeMods(0, 0, 0);
 
 void Mods::changePrime (unsigned int p) {
+  cout << "changePrime" << endl;
   for (int i = 0; i < NMods; i++)
     if (p == ps[i]) {
-      ps[i] = primes[primeIndex];
+      ps[i] = primes[primeIndex]; // PRIMES
+      // ps[i] = random32bitPrime();
+      cout << "changeprime " << ps[i] << endl;
       modder[i] = Modder(ps[i]);
       primeIndex = (primeIndex + 1) % NPrimes;
       return;
@@ -187,6 +193,96 @@ MInt* EInt::divide (const MInt* that) const
   }
   return 0;
 }
+
+/* 
+ * calculates (a * b) % c taking into account that a * b might overflow 
+ */
+unsigned long mulmod(unsigned long a, unsigned long b, unsigned long mod)
+{
+  unsigned long x = 0,y = a % mod;
+  while (b > 0)
+    {
+      if (b % 2 == 1)
+        {    
+	  x = (x + y) % mod;
+        }
+      y = (y * 2) % mod;
+      b /= 2;
+    }
+  return x % mod;
+}
+/* 
+ * modular exponentiation
+ */
+unsigned long modulo(unsigned long base, unsigned long exponent, unsigned long mod)
+{
+  unsigned long x = 1;
+  unsigned long y = base;
+  while (exponent > 0)
+    {
+      if (exponent % 2 == 1)
+	x = (x * y) % mod;
+      y = (y * y) % mod;
+      exponent = exponent / 2;
+    }
+  return x % mod;
+}
+ 
+/*
+ * Miller-Rabin Primality test, iteration signifies the accuracy
+ */
+int Miller(unsigned long p,int iteration)
+{
+ 
+  int i;
+  unsigned long s;
+  if (p < 2)
+    {
+      return 0;
+    }
+  if (p != 2 && p % 2==0)
+    {
+      return 0;
+    }
+  s = p - 1;
+  while (s % 2 == 0)
+    {
+      s /= 2;
+    }
+  for (i = 0; i < iteration; i++)
+    {
+      unsigned long a = random() % (p - 1) + 1, temp = s;
+      unsigned long mod = modulo(a, temp, p);
+      while (temp != p - 1 && mod != 1 && mod != p - 1)
+        {
+	  mod = mulmod(mod, mod, p);
+	  temp *= 2;
+        }
+      if (mod != p - 1 && temp % 2 == 0)
+        {
+	  return 0;
+        }
+    }
+  return 1;
+}
+
+
+bool isPrime (unsigned int p) {
+  return Miller(p, 40);
+}
+
+unsigned int random32bitPrime () {
+  static unsigned int nRandom;
+  while (true) {
+    unsigned int p = random();
+    cout << "random" << ++nRandom << endl;
+    p |= (1 << 31);
+    if (!isPrime(p))
+      continue;
+    return p;
+  }
+}
+
 
 }
 

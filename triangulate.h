@@ -7,14 +7,14 @@ class Edge2;
 
 class Vertex2 {
  public:
-  Vertex2 () : v(0) {}
-  Vertex2 (Vertex *v, int coord) : v(v), coord(coord), edge(0), left(0) {}
+  Vertex2 () : p(0) {}
+  Vertex2 (Point *p, int coord) : p(p), coord(coord), edge(0), left(0) {}
   void addEdge (Edge2 *e);
   Edge2 * findEdge (Vertex2 *h) const;
   int yOrder (Vertex2 *b) const;
   int leftTurn (Vertex2 *b, Vertex2 *c) const;
 
-  Vertex *v;
+  Point *p;
   int coord;
   Edge2 *edge, *left;
   bool flag;
@@ -57,15 +57,15 @@ class Edge2xOrder {
 
 typedef set<Edge2 *, Edge2xOrder> Edge2Set;
 
-typedef map<Vertex *, Vertex2 *> VV2Map;
+typedef map<Point *, Vertex2 *> PV2Map;
 
 Edge2 * getEdge (Vertex2 *tail, Vertex2 *head, bool flag, bool tflag);
 
-void triangulate (const VVertices &reg, int coord, Triangles &tr);
+void triangulate (const vector<Points *> &reg, int coord, Triangles &tr);
 
-void triangulateInit (const VVertices &reg, int coord, Vertices2 &vertices);
+void triangulateInit (const vector<Points *> &reg, int coord, Vertices2 &vertices);
 
-Vertex2 * getVertex2 (Vertex *v, int coord, VV2Map &vmap);
+Vertex2 * getVertex2 (Point *p, int coord, PV2Map &vmap);
 
 void triangulate (Vertices2 &vertices, Triangles &tr);
 

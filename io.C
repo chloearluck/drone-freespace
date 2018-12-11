@@ -332,26 +332,6 @@ void plines (const vector<vector<PV3> > &lines, int i)
   outputVTK(pts, data, 2, ostr);
 }
 
-void ptriangles (const Triangles &tr, ostream &ostr)
-{
-  vector<PV3> pts;
-  vector<ID> data;
-  VIMap vimap;
-  for (Triangles::const_iterator t = tr.begin(); t != tr.end(); ++t) {
-    data.push_back(3);
-    data.push_back(getPoint(vimap, pts, t->a));
-    data.push_back(getPoint(vimap, pts, t->b));
-    data.push_back(getPoint(vimap, pts, t->c));
-  }
-  outputVTK(pts, data, 1, ostr);
-}
-
-void ptriangles (const Triangles &tr, int i)
-{
-  ofstream ostr(outi(i).c_str());
-  ptriangles(tr, ostr);
-}
-
 void pfaces (const Faces &faces, int i)
 {
   ofstream ostr(outi(i).c_str());

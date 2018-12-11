@@ -7,7 +7,7 @@ double getTime ()
   return tv.tv_sec + 1e-6*tv.tv_usec;
 }
 
-Parameter cross (const PV3 &a, const PV3 &b, const int coord)
+Parameter cross (const PV3 &a, const PV3 &b, int coord)
 {
   int s = coord > 0 ? 1 : -1;
   switch (s*coord) {
@@ -28,20 +28,6 @@ set<ID> intersection (const set<ID> &a, const set<ID> &b)
   set_intersection(a.begin(), a.end(), b.begin(), b.end(),
 		   inserter(ab, ab.begin()));
   return ab;
-}
-
-ID Plane::planeid = 1u;
-
-int Plane::projectionCoordinate ()
-{
-  PV3 n = getApprox(1.0).n;
-  double x = n.x.mid(), y = n.y.mid(), z = n.z.mid(),
-    ax = fabs(x), ay = fabs(y), az = fabs(z);
-  if (ax >= ay && ax >= az)
-    return x > 0.0 ? 1 : -1;
-  if (ay >= ax && ay >= az)
-    return y > 0.0 ? 2 : -2;
-  return z > 0.0 ? 3 : -3;
 }
 
 void Point::getBBox (double *bbox)
@@ -94,7 +80,7 @@ int Point::side (Plane *a)
   if (ps.find(a->id) != ps.end())
     return 0;
   int s = Side(a, this);
-  if (s == 0)
+  if (s == 0) 
     ps.insert(a->id);
   return s;
 }
@@ -114,6 +100,8 @@ bool closerPair (Point *a, Point *b, Point *c, Point *d)
     return false;
   return CloserPair(a, b, c, d) == 1;
 }
+
+ID Plane::planeid = 1u;
 
 double bboxSize (double *bb)
 {
@@ -245,6 +233,15 @@ Vertices HEdge::loop () const
   return ve;
 }
 
+Points HEdge::pointLoop () const
+{
+  Vertices ve = loop();
+  Points pts;
+  for (Vertices::iterator v = ve.begin(); v != ve.end(); ++v)
+    pts.push_back((*v)->p);
+  return pts;
+}
+
 HEdges HEdge::edgeLoop ()
 {
   HEdges ed;
@@ -312,13 +309,10 @@ PV3 HFace::getN ()
 
 HFaces HFace::neighbors () const
 {
+  HEdges ed = f->boundaryHEdges();
   HFaces hf;
-  HEdge *e = f->h;
-  do {
-    hf.push_back(neighbor(e));
-    e = e->next;
-  }
-  while (e != f->h);
+  for (HEdges::iterator e = ed.begin(); e != ed.end(); ++e)
+    hf.push_back(neighbor(*e));
   return hf;
 }
 
@@ -331,19 +325,11 @@ HFace * HFace::neighbor (HEdge *e) const
   return flag ? g->hfaces + 1 : g->hfaces;
 }
 
-Face::Face (HEdge *h, int pc)
-  : h(h), pc(pc)
+Face::Face (HEdge *h, int pc) : h(h), pc(pc)
 {
   p = new TrianglePlane(h->tail()->p, h->head()->p, h->next->head()->p);
   hfaces[0].f = hfaces[1].f = this;
-  HEdges ed = h->edgeLoop();
-  copyBBox(ed[0]->tail()->bbox, bbox);
-  for (int i = 1; i < ed.size(); ++i)
-    mergeBBox(ed[i]->tail()->bbox, bbox);
-  for (int i = 0; i < ed.size(); ++i) {
-    ed[i]->f = this;
-    ed[i]->tail()->p->ps.insert(p->id);
-  }
+  addLoop(h, true);
 }
 
 Face::Face (Point *a, Point *b, Point *c) : h(0), pc(0)
@@ -358,6 +344,25 @@ Face::Face (Point *a, Point *b, Point *c) : h(0), pc(0)
   mergeBBox(bb, bbox);
 }
 
+Face::Face (HEdge *h, TrianglePlane *p, int pc) : h(h), p(p), pc(pc)
+{
+  hfaces[0].f = hfaces[1].f = this;
+}
+
+void Face::addLoop (HEdge *h, bool flag)
+{
+  HEdges ed = h->edgeLoop();
+  for (HEdges::iterator e = ed.begin(); e != ed.end(); ++e) {
+    (*e)->f = this;
+    (*e)->tail()->p->ps.insert(p->id);
+  }
+  if (flag) {
+    copyBBox(ed[0]->tail()->bbox, bbox);
+    for (int i = 1; i < ed.size(); ++i)
+      mergeBBox(ed[i]->tail()->bbox, bbox);
+  }
+}
+
 void Face::update ()
 {
   Vertices ve = h->loop();
@@ -370,7 +375,7 @@ void Face::update ()
 
 int Face::getPC () {
   if (pc == 0)
-    pc = p->projectionCoordinate();
+    pc = ProjectionCoordinate(p);
   return pc;
 }
 
@@ -439,13 +444,14 @@ Points Face::boundaryPoints () const
     pts.push_back(p->getC());
   }
   return pts;
-} 
+}
 
 bool Face::coplanar (Face *f)
 {
   if (p->id == f->p->id)
     return true;
-  return SamePlane(p, f->p) == 0;
+  return p->getA()->side(f->p) == 0 && p->getB()->side(f->p) == 0 &&
+    p->getC()->side(f->p) == 0;
 };
 
 bool Face::intersects (Face *g, bool strict)
@@ -595,6 +601,14 @@ PTR<Point> Face::rayIntersection (Point *a, Point *r)
   return 0;
 }
 
+void Face::triangulate (Triangles &tr)
+{
+  Vertices ve = h->loop();
+  int n = ve.size();
+  for (int i = 1; i + 1 < n; ++i)
+    tr.push_back(Triangle(ve[0]->getP(), ve[i]->getP(), ve[i+1]->getP()));
+}
+
 bool contains (const Points &pts, int c, Point *a, bool strict, int *ie)
 {
   int n = pts.size();
@@ -651,28 +665,6 @@ void Shell::setOctree ()
   octreef = Octree<Face *>::octree(fa, bbox);
 }
 
-/*
-bool Shell::outer () const
-{
-  PTR<Point> r = new Point(0.0, 0.0, 1.0);
-  Vertex *vm = vmax(r);
-  HEdge *em = 0;
-  HFace *fm = 0;
-  for (Edges::iterator e = vm->edges.begin(); e != vm->edges.end(); ++e)
-    for (HEdges::iterator h = (*e)->hedges.begin(); h != (*e)->hedges.end(); ++h)
-      for (int i = 0; i < 2; ++i)
-	if ((*h)->f->hfaces[i].s == this) {
-	  if (!em || em->e != *e && SlopeOrder(*e, em->e, r) == 1) {
-	    em = *h;
-	    fm = (*h)->f->hfaces + i;
-	  }
-	  break;
-	}
-  return !fm->getF()->coplanar(fm->neighbor(em)->getF())
-    && Convex(em, fm) == 1;
-}
-*/
-
 bool Shell::outer () const
 {
   PTR<Point> r = new Point(0.0, 0.0, 1.0);
@@ -689,7 +681,7 @@ bool Shell::outer () const
 	    if (!nfm->getF()->coplanar(nfm->neighbor(nem)->getF())) {
 	      em = nem;
 	      fm = nfm;
-	    }
+	      }
 	  }
 	  break;
 	}
@@ -825,21 +817,25 @@ bool Cell::contains (Point *p) const
 
 PTR<Point> Cell::interiorPoint () const
 {
-  HFace *hf = getShell(0)->hfaces[0];
-  Face *f = hf->f;
-  PTR<Point> p = f->centroid(), n = new HFaceNormal(hf), qmin = 0;
-  for (int i = 0; i < nShells(); ++i) {
-    Shell *s = getShell(i);
-    for (HFaces::iterator h = s->hfaces.begin(); h != s->hfaces.end(); ++h) {
-      Face *g = (*h)->f;
-      if (g != f) {
-	PTR<Point> q = g->rayIntersection(p, n);
-	if (q && p != q && (!qmin || CloserPair(p, q, p, qmin) == 1))
-	  qmin = q;
+  Shell *s = getShell(0);
+  for (HFaces::iterator hf = s->hfaces.begin(); hf != s->hfaces.end(); ++hf) {
+    Face *f = (*hf)->f;
+    PTR<Point> p = f->centroid(), n = new HFaceNormal(*hf), qmin = 0;
+    for (int i = 0; i < nShells(); ++i) {
+      Shell *s = getShell(i);
+      for (HFaces::iterator h = s->hfaces.begin(); h != s->hfaces.end(); ++h) {
+	Face *g = (*h)->f;
+	if (g != f) {
+	  PTR<Point> q = g->rayIntersection(p, n);
+	  if (q && p != q && (!qmin || CloserPair(p, q, p, qmin) == 1))
+	    qmin = q;
+	}
       }
     }
+    if (qmin)
+      return new CentroidPoint(p, qmin);
   }
-  return new CentroidPoint(p, qmin);
+  return 0;
 }
 
 Polyhedron::~Polyhedron ()
@@ -1025,19 +1021,19 @@ void Polyhedron::clearCells ()
   cells.clear();
 }
 
-Face * Polyhedron::addTriangle (Vertex *ta, Vertex *tb, Vertex *tc,
+Face * Polyhedron::addTriangle (PTR<Point> a, PTR<Point> b, PTR<Point> c,
 				PVMap &pvmap, int pc)
 {
-  Vertex *a = getVertex(ta, pvmap), *b = getVertex(tb, pvmap),
-    *c = getVertex(tc, pvmap);
-  return addTriangle(a, b, c, pc);
+  Vertex *u = getVertex(a, pvmap), *v = getVertex(b, pvmap),
+    *w = getVertex(c, pvmap);
+  return addTriangle(u, v, w, pc);
 }
 
 Face * Polyhedron::addTriangle (Face *f, PVMap &pvmap)
 {
-  Vertices vf = f->h->loop();
+  Points pf = f->h->pointLoop();
   int pc = f->getPC();
-  return addTriangle(vf[0], vf[1], vf[2], pvmap, pc);
+  return addTriangle(pf[0], pf[1], pf[2], pvmap, pc);
 }
 
 Polyhedron * Polyhedron::copy () const
@@ -1067,8 +1063,8 @@ Polyhedron * Polyhedron::negative () const
   for (Vertices::const_iterator v = vertices.begin(); v != vertices.end(); ++v)
     pvmap.insert(PVPair((*v)->p, a->getVertex(new NegPoint((*v)->p))));
   for (Faces::const_iterator f = faces.begin(); f != faces.end(); ++f) {
-    Vertices ve = (*f)->h->loop();
-    a->addTriangle(ve[2], ve[1], ve[0], pvmap);
+    Points pf = (*f)->h->pointLoop();
+    a->addTriangle(pf[2], pf[1], pf[0], pvmap);
   }
   return a;
 }
@@ -1091,8 +1087,8 @@ Polyhedron * Polyhedron::negativeTranslate (Point *t) const
   for (Vertices::const_iterator v = vertices.begin(); v != vertices.end(); ++v)
     pvmap.insert(PVPair((*v)->p, a->getVertex(new DiffPoint(t, (*v)->p))));
   for (Faces::const_iterator f = faces.begin(); f != faces.end(); ++f) {
-    Vertices ve = (*f)->h->loop();
-    a->addTriangle(ve[2], ve[1], ve[0], pvmap);
+    Points pf = (*f)->h->pointLoop();
+    a->addTriangle(pf[2], pf[1], pf[0], pvmap);
   }
   return a;
 }
@@ -1157,12 +1153,12 @@ Polyhedron * Polyhedron::boolean (Polyhedron *a, SetOp op)
     bool in1 = cin.find((*f)->hfaces[0].s->c) != cin.end(),
       in2 = cin.find((*f)->hfaces[1].s->c) != cin.end();
     if (in1 != in2) {
-      Vertices vf = (*f)->h->loop();
+      Points pf = (*f)->h->pointLoop();
       int pc = (*f)->getPC();
       if (in2)
-	d->addTriangle(vf[0], vf[1], vf[2], pvmap, pc);
+	d->addTriangle(pf[0], pf[1], pf[2], pvmap, pc);
       else
-	d->addTriangle(vf[2], vf[1], vf[0], pvmap, - pc);
+	d->addTriangle(pf[2], pf[1], pf[0], pvmap, - pc);
     }
   }
   delete c;
@@ -1393,56 +1389,42 @@ Polyhedron * subdivide (Polyhedron *a, bool oneway)
 {
   map<Edge *, Points *> epsmap;
   map<pair<Face *, Face *>, FFE> ffemap;
-  map<Face *, Edges> fesmap;
-  intersectFF(a, epsmap, ffemap, fesmap);
-  double t0 = getTime();
-  for (map<Edge *, Points *>::iterator i = epsmap.begin(); i != epsmap.end(); ++i)
-    sortPoints(i->first, i->second);
-  map<Face *, vector<FFE> > femap = feMap(epsmap, ffemap, fesmap);
+  vector<pair<Face *, Edge *>> fe;
+  intersectFF(a, epsmap, ffemap, fe);
+  map<Face *, vector<FFE>> femap = feMap(epsmap, ffemap, fe);
   intersectFFF(ffemap, femap);
-  double t1 = getTime() - t0;
-  t0 = getTime();
-  for (map<pair<Face *, Face *>, FFE>::iterator i = ffemap.begin();
-       i != ffemap.end(); ++i)
-    sortPoints(i->second.pts);
+  set<Point *> bpts;
+  subedgesE(epsmap, oneway, bpts);
+  subedgesFF(ffemap, oneway, bpts);
   Polyhedron *b = subfaces(a, oneway, epsmap, femap);
-  for (map<Edge *, Points *>::iterator i = epsmap.begin(); i != epsmap.end(); ++i)
-    delete i->second;
-  deleteFEmap(femap);
-  double t2 = getTime() - t0;
-  cerr << "; fff = " << t1 << "; sub " << t2 << endl;
+  deleteMaps(epsmap, ffemap);
   return b;
 }
 
 void intersectFF (Polyhedron *a, map<Edge *, Points *> &epsmap,
 		  map<pair<Face *, Face *>, FFE> &ffemap,
-		  map<Face *, Edges> &fesmap)
+		  vector<pair<Face *, Edge *>> &fe)
 {
-  double t0 = getTime();
   Octree<Face *> *octree = a->faceOctree();
-  vector<pair<Face *, Face *> > ff1, ff;
+  vector<pair<Face *, Face *>> ff1, ff;
   octree->pairs(ff1);
   delete octree;
-  map<pair<Face *, Edge *>, PTR<Point> > fepmap;
+  map<pair<Face *, Edge *>, PTR<Point>> fepmap;
   map<Face *, Points *> fpsmap;
-  intersectFE(ff1, fepmap, epsmap, fesmap, fpsmap, ff);
-  double t1 = getTime() - t0;
-  t0 = getTime();
+  intersectFE(ff1, fepmap, epsmap, fpsmap, ff, fe);
   intersectFF(ff, a->perturbed, fepmap, epsmap, fpsmap, ffemap);
   for (map<Face *, Points *>::iterator i = fpsmap.begin(); i != fpsmap.end(); ++i)
     delete i->second;
-  double t2 = getTime() - t0;
-  cerr << "fe = " << t1 << "; ff = " << t2;
 }
 
-void intersectFE (const vector<pair<Face *, Face *> > &ff1,
-		  map<pair<Face *, Edge *>, PTR<Point> > &fepmap,
+void intersectFE (const vector<pair<Face *, Face *>> &ff1,
+		  map<pair<Face *, Edge *>, PTR<Point>> &fepmap,
 		  map<Edge *, Points *> &epsmap,
-		  map<Face *, Edges> &fesmap,
 		  map<Face *, Points *> &fpsmap,
-		  vector<pair<Face *, Face *> > &ff)
+		  vector<pair<Face *, Face *>> &ff,
+		  vector<pair<Face *, Edge *>> &fe)
 {
-  static unsigned int n = 8;
+  const unsigned int n = 8;
   unsigned int k = ff1.size(), m = k/n, is = 0;
   FEData fed[n];
   for (int i = 0; i < n; ++i) {
@@ -1459,19 +1441,17 @@ void intersectFE (const vector<pair<Face *, Face *> > &ff1,
   for (int i = 0; i < n; ++i)
     pthread_join(threads[i], 0);
   for (int i = 0; i < n; ++i) {
-    for (vector<pair<pair<Face *, Edge *>, PTR<Point> > >::iterator
-	   x = fed[i].fep.begin(); x != fed[i].fep.end(); ++x)
-      fepmap.insert(*x);
-    for (vector<pair<Edge *, PTR<Point> > >::iterator x = fed[i].ep.begin();
+    for (vector<pair<Edge *, PTR<Point>>>::iterator x = fed[i].ep.begin();
 	 x != fed[i].ep.end(); ++x)
       update(x->first, x->second, epsmap);
-    for (vector<pair<Face *, Edge *> >::iterator x = fed[i].fe.begin();
-       x != fed[i].fe.end(); ++x)
-      update(x->first, x->second, fesmap);
-    for (vector<pair<Face *, PTR<Point> > >::iterator x = fed[i].fp.begin();
+    for (vector<pair<pair<Face *, Edge *>, PTR<Point>>>::iterator
+	   x = fed[i].fep.begin(); x != fed[i].fep.end(); ++x)
+      fepmap.insert(*x);
+    for (vector<pair<Face *, PTR<Point>>>::iterator x = fed[i].fp.begin();
 	 x != fed[i].fp.end(); ++x)
       update(x->first, x->second, fpsmap);
     ff.insert(ff.end(), fed[i].ff.begin(), fed[i].ff.end());
+    fe.insert(fe.end(), fed[i].fe.begin(), fed[i].fe.end());
   }
 }
 
@@ -1481,24 +1461,17 @@ void intersectFET (void *ptr)
   BaseObject::addThread(fed->i);
   for (int i = fed->is; i < fed->ie; ++i) {
     const pair<Face *, Face *> &ff = fed->ff1->at(i);
-    intersectFE(ff.first, ff.second, fed->ep, fed->fep, fed->fe, fed->fp, fed->ff);
+    intersectFE(ff.first, ff.second, fed->ep, fed->fep, fed->fp, fed->ff, fed->fe);
   }
 }
 
 void intersectFE (Face *f, Face *g,
-		  vector<pair<Edge *, PTR<Point> > > &ep,
-		  vector<pair<pair<Face *, Edge *>, PTR<Point> > > &fep,
-		  vector<pair<Face *, Edge *> > &fe,
-		  vector<pair<Face *, PTR<Point> > > &fp,
-		  vector<pair<Face *, Face *> > &ff)
+		  vector<pair<Edge *, PTR<Point>>> &ep,
+		  vector<pair<pair<Face *, Edge *>, PTR<Point>>> &fep,
+		  vector<pair<Face *, PTR<Point>>> &fp,
+		  vector<pair<Face *, Face *>> &ff,
+		  vector<pair<Face *, Edge *>> &fe)
 {
-  if (f->coplanar(g)) {
-    intersectFEP(f, g, ep, fe);
-    intersectFEP(g, f, ep, fe);
-    return;
-  }
-  if (f->sharedEdge(g))
-    return;
   int sf[] = {0, 0, 0, 0}, sg[] = {0, 0, 0, 0};
   if (f->intersectsFP(g, sg) || g->intersectsFP(f, sf) ||
       f->verifyFP(g, sg) || g->verifyFP(f, sf))
@@ -1510,8 +1483,8 @@ void intersectFE (Face *f, Face *g,
 }
 
 void intersectFEP (Face *f, Face *g,
-		   vector<pair<Edge *, PTR<Point> > > &ep,
-		   vector<pair<Face *, Edge *> > &fe)
+		   vector<pair<Edge *, PTR<Point>>> &ep,
+		   vector<pair<Face *, Edge *>> &fe)
 {
   HEdges eg = g->getBoundary()->edgeLoop();
   for (HEdges::iterator e = eg.begin(); e != eg.end(); ++e)
@@ -1519,8 +1492,8 @@ void intersectFEP (Face *f, Face *g,
 }
 
 void intersectFEP (Face *f, HEdge *h,
-		   vector<pair<Edge *, PTR<Point> > > &ep,
-		   vector<pair<Face *, Edge *> > &fe)
+		   vector<pair<Edge *, PTR<Point>>> &ep,
+		   vector<pair<Face *, Edge *>> &fe)
 {
   if (!first(h))
     return;
@@ -1535,15 +1508,15 @@ void intersectFEP (Face *f, HEdge *h,
 }
 
 void intersectEE (Edge *e, Edge *f, int c,
-		  vector<pair<Edge *, PTR<Point> > > &ep)
+		  vector<pair<Edge *, PTR<Point>>> &ep)
 {
   Points pe, pf;
   intersectEE(e->getT()->getP(), e->getH()->getP(), f->getT()->getP(),
 	      f->getH()->getP(), c, pe, pf);
   for (Points::iterator p = pe.begin(); p != pe.end(); ++p)
-    ep.push_back(pair<Edge *, PTR<Point> >(e, *p));
+    ep.push_back(pair<Edge *, PTR<Point>>(e, *p));
   for (Points::iterator p = pf.begin(); p != pf.end(); ++p)
-    ep.push_back(pair<Edge *, PTR<Point> >(f, *p));
+    ep.push_back(pair<Edge *, PTR<Point>>(f, *p));
 }
 
 void intersectEE (Point *et, Point *eh, Point *ft, Point *fh,
@@ -1557,7 +1530,8 @@ void intersectEE (Point *et, Point *eh, Point *ft, Point *fh,
     pf.push_back(et);
   if (tp2 == 0 && onEdge(eh, ft, fh, true))
     pf.push_back(eh);
-  int tp3 = LeftTurn(ft, et, eh, c), tp4 = LeftTurn(fh, et, eh, c);
+  int tp3 = ft == et || ft == eh ? 0 : LeftTurn(ft, et, eh, c),
+    tp4 = fh == et || fh == eh ? 0 : LeftTurn(fh, et, eh, c);
   if (tp3 == 0 && onEdge(ft, et, eh, true))
     pe.push_back(ft);
   if (tp4 == 0 && onEdge(fh, et, eh, true))
@@ -1570,18 +1544,21 @@ void intersectEE (Point *et, Point *eh, Point *ft, Point *fh,
 }
 
 void intersectFE (Face *f, Face *g, int *sg,
-		  vector<pair<Edge *, PTR<Point> > > &ep,
-		  vector<pair<pair<Face *, Edge *>, PTR<Point> > > &fep,
-		  vector<pair<Face *, Edge *> > &fe,
-		  vector<pair<Face *, PTR<Point> > > &fp)
+		  vector<pair<Edge *, PTR<Point>>> &ep,
+		  vector<pair<pair<Face *, Edge *>, PTR<Point>>> &fep,
+		  vector<pair<Face *, Edge *>> &fe,
+		  vector<pair<Face *, PTR<Point>>> &fp)
 {
   HEdges eg = g->getBoundary()->edgeLoop();
   int n = eg.size();
+  bool flag = false;
   for (int i = 0; i < n; ++i)
     if ((sg[i] == 0 || sg[i] == 2) && (sg[(i+1)%n] == 0 || sg[(i+1)%n] == 2)) {
       intersectFEP(f, eg[i], ep, fe);
-      return;
+      flag = true;
     }
+  if (flag || f->sharedEdge(g))
+    return;
   for (int i = 0; i < n; ++i)
     if (sg[i] == 0)
       intersectFV(f, eg[i], ep, fp);
@@ -1590,24 +1567,24 @@ void intersectFE (Face *f, Face *g, int *sg,
 }
 
 void intersectFV (Face *f, HEdge *h,
-		  vector<pair<Edge *, PTR<Point> > > &ep,
-		  vector<pair<Face *, PTR<Point> > > &fp)
+		  vector<pair<Edge *, PTR<Point>>> &ep,
+		  vector<pair<Face *, PTR<Point>>> &fp)
 {
   int ie = -1;
   PTR<Point> p = h->tail()->getP();
   if (f->contains(p, false, &ie)) {
     if (ie == -1)
-      fp.push_back(pair<Face *, PTR<Point> >(f, p));
+      fp.push_back(pair<Face *, PTR<Point>>(f, p));
     else {
       HEdges ef = f->getBoundary()->edgeLoop();
-      ep.push_back(pair<Edge *, PTR<Point> >(ef[ie]->getE(), p));
+      ep.push_back(pair<Edge *, PTR<Point>>(ef[ie]->getE(), p));
     }
   }
 }
 
 void intersectFEG (Face *f, HEdge *h,
-		   vector<pair<Edge *, PTR<Point> > > &ep,
-		   vector<pair<pair<Face *, Edge *>, PTR<Point> > > &fep)
+		   vector<pair<Edge *, PTR<Point>>> &ep,
+		   vector<pair<pair<Face *, Edge *>, PTR<Point>>> &fep)
 {
   if (!first(h))
     return;
@@ -1617,14 +1594,14 @@ void intersectFEG (Face *f, HEdge *h,
   PTR<Point> p = new EPPoint(e->getT()->getP(), e->getH()->getP(), f->getP());
   int ie = -1;
   if (f->contains(p, false, &ie)) {
-    ep.push_back(pair<Edge *, PTR<Point> >(e, p));
+    ep.push_back(pair<Edge *, PTR<Point>>(e, p));
     if (ie == -1) {
       pair<Face *, Edge *> fe(f, e);
-      fep.push_back(pair<pair<Face *, Edge *>, PTR<Point> >(fe, p));
+      fep.push_back(pair<pair<Face *, Edge *>, PTR<Point>>(fe, p));
     }
     else {
       HEdges ef = f->getBoundary()->edgeLoop();
-      ep.push_back(pair<Edge *, PTR<Point> >(ef[ie]->getE(), p));
+      ep.push_back(pair<Edge *, PTR<Point>>(ef[ie]->getE(), p));
     }
   }
 }
@@ -1657,18 +1634,6 @@ void update (Edge *e, PTR<Point> p, map<Edge *, Points *> &epsmap)
     i->second->push_back(p);
 }
 
-void update (Face *f, Edge *e, map<Face *, Edges> &fesmap)
-{
-  map<Face *, Edges>::iterator i = fesmap.find(f);
-  if (i == fesmap.end()) {
-    Edges ed;
-    ed.push_back(e);
-    fesmap.insert(pair<Face *, Edges>(f, ed));
-  }
-  else
-    i->second.push_back(e);
-}
-
 void update (Face *f, PTR<Point> p, map<Face *, Points *> &fpsmap)
 {
   map<Face *, Points *>::iterator i = fpsmap.find(f);
@@ -1681,27 +1646,56 @@ void update (Face *f, PTR<Point> p, map<Face *, Points *> &fpsmap)
     i->second->push_back(p);
 }
 
-void intersectFF (const vector<pair<Face *, Face *> > &ff, bool perturbed,
-		  const map<pair<Face *, Edge *>, PTR<Point> > &fepmap,
+void intersectFF (const vector<pair<Face *, Face *>> &ff, bool perturbed,
+		  const map<pair<Face *, Edge *>, PTR<Point>> &fepmap,
 		  const map<Edge *, Points *> &epsmap,
 		  const map<Face *, Points *> &fpsmap,
 		  map<pair<Face *, Face *>, FFE> &ffemap)
 {
-  vector<pair< pair<Face *, Face *>, pair<PTR<Point>, PTR<Point> > > > ffpp;
-  for (vector<pair<Face *, Face *> >::const_iterator i = ff.begin();
-       i != ff.end(); ++i)
-    intersectFF(i->first, i->second, perturbed, fepmap, epsmap, fpsmap, ffpp);
-  for (vector<pair< pair<Face *, Face *>, pair<PTR<Point>, PTR<Point> > > >::iterator
-	 i = ffpp.begin(); i != ffpp.end(); ++i)
-    update(i->first.first, i->first.second, i->second.first, i->second.second,
+  const unsigned int n = 8;
+  unsigned int k = ff.size(), m = k/n, is = 0;
+  FFData ffd[n];
+  for (int i = 0; i < n; ++i) {
+    ffd[i].i = i;
+    ffd[i].is = is;
+    is = i + 1 == n ? k : is + m;
+    ffd[i].ie = is;
+    ffd[i].ff = &ff;
+    ffd[i].perturbed = perturbed;
+    ffd[i].fepmap = &fepmap;
+    ffd[i].epsmap = &epsmap;
+    ffd[i].fpsmap = &fpsmap;
+  }
+  pthread_t threads[n];
+  for (int i = 0; i < n; ++i)
+    pthread_create(threads + i, 0,
+		   (void* (*)(void*)) intersectFFT, (void *) (ffd + i));
+  for (int i = 0; i < n; ++i)
+    pthread_join(threads[i], 0);
+  vector<pair< pair<Face *, Face *>, pair<PTR<Point>, PTR<Point>>>> ffpp;
+  for (int i = 0; i < n; ++i)
+    for (vector<pair< pair<Face *, Face *>, pair<PTR<Point>, PTR<Point>>>>::iterator
+	 j = ffd[i].ffpp.begin(); j != ffd[i].ffpp.end(); ++j)
+    update(j->first.first, j->first.second, j->second.first, j->second.second,
 	   ffemap);
 }
 
+void intersectFFT (void *ptr)
+{
+  FFData *ffd = (FFData *) ptr;
+  BaseObject::addThread(ffd->i);
+  for (int i = ffd->is; i < ffd->ie; ++i) {
+    const pair<Face *, Face *> &ff = ffd->ff->at(i);
+    intersectFF(ff.first, ff.second, ffd->perturbed, *ffd->fepmap, *ffd->epsmap,
+		*ffd->fpsmap, ffd->ffpp);
+  }
+}
+
 void intersectFF (Face *f, Face *g, bool perturbed,
-		  const map<pair<Face *, Edge *>, PTR<Point> > &fepmap,
+		  const map<pair<Face *, Edge *>, PTR<Point>> &fepmap,
 		  const map<Edge *, Points *> &epsmap,
 		  const map<Face *, Points *> &fpsmap,
-		  vector<pair< pair<Face *, Face *>, pair<PTR<Point>, PTR<Point> > > > &ffpp)
+		  vector<pair< pair<Face *, Face *>, pair<PTR<Point>, PTR<Point>>>> &ffpp)
 {
   Points pts;
   findFE(f, g, fepmap, pts);
@@ -1718,18 +1712,18 @@ void intersectFF (Face *f, Face *g, bool perturbed,
   Face *ff = f < g ? f : g, *gg = f < g ? g : f;
   bool flag = FFOrder(ff, gg, pts[0], pts[1]) == 1;
   pair<Face *, Face *> fg(ff, gg);
-  pair<PTR<Point>, PTR<Point> > pq(pts[flag ? 0 : 1], pts[flag ? 1 : 0]);
-  ffpp.push_back(pair<pair<Face *, Face *>, pair<PTR<Point>, PTR<Point> > >(fg, pq));
+  pair<PTR<Point>, PTR<Point>> pq(pts[flag ? 0 : 1], pts[flag ? 1 : 0]);
+  ffpp.push_back(pair<pair<Face *, Face *>, pair<PTR<Point>, PTR<Point>>>(fg, pq));
 }
 
 void findFE (Face *f, Face *g,
-	     const map<pair<Face *, Edge *>, PTR<Point> > &fepmap,
+	     const map<pair<Face *, Edge *>, PTR<Point>> &fepmap,
 	     Points &pts)
 {
   HEdges eg = g->getBoundary()->edgeLoop();
   for (HEdges::iterator h = eg.begin(); h != eg.end(); ++h) {
     pair<Face *, Edge *> fe(f, (*h)->getE());
-    map<pair<Face *, Edge *>, PTR<Point> >::const_iterator i = fepmap.find(fe);
+    map<pair<Face *, Edge *>, PTR<Point>>::const_iterator i = fepmap.find(fe);
     if (i != fepmap.end())
       pts.push_back(i->second);
   }
@@ -1794,86 +1788,76 @@ void update (Face *f, Face *g, PTR<Point> a, PTR<Point> b,
   ffemap.insert(pair<pair<Face *, Face *>, FFE>(fg, ffe));
 }
 
-map<Face *, vector<FFE> > feMap (map<Edge *, Points *> &epsmap,
-				const map<pair<Face *, Face *>, FFE> &ffemap,
-				map<Face *, Edges> &fesmap)
+map<Face *, vector<FFE>> feMap (map<Edge *, Points *> &epsmap,
+				map<pair<Face *, Face *>, FFE> &ffemap,
+				const vector<pair<Face *, Edge *>> &fe)
 {
-  map<Face *, vector<FFE> > femap;
-  for (map<pair<Face *, Face *>, FFE>::const_iterator i = ffemap.begin();
+  map<Face *, vector<FFE>> femap;
+  for (map<pair<Face *, Face *>, FFE>::iterator i = ffemap.begin();
        i != ffemap.end(); ++i) {
     update(i->first.first, i->second, femap);
     update(i->first.second, i->second, femap);
   }
-  for (map<Face *, Edges>::iterator i = fesmap.begin(); i != fesmap.end(); ++i)
-    for (Edges::iterator e = i->second.begin(); e != i->second.end(); ++e)
-      feMapFE(epsmap, i->first, *e, femap);
+  for (vector<pair<Face *, Edge *>>::const_iterator i = fe.begin(); i != fe.end(); ++i)
+    feMapFE(epsmap, ffemap, i->first, i->second, femap);
   return femap;
 }
 
-void feMapFE (const map<Edge *, Points *> &epsmap,
-	      Face *f, Edge *e, map<Face *, vector<FFE> > &femap)
+void feMapFE (map<Edge *, Points *> &epsmap,
+	      map<pair<Face *, Face *>, FFE> &ffemap,
+	      Face *f, Edge *e, map<Face *, vector<FFE>> &femap)
 {
   HEdges ef = f->getBoundary()->edgeLoop();
   for (HEdges::iterator h = ef.begin(); h != ef.end(); ++h)
     if ((*h)->tail()->getP()->onLine(e->getT()->getP(), e->getH()->getP()) &&
 	(*h)->head()->getP()->onLine(e->getT()->getP(), e->getH()->getP()))
       return;
-  set<Point *> vpts1 = boundaryVertices(f, epsmap);
-  set<Point *, PointOrderRP> vpts(vpts1.begin(), vpts1.end());
-  Points epts;
-  epts.push_back(e->getT()->getP());
+  Points *pts;
   map<Edge *, Points *>::const_iterator i = epsmap.find(e);
-  if (i != epsmap.end())
-    epts.insert(epts.end(), i->second->begin(), i->second->end());
-  epts.push_back(e->getH()->getP());
-  int is = 0, n = epts.size();
-  while (is < n && vpts.find(epts[is]) == vpts.end() &&
-	 !f->contains(epts[is], true))
-    ++is;
-  if (is == n)
-    return;
-  while (is + 1 < n && epts[is]->identical(epts[is+1]))
-    ++is;
-  int ie = is + 1;
-  while (ie < n && f->contains(epts[ie], true))
-    ++ie;
-  if (ie < n && vpts.find(epts[ie]) != vpts.end())
-    ++ie;
-  if (ie == is + 1)
-    return;
-  FFE ffe(f, 0, epts[is], epts[is+1]);
-  for (int i = is + 2; i < ie; ++i)
-    ffe.pts->push_back(epts[i]);
+  if (i == epsmap.end()) {
+    pts = new Points;
+    epsmap.insert(pair<Edge *, Points *>(e, pts));
+  }
+  else
+    pts = i->second;
+  pts->insert(pts->begin(), (e->getT()->getP()));
+  pts->push_back(e->getH()->getP());
+  FFE ffe(f, 0, pts);
   update(f, ffe, femap);
+  for (int i = 0; i < e->HEdgesN(); ++i) {
+    Face *g = e->getHEdge(i)->getF();
+    pair<Face *, Face *> fg(f < g ? f : g, f < g ? g : f);
+    ffemap.insert(pair<pair<Face *, Face *>, FFE>(fg, FFE()));
+  }
 }
 
-void update (Face *f, const FFE &ffe, map<Face *, vector<FFE> > &femap)
+void update (Face *f, const FFE &ffe, map<Face *, vector<FFE>> &femap)
 {
-  map<Face *, vector<FFE> >::iterator i = femap.find(f);
+  map<Face *, vector<FFE>>::iterator i = femap.find(f);
   if (i == femap.end()) {
     vector<FFE> ffes;
     ffes.push_back(ffe);
-    femap.insert(pair<Face *, vector<FFE> >(f, ffes));
+    femap.insert(pair<Face *, vector<FFE>>(f, ffes));
   }
   else
     i->second.push_back(ffe);
 }
 
 void intersectFFF (const map<pair<Face *, Face *>, FFE> &ffemap,
-		   const map<Face *, vector<FFE> > &femap)
+		   const map<Face *, vector<FFE>> &femap)
 {
-  vector<pair<Points *, PTR<Point> > > psps;
+  vector<pair<Points *, PTR<Point>>> psps;
   intersectFFFAux(ffemap, femap, psps);
-  for (vector<pair<Points *, PTR<Point> > >::iterator i = psps.begin();
+  for (vector<pair<Points *, PTR<Point>>>::iterator i = psps.begin();
        i != psps.end(); ++i)
     i->first->push_back(i->second);
 }
 
 void intersectFFFAux (const map<pair<Face *, Face *>, FFE> &ffemap,
-		      const map<Face *, vector<FFE> > &femap,
-		      vector<pair<Points *, PTR<Point> > > &psps)
+		      const map<Face *, vector<FFE>> &femap,
+		      vector<pair<Points *, PTR<Point>>> &psps)
 {
-  static unsigned int n = 8;
+  const unsigned int n = 8;
   unsigned int k = femap.size(), m = k/n, is = 0;
   FFFData fd[n];
   for (int i = 0; i < n; ++i) {
@@ -1896,10 +1880,9 @@ void intersectFFFAux (const map<pair<Face *, Face *>, FFE> &ffemap,
 
 void intersectFFFT (void *ptr)
 {
-  double t0 = getTime();
   FFFData *fd = (FFFData *) ptr;
   BaseObject::addThread(fd->i);
-  map<Face *, vector<FFE> >::const_iterator x = fd->femap->begin();
+  map<Face *, vector<FFE>>::const_iterator x = fd->femap->begin();
   for (int i = 0; i < fd->is; ++i, ++x)
     ;
   for (int i = fd->is; i < fd->ie; ++i, ++x)
@@ -1908,7 +1891,7 @@ void intersectFFFT (void *ptr)
 
 void intersectFFF (Face *f, const vector<FFE> &ed,
 		   const map<pair<Face *, Face *>, FFE> &ffemap,
-		   vector<pair<Points *, PTR<Point> > > &psps)
+		   vector<pair<Points *, PTR<Point>>> &psps)
 {
   int n = ed.size(), pc = f->getPC();
   for (int i = 0; i + 1 < n; ++i) {
@@ -1917,63 +1900,237 @@ void intersectFFF (Face *f, const vector<FFE> &ed,
     for (int j = i + 1; j < n; ++j) {
       const FFE &ej = ed[j];
       Face *fj = ej.f == f ? ej.g : ej.f;
-      if (bboxOverlap(ei.bbox, ej.bbox)) {
-	pair<Face *, Face *> fifj(fi < fj ? fi : fj, fi < fj ? fj : fi);
-	map<pair<Face *, Face *>, FFE>::const_iterator y = ffemap.find(fifj);
-	if ((fi == 0 || f < fi) && (fj == 0 || f < fj) || y == ffemap.end()) {
+      if ((fi || fj) && bboxOverlap(ei.bbox, ej.bbox)) {
+	bool flag = !fi || !fj;
+	map<pair<Face *, Face *>, FFE>::const_iterator y = ffemap.end();
+	if (!flag) {
+	  pair<Face *, Face *> fifj(fi < fj ? fi : fj, fi < fj ? fj : fi);
+	  y = ffemap.find(fifj);
+	  if (y != ffemap.end())
+	    flag = !y->second.pts || f < fi && f < fj;
+	}
+	if (flag) {
 	  Points pi, pj;
 	  intersectEE(ei.pts->at(0), ei.pts->at(1), ej.pts->at(0), ej.pts->at(1),
 		      pc, pi, pj);
-	  for (Points::iterator p = pi.begin(); p != pi.end(); ++p)
-	    psps.push_back(pair<Points *, PTR<Point> >(ei.pts, *p));
-	  for (Points::iterator p = pj.begin(); p != pj.end(); ++p)
-	    psps.push_back(pair<Points *, PTR<Point> >(ej.pts, *p));
-	  if (!pi.empty() && y != ffemap.end())
-	    psps.push_back(pair<Points *, PTR<Point> >(y->second.pts, pi[0]));
+	  if (fi)
+	    for (Points::iterator p = pi.begin(); p != pi.end(); ++p)
+	      psps.push_back(pair<Points *, PTR<Point>>(ei.pts, *p));
+	  if (fj)
+	    for (Points::iterator p = pj.begin(); p != pj.end(); ++p)
+	      psps.push_back(pair<Points *, PTR<Point>>(ej.pts, *p));
+	  if (pi.size() == 1 && pj.size() == 1 && y != ffemap.end() && y->second.pts) {
+	    psps.push_back(pair<Points *, PTR<Point>>(y->second.pts, pi[0]));
+	    EEPoint *pee = dynamic_cast<EEPoint *>((Point *) pi[0]);
+	    if (pee) {
+	      pee->addFace(f);
+	      pee->addFace(fi);
+	      pee->addFace(fj);
+	    }
+	  }
 	}
       }
     }
   }
 }
 
-void sortPoints (Edge *e, Points *pts)
+void subedgesE (map<Edge *, Points *> &epsmap, bool oneway, set<Point *> &bpts)
 {
-  if (pts->size() > 1)
-    sort(pts->begin(), pts->end(),
-	 PointOrderPPP(e->getT()->getP(), e->getH()->getP()));
+  const unsigned int n = 8;
+  unsigned int k = epsmap.size(), m = k/n, is = 0;
+  SEEData see[n];
+  for (int i = 0; i < n; ++i) {
+    see[i].i = i;
+    see[i].is = is;
+    is = i + 1 == n ? k : is + m;
+    see[i].ie = is;
+    see[i].epsmap = &epsmap;
+    see[i].oneway = oneway;
+  }
+  pthread_t threads[n];
+  for (int i = 0; i < n; ++i)
+    pthread_create(threads + i, 0,
+		   (void* (*)(void*)) subedgesET, (void *) (see + i));
+  for (int i = 0; i < n; ++i)
+    pthread_join(threads[i], 0);
+  for (int i = 0; i < n; ++i)
+    bpts.insert(see[i].bpts.begin(), see[i].bpts.end());
 }
 
-void sortPoints (Points *pts)
+void subedgesET (void *ptr)
 {
-  if (pts->size() > 2) {
-    Point *t = pts->at(0), *h = pts->at(1);
-    sort(pts->begin(), pts->end(), PointOrderPPP(t, h));
+  SEEData *see = (SEEData *) ptr;
+  BaseObject::addThread(see->i);
+  map<Edge *, Points *>::const_iterator x = see->epsmap->begin();
+  for (int i = 0; i < see->is; ++i, ++x)
+    ;
+  for (int i = see->is; i < see->ie; ++i, ++x)
+    subedgesE(x->first, *x->second, see->oneway, see->bpts);
+}
+
+void subedgesE (Edge *e, Points &pts, bool oneway, set<Point *> &bpts)
+{
+  PTR<Point> t = e->getT()->getP(), h = e->getH()->getP();
+  if (pts.size() > 1)
+    sort(pts.begin(), pts.end(), PointOrderPPP(t, h));
+  pts.insert(pts.begin(), t);
+  pts.push_back(h);
+  subedgesE(pts, oneway, bpts);
+}
+
+void subedgesE (Points &pts, bool oneway, set<Point *> &bpts)
+{
+  if (oneway)
+    subedgesE1(pts, bpts);
+  else
+    subedgesP(pts);
+}
+
+void subedgesE1 (Points &pts, set<Point *> &bpts)
+{
+  Points pp;
+  PTR<Point> u = new DiffPoint(pts.back(), pts[0]);
+  int i = 0, n = pts.size();
+  bool lfree = true, pblocked = false;
+  while (i + 1 < n) {
+    int j = i + 1;
+    while (j + 1 < n && pts[j]->identical(pts[j+1]))
+      ++j;
+    int s = 0;
+    if (i + 1 == j) {
+      EPPoint *epp = dynamic_cast<EPPoint *>((Point *) pts[j]);
+      if (epp)
+	s = PlaneRayAlignment(epp->getP(), u);
+    }
+    if (lfree && s <= 0) {
+      pp.push_back(pts[i]);
+      pp.push_back(pts[j]);
+      pblocked = false;
+    }
+    else {
+      if (pblocked)
+	bpts.insert(pts[i]);
+      pblocked = true;
+    }
+    i = j;
+    lfree = s >= 0;
   }
+  pts = pp;
+}
+
+void subedgesP (Points &pts)
+{
+  Points pp;
+  for (int i = 0; i + 1 < pts.size(); ++i) {
+    pp.push_back(pts[i]);
+    pp.push_back(pts[i+1]);
+  }
+  pts = pp;
+}
+
+void subedgesFF (map<pair<Face *, Face *>, FFE> &ffemap, bool oneway,
+		 const set<Point *> &bpts)
+{
+  const unsigned int n = 8;
+  unsigned int k = ffemap.size(), m = k/n, is = 0;
+  SEFData sef[n];
+  for (int i = 0; i < n; ++i) {
+    sef[i].i = i;
+    sef[i].is = is;
+    is = i + 1 == n ? k : is + m;
+    sef[i].ie = is;
+    sef[i].ffemap = &ffemap;
+    sef[i].oneway = oneway;
+    sef[i].bpts = &bpts;
+  }
+  pthread_t threads[n];
+  for (int i = 0; i < n; ++i)
+    pthread_create(threads + i, 0,
+		   (void* (*)(void*)) subedgesFFT, (void *) (sef + i));
+  for (int i = 0; i < n; ++i)
+    pthread_join(threads[i], 0);
+}
+
+void subedgesFFT (void *ptr)
+{
+  SEFData *sef = (SEFData *) ptr;
+  BaseObject::addThread(sef->i);
+  map<pair<Face *, Face *>, FFE>::iterator x = sef->ffemap->begin();
+  for (int i = 0; i < sef->is; ++i, ++x)
+    ;
+  for (int i = sef->is; i < sef->ie; ++i, ++x)
+    subedgesFF(x->second, sef->oneway, *sef->bpts);
+}
+
+void subedgesFF (FFE &ffe, bool oneway, const set<Point *> &bpts)
+{
+  if (ffe.pts) {
+    if (ffe.pts->size() > 1)
+      sort(ffe.pts->begin(), ffe.pts->end(), 
+	   PointOrderPPP(ffe.pts->at(0), ffe.pts->at(1)));
+    if (oneway)
+      subedgesFF(ffe, bpts);
+    else
+      subedgesP(*ffe.pts);
+  }
+}
+
+void subedgesFF (FFE &ffe, const set<Point *> &bpts)
+{
+  Points &pts = *ffe.pts, pp;
+  PTR<Point> u = new DiffPoint(pts[1], pts[0]);
+  int i = 0, n = pts.size();
+  bool lfree = true;
+  while (i + 1 < n) {
+    int j = i + 1;
+    while (j + 1 < n && pts[j]->identical(pts[j+1]))
+      ++j;
+    int s = 0;
+    if (i + 1 == j && i + 2 < n) {
+      EEPoint *eh = dynamic_cast<EEPoint *>((Point *) pts[i+1]);
+      if (eh) {
+	Face *g = otherFace(ffe.f, ffe.g, eh->getFaces());
+	if (g)
+	  s = PlaneRayAlignment(g->getP(), u);
+      }
+    }
+    if ((i > 0 || bpts.find(pts[i]) == bpts.end()) &&
+	(i + 2 < n || bpts.find(pts[i+1]) == bpts.end()) &&
+	lfree && s <= 0) {
+      pp.push_back(pts[i]);
+      pp.push_back(pts[j]);
+    }
+    lfree = s >= 0;
+    i = j;
+  }
+  pts = pp;
+}
+
+Face * otherFace (Face *f, Face *g, const Faces &fa)
+{
+  for (Faces::const_iterator h = fa.begin(); h != fa.end(); ++h)
+    if (*h != f && *h != g)
+      return *h;
+  return 0;
+}
+
+Points SEdge::loop () const
+{
+  Points pts;
+  const SEdge *e = this;
+  do {
+    pts.push_back(e->tail);
+    e = e->next();
+  }
+  while (e != this);
+  return pts;
 }
 
 Polyhedron * subfaces (Polyhedron *a, bool oneway,
 		       const map<Edge *, Points *> &epsmap,
-		       const map<Face *, vector<FFE> > &femap)
+		       const map<Face *, vector<FFE>> &femap)
 {
-  PTriangles tr;
-  subfacesAux(a, oneway, epsmap, femap, tr);
-  Polyhedron *b = new Polyhedron(a->perturbed);
-  PVMap pvmap;
-  for (PTriangles::iterator t = tr.begin(); t != tr.end(); ++t) {
-    Vertex *u = b->getVertex(t->a, pvmap), *v = b->getVertex(t->b, pvmap),
-      *w = b->getVertex(t->c, pvmap);
-    if (!faceVertices(u, v, w) && !faceVertices(u, w, v))
-      b->addTriangle(u, v, w);
-  }
-  return b;
-}
-
-void subfacesAux (Polyhedron *a, bool oneway,
-		  const map<Edge *, Points *> &epsmap,
-		  const map<Face *, vector<FFE> > &femap,
-		  PTriangles &tr)
-{
-  static unsigned int n = 16;
+  const unsigned int n = 16;
   unsigned int k = a->faces.size(), m = k/n, is = 0;
   SUData sud[n];
   for (int i = 0; i < n; ++i) {
@@ -1992,8 +2149,12 @@ void subfacesAux (Polyhedron *a, bool oneway,
 		   (void* (*)(void*)) subfacesT, (void *) (sud + i));
   for (int i = 0; i < n; ++i)
     pthread_join(threads[i], 0);
+  Polyhedron *b = new Polyhedron(a->perturbed);
+  PVMap pvmap;
   for (int i = 0; i < n; ++i)
-    tr.insert(tr.end(), sud[i].tr.begin(), sud[i].tr.end());
+    for (SFaces::iterator s = sud[i].sf.begin(); s != sud[i].sf.end(); ++s)
+      addFace(*s, b, pvmap);
+  return b;
 }
 
 void subfacesT (void *ptr)
@@ -2001,184 +2162,308 @@ void subfacesT (void *ptr)
   SUData *sud = (SUData *) ptr;
   BaseObject::addThread(sud->i);
   for (int i = sud->is; i < sud->ie; ++i)
-    subfaces(sud->a->faces[i], sud->oneway, *sud->epsmap, *sud->femap,
-	     sud->a->perturbed, sud->tr);
+    subfaces(sud->a->faces[i], sud->oneway, *sud->epsmap,
+	     *sud->femap, sud->a->perturbed, sud->sf);
 }
 
 void subfaces (Face *f, bool oneway, const map<Edge *, Points *> &epsmap,
-	       const map<Face *, vector<FFE> > &femap,
-	       bool perturbed, PTriangles &tr)
+	       const map<Face *, vector<FFE>> &femap, bool perturbed,
+	       SFaces &sf)
 {
-  Polyhedron *a = new Polyhedron(perturbed);
-  PVMap pvmap;
   int c = f->getPC();
-  HEdges he = subedges(f, oneway, epsmap, femap, a, pvmap), outer, inner;
-  for (HEdges::iterator e = he.begin(); e != he.end(); ++e)
-    if (!(*e)->getFlag()) {
-      HEdge *l = findLoop(*e);
-      if (l)
-	if (LeftTurn(l->tail()->getP(), l->head()->getP(),
-		     l->getNext()->head()->getP(), c) == 1)
-	  outer.push_back(l);
-	else 
-	  inner.push_back(l);
-    }
-  sort(outer.begin(), outer.end(), HEdgeOrder());
-  sort(inner.begin(), inner.end(), HEdgeOrder());
-  vector<HEdges> nfaces;
-  for (HEdges::iterator e = outer.begin(); e != outer.end(); ++e) {
-    HEdges he;
-    he.push_back(*e);
-    nfaces.push_back(he);
+  SEdges ed = subedges(f, oneway, epsmap, femap, perturbed), outer, inner;
+  for (SEdges::iterator e = ed.begin(); e != ed.end(); ++e) {
+    SEdge *l = findLoop(*e);
+    if (l)
+      if (LeftTurn(l->tail, l->head(), l->next()->head(), c) == 1)
+	outer.push_back(l);
+      else
+	inner.push_back(l);
   }
-  for (HEdges::iterator e = inner.begin(); e != inner.end(); ++e)
-    addInner(*e, oneway, c, nfaces);
-  for (vector<HEdges>::iterator i = nfaces.begin(); i != nfaces.end(); ++i)
-    triangulate(*i, c, tr);
-  delete a;
+  sort(outer.begin(), outer.end(), SEdgeHeadOrder());
+  sort(inner.begin(), inner.end(), SEdgeHeadOrder());
+  SFaces nf;
+  for (SEdges::iterator e = outer.begin(); e != outer.end(); ++e)
+    nf.push_back(SFace(f, (*e)->loop()));
+  for (SEdges::iterator e = inner.begin(); e != inner.end(); ++e)
+    addInner(*e, oneway, c, nf);
+  sf.insert(sf.end(), nf.begin(), nf.end());
+  for (SEdges::iterator e = ed.begin(); e != ed.end(); ++e)
+    delete *e;
 }
 
-HEdges subedges (Face *f, bool oneway,
+SEdges subedges (Face *f, bool oneway,
 		 const map<Edge *, Points *> &epsmap,
-		 const map<Face *, vector<FFE> > &femap,
-		 Polyhedron *a, PVMap &pvmap)
+		 const map<Face *, vector<FFE>> &femap, bool perturbed)
 {
-  set<pair<Vertex *, Vertex *> > vv;
-  HEdges ef = f->getBoundary()->edgeLoop(), ed;
+  vector<pair<PTR<Point>, PTR<Point>>> pp;
+  HEdges ef = f->getBoundary()->edgeLoop();
   for (HEdges::iterator h = ef.begin(); h != ef.end(); ++h)
-    subedges(*h, epsmap, a, pvmap, vv);
-  map<Face *, vector<FFE> >::const_iterator i = femap.find(f);
+    subedgesH(*h, epsmap, pp);
+  map<Face *, vector<FFE>>::const_iterator i = femap.find(f);
   if (i != femap.end())
     for (vector<FFE>::const_iterator j = i->second.begin();
-	 j != i->second.end(); ++j) {
-      bool oflag = !oneway || !j->g,
-	fflag = oflag || j->f == f, gflag = oflag || j->f != f;
-      subedges(*j->pts, fflag, gflag, a, pvmap, vv);
+	 j != i->second.end(); ++j)
+      subedgesFFE(f, *j, oneway, pp);
+  return subedgesPP(pp, f->getPC(), perturbed);
+}
+
+void subedgesH (HEdge *h, const map<Edge *, Points *> &epsmap,
+		vector<pair<PTR<Point>, PTR<Point>>> &pp)
+{
+  map<Edge *, Points *>::const_iterator i = epsmap.find(h->getE());
+  if (i == epsmap.end()) {
+    Points pts;
+    pts.push_back(h->tail()->getP());
+    pts.push_back(h->head()->getP());
+    subedges(pts, true, false, pp);
+  }
+  else
+    subedges(*i->second, h->getForward(), !h->getForward(), pp);
+}
+
+void subedges (const Points &pts, bool fflag, bool bflag,  
+	       vector<pair<PTR<Point>, PTR<Point>>> &pp)
+{
+  for (int i = 0; i + 1 < pts.size(); i += 2) {
+    if (fflag)
+      pp.push_back(pair<PTR<Point>, PTR<Point>>(pts[i], pts[i+1]));
+    if (bflag)
+      pp.push_back(pair<PTR<Point>, PTR<Point>>(pts[i+1], pts[i]));
+  }
+}
+
+void subedgesFFE (Face *f, const FFE &ffe, bool oneway,
+		  vector<pair<PTR<Point>, PTR<Point>>> &pp)
+{
+  Points &pts = *ffe.pts;
+  if (ffe.g) {
+    bool fflag = !oneway || ffe.f == f, gflag = !oneway || ffe.f != f;
+    subedges(pts, fflag, gflag, pp);
+  }
+  else
+    for (int i = 0; i + 1 < pts.size(); i += 2) {
+      CentroidPoint c(pts[i], pts[i+1]);
+      if (f->contains(&c, true)) {
+	pp.push_back(pair<PTR<Point>, PTR<Point>>(pts[i], pts[i+1]));
+	pp.push_back(pair<PTR<Point>, PTR<Point>>(pts[i+1], pts[i]));
+      }
     }
-  for (set<pair<Vertex *, Vertex *> >::iterator v = vv.begin();
-       v != vv.end(); ++v)
-    ed.push_back(a->addHEdge(v->first, v->second));
-  setNext(ed, f->getPC());
+}
+
+SEdges subedgesPP (const vector<pair<PTR<Point>, PTR<Point>>> &pp, int c,
+		   bool perturbed)
+{
+  set<PTR<Point>, PointOrderRP> ps;
+  map<PTR<Point>, PTR<Point>> ppmap;
+  set<pair<PTR<Point>, PTR<Point>>> pps;
+  for (vector<pair<PTR<Point>, PTR<Point>>>::const_iterator i = pp.begin();
+       i != pp.end(); ++i) {
+    PTR<Point> t = perturbed ? i->first : getPoint(i->first, ps, ppmap),
+      h = perturbed ? i->second : getPoint(i->second, ps, ppmap);
+    if (t != h)
+      pps.insert(pair<PTR<Point>, PTR<Point>>(t, h));
+  }
+  SEdges ed;
+  for (set<pair<PTR<Point>, PTR<Point>>>::const_iterator i = pps.begin();
+       i != pps.end(); ++i)
+    sedges(i->first, i->second, ed);
+  sort(ed.begin(), ed.end(), SEdgeCWOrder(c));
+  int i = 0, n = ed.size();
+  while (i < n) {
+    int j = i + 1;
+    while (j < n && ed[i]->tail == ed[j]->tail) {
+      ed[j-1]->cw = ed[j];
+      ++j;
+    }
+    ed[j-1]->cw = ed[i];
+    i = j;
+  }
   return ed;
 }
 
-void subedges (HEdge *h, const map<Edge *, Points *> &epsmap,
-	       Polyhedron *a, PVMap &pvmap, set<pair<Vertex *, Vertex *> > &vv)
+PTR<Point> getPoint (PTR<Point> p, set<PTR<Point>, PointOrderRP> &ps,
+		     map<PTR<Point>, PTR<Point>> &ppmap)
 {
-  Edge *e = h->getE();
-  Points pts;
-  pts.push_back(e->getT()->getP());
-  map<Edge *, Points *>::const_iterator i = epsmap.find(e);
-  if (i != epsmap.end())
-    pts.insert(pts.end(), i->second->begin(), i->second->end());
-  pts.push_back(e->getH()->getP());
-  subedges(pts, h->getForward(), !h->getForward(), a, pvmap, vv);
+  map<PTR<Point>, PTR<Point>>::iterator i = ppmap.find(p);
+  if (i != ppmap.end())
+    return i->second;
+  PTR<Point> q = *ps.insert(p).first;
+  ppmap.insert(pair<PTR<Point>, PTR<Point>>(p, q));
+  return q;
 }
 
-void subedges (const Points &pts, bool fflag, bool bflag, Polyhedron *a,
-	       PVMap &pvmap, set<pair<Vertex *, Vertex *> > &vv)
+void sedges (PTR<Point> t, PTR<Point> h, SEdges &ed)
 {
-  Vertex *v = a->getVertex(pts[0], pvmap);
-  for (int i = 1; i < pts.size(); ++i) {
-    Vertex *w = a->getVertex(pts[i], pvmap);
-    if (v != w) {
-      if (fflag)
-	vv.insert(pair<Vertex *, Vertex *>(v, w));
-      if (bflag)
-	vv.insert(pair<Vertex *, Vertex *>(w, v));
-    }
-    v = w;
-  }
+  SEdge *f = new SEdge(t, true), *b = new SEdge(h, false, f);
+  f->twin = b;
+  ed.push_back(f);
+  ed.push_back(b);
 }
 
-void setNext (const HEdges &he, int c)
+SEdge * findLoop (SEdge *e)
 {
-  HHEdges hhe;
-  for (HEdges::const_iterator e = he.begin(); e != he.end(); ++e) {
-    hhe.push_back(HHEdge(*e, true));
-    hhe.push_back(HHEdge(*e, false));
-  }
-  sort(hhe.begin(), hhe.end(), HHEdgeOrder(c));
-  int i = 0, n = hhe.size();
-  while (i < n) {
-    int m = 1;
-    while (i + m < n && hhe[i].tail() == hhe[i+m].tail())
-      ++m;
-    int j = 0;
-    while (j < m) {
-      int k = i + (j + 1)%m;
-      if (!hhe[i+j].f && hhe[k].f)
-	hhe[i+j].e->setNext(hhe[k].e);
-      ++j;
-    }
-    i += m;
-  }
-}
-
-HEdge * findLoop (HEdge *h)
-{
-  HEdge *l = h, *h0 = h;
+  if (e->flag || !e->forward)
+    return 0;
+  SEdge *l = e, *f = e;
   do {
-    h->setFlag(true);
-    if (HEdgeOrder()(h, l))
-      l = h;
-    h = h->getNext();
-    if (!h)
+    f->flag = true;
+    if (SEdgeHeadOrder()(f, l))
+      l = f;
+    f = f->next();
+    if (!(f && f->forward))
       return 0;
   }
-  while (h != h0);
+  while (f != e);
   return l;
 }
 
-void addInner (HEdge *e, bool oneway, int c, vector<HEdges> &fa)
+void addInner (SEdge *e, bool oneway, int c, SFaces &sf)
 {
-  Point *p = e->head()->getP();
-  for (int i = fa.size() - 1; i >= 0; --i) {
-    HEdges &f = fa[i];
-    if (contains(f[0], c, p)) {
+  Point *p = e->head();
+  for (int i = sf.size() - 1; i >= 0; --i)
+    if (contains(sf[i].b[0], c, p, true, 0)) {
       if (oneway)
-	for (int j = 1; j < f.size(); ++j)
-	  if (contains(f[j], c, p))
+	for (int j = 1; j < sf[i].b.size(); ++j)
+	  if (contains(sf[i].b[j], c, p, true, 0))
 	    return;
-      f.push_back(e);
+      sf[i].b.push_back(e->loop());
       return;
     }
-  }
 }
 
-bool contains (HEdge *e, int c, Point *p)
+HEdges MFace::boundaryHEdges () const
 {
-  Vertices ve = e->loop();
-  Points pts;
-  for (Vertices::iterator v = ve.begin(); v != ve.end(); ++v)
-    pts.push_back((*v)->getP());
-  return contains(pts, c, p, true, 0);
+  HEdges ed = h->edgeLoop();
+  for (HEdges::const_iterator e = inner.begin(); e != inner.end(); ++e) {
+    HEdges eed = (*e)->edgeLoop();
+    ed.insert(ed.end(), eed.begin(), eed.end());
+  }
+  return ed;
 }
-    
-void triangulate (const HEdges &fa, int c, PTriangles &ptr)
+
+void MFace::triangulate (Triangles &tr)
 {
-  Triangles tr;
-  vector<Vertices> vv;
-  for (HEdges::const_iterator h = fa.begin(); h != fa.end(); ++h)
-    vv.push_back((*h)->loop());
-  if (vv.size() == 1 && vv[0].size() == 3)
-    tr.push_back(Triangle(vv[0][0], vv[0][1], vv[0][2]));
+  vector<Points> pp;
+  pp.push_back(h->pointLoop());
+  for (HEdges::iterator e = inner.begin(); e != inner.end(); ++e)
+    pp.push_back((*e)->pointLoop());
+  if (pp.size() == 1 && pp[0].size() == 3)
+    tr.push_back(Triangle(pp[0][0], pp[0][1], pp[0][2]));
   else {
-    VVertices reg;
-    for (vector<Vertices>::iterator v = vv.begin(); v != vv.end(); ++v)
-      reg.push_back(&*v);
-    triangulate(reg, c, tr);
+    vector<Points *> reg;
+    for (vector<Points>::iterator i = pp.begin(); i != pp.end(); ++i)
+      reg.push_back(&*i);
+    ::triangulate(reg, getPC(), tr);
   }
-  for (Triangles::iterator t = tr.begin(); t != tr.end(); ++t)
-    ptr.push_back(PTriangle(t->a->getP(), t->b->getP(), t->c->getP()));
 }
 
-void deleteFEmap (map<Face *, vector<FFE> > &femap)
+void addFace (const SFace &sf, Polyhedron *a, PVMap &pvmap)
 {
-  for (map<Face *, vector<FFE> >::iterator i = femap.begin(); i != femap.end(); ++i)
-    for (vector<FFE>::iterator j = i->second.begin(); j != i->second.end(); ++j)
-      if (j->f == i->first)
-	delete j->pts;
+  Vertices ve = loop(sf.b[0], a, pvmap);
+  if (!a->perturbed && currentFace(ve, a))
+    return;
+  MFace *f = new MFace(addLoop(ve, a), sf.f->getP(), sf.f->getPC());
+  for (int i = 1; i < sf.b.size(); ++i)
+    f->addInner(addLoop(loop(sf.b[i], a, pvmap), a));
+  a->faces.push_back(f);
+}
+
+Vertices loop (const Points &pts, Polyhedron *a, PVMap &pvmap)
+{
+  Vertices ve;
+  for (Points::const_iterator p = pts.begin(); p != pts.end(); ++p)
+    ve.push_back(a->getVertex(*p, pvmap));
+  return ve;
+}
+
+bool currentFace (const Vertices &ve, Polyhedron *a)
+{
+  int n = ve.size();
+  Edge *e = a->getEdge(ve[0], ve[1]);
+  for (int i = 0; i < e->HEdgesN(); ++i) {
+    HEdge *h = e->getHEdge(i);
+    Vertices vh = h->loop();
+    if (vh.size() == n) {
+      bool flag = true;
+      if (h->tail() == ve[0])
+      	for (int j = 0; flag && j < n; ++j)
+	  flag = ve[j] == vh[j];
+      else
+	for (int j = 0; flag && j < n; ++j)
+	  flag = ve[j] == vh[(n+1-j)%n];
+      if (flag)
+	return true;
+    }
+  }
+  return false;
+}
+
+HEdge * addLoop (const Vertices &ve, Polyhedron *a)
+{
+  Vertex *t = ve.back();
+  HEdges ed;
+  for (Vertices::const_iterator h = ve.begin(); h != ve.end(); ++h) {
+    HEdge *f = a->getHEdge(t, *h);
+    ed.push_back(f);
+    t = *h;
+  }
+  for (int i = 0; i + 1 < ed.size(); ++i)
+    ed[i]->setNext(ed[i+1]);
+  ed.back()->setNext(ed[0]);
+  return ed[0];
+}
+
+void deleteMaps (map<Edge *, Points *> &epsmap,
+		 map<pair<Face *, Face *>, FFE> &ffemap)
+{
+  for (map<Edge *, Points *>::iterator i = epsmap.begin(); i != epsmap.end(); ++i)
+    delete i->second;
+  for (map<pair<Face *, Face *>, FFE>::iterator i = ffemap.begin();
+       i != ffemap.end(); ++i)
+    delete i->second.pts;
+}
+
+Polyhedron * triangulate (Polyhedron *a)
+{
+  Triangles tr = triangulate(a->faces);
+  Polyhedron *b = new Polyhedron(a->perturbed);
+  PVMap pvmap;
+  for (Triangles::iterator t = tr.begin(); t != tr.end(); ++t) 
+    b->addTriangle(t->a, t->b, t->c, pvmap);
+  return b;
+}
+
+Triangles triangulate (const Faces &fa)
+{
+  const unsigned int n = 1; // debug 8
+  unsigned int k = fa.size(), m = k/n, is = 0;
+  TRData trd[n];
+  for (int i = 0; i < n; ++i) {
+    trd[i].i = i;
+    trd[i].is = is;
+    is = i + 1 == n ? k : is + m;
+    trd[i].ie = is;
+    trd[i].fa = &fa;
+  }
+  pthread_t threads[n];
+  for (int i = 0; i < n; ++i)
+    pthread_create(threads + i, 0,
+		   (void* (*)(void*)) triangulateT, (void *) (trd + i));
+  for (int i = 0; i < n; ++i)
+    pthread_join(threads[i], 0);
+  Triangles tr;
+  for (int i = 0; i < n; ++i)
+    tr.insert(tr.end(), trd[i].tr.begin(), trd[i].tr.end());
+  return tr;
+}
+
+void triangulateT (void *ptr)
+{
+  TRData *trd = (TRData *) ptr;
+  BaseObject::addThread(trd->i);
+  for (int i = trd->is; i < trd->ie; ++i)
+    trd->fa->at(i)->triangulate(trd->tr);
 }
 
 bool inSet (bool ina, bool inb, SetOp op)
@@ -2195,26 +2480,19 @@ bool inSet (bool ina, bool inb, SetOp op)
 
 Polyhedron * overlay (Polyhedron **poly, int n)
 {
-  int m = 0;
-  for (int i = 0; i < n; ++i) {
-    m += poly[i]->faces.size();
-    for (int j = 0; j < poly[i]->faces.size(); ++j)
-      if (poly[i]->faces[j]->getBoundary()->loop().size() > 3)
-	cerr << "bad" << endl;
-  }      
-
   Polyhedron *c = new Polyhedron(false);
   PVMap pvmap;
   for (int i = 0; i < n; ++i) {
     const Faces &fa = poly[i]->faces;
     for (Faces::const_iterator f = fa.begin(); f != fa.end(); ++f) {
-      Vertices ve = (*f)->getBoundary()->loop();
-      c->addTriangle(ve[0], ve[1], ve[2], pvmap);
+      Points pf = (*f)->getBoundary()->pointLoop();
+      c->addTriangle(pf[0], pf[1], pf[2], pvmap);
     }
   }
-  Polyhedron *d = subdivide(c, false);
+  Polyhedron *d = subdivide(c, false), *e = triangulate(d);
   delete c;
-  return d;
+  delete d;
+  return e;
 }
 
 Polyhedron * multiUnion (Polyhedron **poly, int n)
@@ -2228,8 +2506,8 @@ Polyhedron * multiUnion (Polyhedron **poly, int n)
     Cell *ci = c->cells[i];
     PTR<Point> p = ci->interiorPoint();
     bool flag = false;
-    for (int i = 0; !flag && i < n; ++i)
-      flag = poly[i]->contains(p);
+    for (int j = 0; !flag && j < n; ++j)
+      flag = poly[j]->contains(p);
     if (flag)
       cin.insert(ci);
   }
@@ -2238,12 +2516,12 @@ Polyhedron * multiUnion (Polyhedron **poly, int n)
     bool in1 = cin.find((*f)->getHFace(0)->getS()->getC()) != cin.end(),
       in2 = cin.find((*f)->getHFace(1)->getS()->getC()) != cin.end();
     if (in1 != in2) {
-      Vertices vf = (*f)->getBoundary()->loop();
+      Points pf = (*f)->getBoundary()->pointLoop();
       int pc = (*f)->getPC();
       if (in2)
-	d->addTriangle(vf[0], vf[1], vf[2], pvmap, pc);
+	d->addTriangle(pf[0], pf[1], pf[2], pvmap, pc);
       else
-	d->addTriangle(vf[2], vf[1], vf[0], pvmap, - pc);
+	d->addTriangle(pf[2], pf[1], pf[0], pvmap, - pc);
     }
   }
   delete c;
@@ -2260,17 +2538,17 @@ Polyhedron * coalesce (Polyhedron *a)
 
 Polyhedron * coalesceFaces (Polyhedron *a)
 {
-  vector<set<Face *> > fg = groupFaces(a);
+  vector<set<Face *>> fg = groupFaces(a);
   Polyhedron *b = new Polyhedron(a->perturbed);
   PVMap pvmap;
-  for (vector<set<Face *> >::iterator f = fg.begin(); f != fg.end(); ++f)
+  for (vector<set<Face *>>::iterator f = fg.begin(); f != fg.end(); ++f)
     coalesceFace(b, pvmap, *f);
   return b;
 }
 
-vector<set<Face *> > groupFaces (Polyhedron *a)
+vector<set<Face *>> groupFaces (Polyhedron *a)
 {
-  vector<set<Face *> > res;
+  vector<set<Face *>> res;
   set<Face *> done;
   for (Faces::iterator f = a->faces.begin(); f != a->faces.end(); ++f)
     if (done.insert(*f).second) {
@@ -2493,9 +2771,10 @@ Polyhedron * randomTets (int n, double u, double v)
   Polyhedron *a = new Polyhedron;
   for (int i = 0; i < n; ++i)
     randomTet(a, u, v);
-  Polyhedron *b = subdivide(a, false);
+  Polyhedron *b = subdivide(a, false), *c = triangulate(b);
+  delete b;
   delete a;
-  return b;
+  return c;
 }
 
 void randomTet (Polyhedron *a, double u, double v)
@@ -2576,6 +2855,14 @@ void find (ID id, const Faces &faces, Faces &res)
       res.push_back(faces[i]);
 }
 
+int find (Shell *s, const Shells &shells)
+{
+  for (int i = 0; i < shells.size(); ++i)
+    if (s == shells[i])
+      return i;
+  return -1;
+}
+
 int find (Cell *c, const Cells &cells)
 {
   for (int i = 0; i < cells.size(); ++i)
@@ -2633,9 +2920,9 @@ void pvs (const Vertices &ve)
 void ptr (const Triangle &t)
 {
   cerr << "(";
-  pv(t.a);
-  pv(t.b);
-  pv(t.c);
+  pp(t.a);
+  pp(t.b);
+  pp(t.c);
   cerr << ")";
 }
 
@@ -2686,18 +2973,32 @@ void pes (const HEdges &ed)
   cerr << ")" << endl;
 }
 
-void pes (const HHEdges &ed)
-{
-  cerr << "(";
-  for (HHEdges::const_iterator e = ed.begin(); e != ed.end(); ++e)
-    pe(e->e);
-  cerr << ")" << endl;
-}
-
 void pl (HEdge *e)
 {
   Vertices ve = e->loop();
   pvs(ve);
+}
+
+void pe (SEdge *e)
+{
+  cerr << "(";
+  pp1(e->tail->getApprox());
+  pp1(e->head()->getApprox());
+  cerr << ")" << endl;
+}
+
+void pes (const SEdges &ed)
+{
+  cerr << "(";
+  for (SEdges::const_iterator e = ed.begin(); e != ed.end(); ++e)
+    pe(*e);
+  cerr << ")" << endl;
+}
+
+void pl (SEdge *e)
+{
+  Points pts = e->loop();
+  pps(pts);
 }
 
 void pf (Face *f)
@@ -2869,14 +3170,14 @@ Polyhedron * rotate (Polyhedron *a, double t,  double *u)
   for (Vertices::const_iterator v = a->vertices.begin(); v != a->vertices.end(); ++v)
     pvmap.insert(PVPair((*v)->getP(), b->getVertex(rotate((*v)->getP(), m))));
   for (Faces::const_iterator f = a->faces.begin(); f != a->faces.end(); ++f) {
-    Vertices ve = (*f)->getBoundary()->loop();
-    b->addTriangle(ve[0], ve[1], ve[2], pvmap);
+    Points pf = (*f)->getBoundary()->pointLoop();
+    b->addTriangle(pf[0], pf[1], pf[2], pvmap);
   }
   delete [] m;
   return b;
 }
 
-int po (Point *a, Point *b, Point *r)
+int side (Plane *p, Point *a)
 {
-  return PointOrder(a, b, r);
+  return Side(p, a);
 }

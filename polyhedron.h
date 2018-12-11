@@ -16,7 +16,7 @@ using namespace acp;
 
 double getTime ();
 
-Parameter cross (const PV3 &a, const PV3 &b, const int coord);
+Parameter cross (const PV3 &a, const PV3 &b, int coord);
 
 typedef unsigned int ID;
 
@@ -52,49 +52,9 @@ class Point : public Object<PV3> {
   int side (Plane *a);
 };
 
-typedef vector<PTR<Point> > Points;
+typedef vector<PTR<Point>> Points;
 
 extern PTR<Point> Rdir;
-
-class PlaneData {
- public:
-  PV3 n;
-  Parameter k;
-
-  int size () const { return 4; }
-  const Parameter & operator[](int i) const { return i < 3 ? n[i] : k; }
-  Parameter & operator[](int i) { return i < 3 ? n[i] : k; }
-  PlaneData () {}
-  PlaneData (const PV3 &n, const Parameter &k) : n(n), k(k) {}
-};
-
-class Plane : public Object<PlaneData> {
-  friend class Point;
-  friend class PPoint;
-  friend class Face;
-  friend class Polyhedron;
-  friend class Convolution;
- protected:
-  static ID planeid;
-  ID id;
- public:
-  int projectionCoordinate ();
-  ID getid () const { return id; }
-};
-
-class SamePlane : public Primitive {
-  Plane *p, *q;
-
-  Parameter calculate () {
-    PV3 np = p->get().n, nq = q->get().n;
-    Parameter kp = p->get().k, kq = q->get().k;
-    if (kp.sign() == 0 && kq.sign() == 0)
-      return Rdir->get().tripleProduct(np, nq);
-    return Rdir->get().dot(kp*nq - kq*np);
-  }
- public:
-  SamePlane (Plane *p, Plane *q) : p(p), q(q) {}
-};
 
 class OnLine : public Primitive {
   Point *a, *t, *h;
@@ -118,17 +78,6 @@ class Order : public Primitive {
 };
 
 bool onEdge (Point *a, Point *t, Point *h, bool strict);
-
-class Side : public Primitive {
-  Plane *p;
-  Point *a;
-
-  Parameter calculate () {
-    return a->get().dot(p->get().n) + p->get().k;
-  }
- public:
-  Side (Plane *p, Point *a) : p(p), a(a) {}
-};
 
 class PointOrder : public Primitive {
   Point *a, *b, *r;
@@ -200,6 +149,58 @@ class CloserPair : public Primitive {
 
 bool closerPair (Point *a, Point *b, Point *c, Point *d);
 
+class PlaneData {
+ public:
+  PV3 n;
+  Parameter k;
+
+  int size () const { return 4; }
+  const Parameter & operator[](int i) const { return i < 3 ? n[i] : k; }
+  Parameter & operator[](int i) { return i < 3 ? n[i] : k; }
+  PlaneData () {}
+  PlaneData (const PV3 &n, const Parameter &k) : n(n), k(k) {}
+};
+
+class Plane : public Object<PlaneData> {
+  friend class Point;
+  friend class PPoint;
+  friend class Face;
+  friend class Polyhedron;
+  friend class Convolution;
+ protected:
+  static ID planeid;
+  ID id;
+ public:
+  ID getid () const { return id; }
+};
+
+class ProjectionCoordinate : public Primitive {
+  Plane *p;
+
+  int sign () {
+    PV3 n = p->get().n;
+    Parameter x = n.x.abs(), y = n.y.abs(), z = n.z.abs();
+    if ((x - y).sign() > -1 && (x - z).sign() > -1)
+      return n.x.sign();
+    if ((y - x).sign() > -1 && (y - z).sign() > -1)
+      return 2*n.y.sign();
+    return 3*n.z.sign();
+  }
+ public:
+  ProjectionCoordinate (Plane *p) : p(p) {}
+};
+
+class Side : public Primitive {
+  Plane *p;
+  Point *a;
+
+  Parameter calculate () {
+    return a->get().dot(p->get().n) + p->get().k;
+  }
+ public:
+  Side (Plane *p, Point *a) : p(p), a(a) {}
+};
+
 class PlaneRayAlignment : public Primitive {
   Plane *p;
   Point *u;
@@ -256,6 +257,30 @@ class NegPoint : public Point {
   PV3 calculate () { return - a->get(); }
  public:
   NegPoint (Point *a) : a(a) {}
+};
+
+class NormalPlane : public Plane {
+  double nx, ny, nz;
+
+  PlaneData calculate () {
+    return PlaneData(PV3::constant(nx, ny, nz), Parameter::constant(0.0));
+  }
+ public:
+  NormalPlane (double nx, double ny, double nz) : nx(nx), ny(ny), nz(nz) {}
+};
+
+class ClosePointPlane : public Primitive {
+  Point *a;
+  Plane *p;
+  double d;
+
+  Parameter calculate () {
+    PlaneData pd = p->get();
+    Parameter s = pd.n.dot(a->get()) + pd.k;
+    return d*d*pd.n.dot(pd.n) - s*s;
+  }
+ public:
+  ClosePointPlane (Point *a, Plane *p, double d) : a(a), p(p), d(d) {}
 };
 
 class SumPoint : public Point {
@@ -367,21 +392,19 @@ class ScalePoint : public Point {
 };
 
 class EPPoint : public Point {
-   PTR<Point> t, h, a, b, c;
+  PTR<Point> t, h;
+  PTR<TrianglePlane> p;
   PV3 calculate () {
-    PV3 ap = a->get(), n = (b->get() - ap).cross(c->get() - ap),
-      tp = t->get(), u = h->get() - tp;
-    Parameter k = n.dot(ap - tp)/n.dot(u);
+    PV3 a = p->a->get(), n = p->get().n, tp = t->get(), u = h->get() - tp;
+    Parameter k = n.dot(a - tp)/n.dot(u);
     return tp + k*u;
   }
  public:
-  EPPoint (Point *t, Point *h, TrianglePlane *q)
-    : t(t), h(h), a(q->a), b(q->b), c(q->c) {
-    set<ID> psth = intersection(t->ps, h->ps);
-    for (set<ID>::iterator i = psth.begin(); i != psth.end(); ++i)
-      ps.insert(*i);
-    ps.insert(q->id);
+  EPPoint (Point *t, Point *h, TrianglePlane *p) : t(t), h(h), p(p) {
+    ps = intersection(t->ps, h->ps);
+    ps.insert(p->id);
   }
+  TrianglePlane * getP () { return p; }
 };
 
 class RayPlanePoint : public Point {
@@ -440,12 +463,10 @@ class Vertex {
 
 typedef vector<Vertex *> Vertices;
 
-typedef vector<const Vertices *> VVertices;
-
 class Triangle {
  public:
-  Vertex *a, *b, *c;
-  Triangle (Vertex *a, Vertex *b, Vertex *c) : a(a), b(b), c(c) {}
+  PTR<Point> a, b, c;
+  Triangle (Point *a, Point *b, Point *c) : a(a), b(b), c(c) {}
 };
 
 typedef vector<Triangle> Triangles;
@@ -465,15 +486,13 @@ class HEdge {
   Face *f;
   HEdge *next;
  public:
-  HEdge () : e(0), forward(false), flag(false), next(0), f(0) {}
+  HEdge () : e(0), forward(false), next(0), f(0) {}
   HEdge (Edge *e, bool forward) 
-    : e(e), forward(forward), flag(false), next(0), f(0) {}
+    : e(e), forward(forward), next(0), f(0) {}
   Vertex * tail () const;
   Vertex * head () const;
   Edge * getE () const { return e; }
   bool getForward () const { return forward; }
-  bool getFlag () const { return flag; }
-  void setFlag (bool f) { flag = f; }
   Face * getF () const { return f; }
   HEdge * getNext () const { return next; }
   void setNext (HEdge *h) { next = h; }
@@ -482,18 +501,11 @@ class HEdge {
   HEdge * cw () const;
   HEdge * ccw () const;
   Vertices loop () const;
+  Points pointLoop () const;
   vector<HEdge *> edgeLoop ();
 };
 
 typedef vector<HEdge *> HEdges;
-
-class HEdgeOrder {
- public:
-  bool operator() (HEdge *e, HEdge *f) const {
-    Point *p = e->head()->getP(), *q = f->head()->getP();
-    return p != q && PointOrderR(p, q) == 1;
-  }
-};
 
 class Edge {
   friend class EEPoint;
@@ -530,7 +542,8 @@ typedef vector<Edge *> Edges;
 class EEPoint : public Point {
   PTR<Point> et, eh, ft, fh;
   int pc;
-
+  vector<Face *> fa;
+  
   PV3 calculate () {
     PV3 a = et->get(), u = eh->get() - a, b = ft->get(), v = fh->get() - b;
     Parameter k = cross(b - a, v, pc)/cross(u, v, pc);
@@ -539,15 +552,14 @@ class EEPoint : public Point {
  public:
   EEPoint (Edge *e, Edge *f, int pc) : et(e->t->getP()), eh(e->h->getP()), 
     ft(f->t->getP()), fh(f->h->getP()), pc(pc) {
-    set<ID> pe = e->ps(), pf = f->ps(), pef;
-    set_union(pe.begin(), pe.end(), pf.begin(), pf.end(),
-	      inserter(pef, pef.begin()));
-    for (set<ID>::iterator i = pef.begin(); i != pef.end(); ++i)
-      ps.insert(*i);
+    ps = intersection(e->ps(), f->ps());
   }
 
   EEPoint (Point *et, Point *eh, Point *ft, Point *fh, int pc)
     : et(et), eh(eh), ft(ft), fh(fh), pc(pc) {}
+
+  void addFace (Face *f) { fa.push_back(f); }
+  vector<Face *> getFaces () { return fa; }
 };
 
 class Shell;
@@ -598,6 +610,8 @@ class Face {
  public:
   Face (HEdge *h, int pc);
   Face (Point *a, Point *b, Point *c);
+  Face (HEdge *h, TrianglePlane *p, int pc);
+  void addLoop (HEdge *h, bool flag);
   void update ();
   TrianglePlane * getP () { return p; }
   HEdge * getBoundary () const { return h; }
@@ -610,6 +624,7 @@ class Face {
   bool sharedEdge (Face *f) const;
   PTR<Point> sharedVertex (Face *f) const;
   Points boundaryPoints () const;
+  virtual HEdges boundaryHEdges () const { return h->edgeLoop(); }
   bool coplanar (Face *f);
   bool intersects (Face *g, bool strict);
   bool intersectsFP (Face *g, int *sg);
@@ -622,6 +637,7 @@ class Face {
   bool contains (Point *a, bool strict, int *ie = 0);
   PTR<Point> centroid () const;
   PTR<Point> rayIntersection (Point *a, Point *r);
+  virtual void triangulate (Triangles &tr);
 };
 
 typedef vector<Face *> Faces;
@@ -639,6 +655,12 @@ class EdgeOrderP : public Primitive {
       return kf;
     PV3 u = e->getU();
     return u.tripleProduct(ng, nf);
+    /* debug
+    Parameter ku = u.tripleProduct(ng, nf);
+    if (ku.sign() == 0 && f->getF()->coplanar(g->getF()))
+      return f->getF() < g->getF() ? kf : - kf;
+    return ku;
+    */
   }
  public:
   EdgeOrderP (Edge *e, HEdge *f, HEdge *g) : e(e), f(f), g(g) {}
@@ -782,7 +804,7 @@ class Polyhedron {
   }
   Vertex * getVertex (Point *p, PVMap &pvmap);
   Vertex * getVertex (Vertex *v, PVMap &pvmap) { return getVertex(v->p, pvmap); }
-    Edge * getEdge (Vertex *a, Vertex *b);
+  Edge * getEdge (Vertex *a, Vertex *b);
   HEdge * addHEdge (Vertex *a, Vertex *b);
   HEdge * getHEdge (Vertex *a, Vertex *b);
   Face * addTriangle (Vertex *a, Vertex *b, Vertex *c, int pc = 0);
@@ -794,7 +816,8 @@ class Polyhedron {
   Shell * formShell (HFace *f) const;
   Cell * enclosingCell (Shell *s, Octree<Cell *> *octreec) const;
   void clearCells ();
-  Face * addTriangle (Vertex *ta, Vertex *tb, Vertex *tc, PVMap &pvmap, int pc = 0);
+  Face * addTriangle (PTR<Point> a, PTR<Point> b, PTR<Point> c, PVMap &pvmap,
+		      int pc = 0);
   Face * addTriangle (Face *f, PVMap &pvmap);
   Polyhedron * copy () const;
   Polyhedron * scale (double unit) const;
@@ -834,6 +857,8 @@ class FFE {
   Points *pts;
   double bbox[6];
 
+  FFE () : f(0), g(0), pts(0) {}
+
   FFE (Face *f, Face *g, PTR<Point> p, PTR<Point> q)
     : f(f), g(g), pts(new Points) {
     pts->push_back(p); pts->push_back(q);
@@ -842,67 +867,75 @@ class FFE {
     q->getBBox(bbq);
     mergeBBox(bbq, bbox);
   }
+
+  FFE (Face *f, Face *g, Points *pts) : f(f), g(g), pts(pts) {
+    pts->at(0)->getBBox(bbox);
+    double bbq[6];
+    pts->back()->getBBox(bbq);
+    mergeBBox(bbq, bbox);
+  }
 };
 
 void intersectFF (Polyhedron *a,
 		  map<Edge *, Points *> &epsmap,
 		  map<pair<Face *, Face *>, FFE> &ffemap,
-		  map<Face *, Edges> &fesmap);
+		  vector<pair<Face *, Edge *>> &fe);
 
-void intersectFE (const vector<pair<Face *, Face *> > &ff1,
-		  map<pair<Face *, Edge *>, PTR<Point> > &fepmap,
+void intersectFE (const vector<pair<Face *, Face *>> &ff1,
+		  map<pair<Face *, Edge *>, PTR<Point>> &fepmap,
 		  map<Edge *, Points *> &epsmap,
-		  map<Face *, Edges> &fesmap,
 		  map<Face *, Points *> &fpsmap,
-		  vector<pair<Face *, Face *> > &ff);
+		  vector<pair<Face *, Face *>> &ff,
+		  vector<pair<Face *, Edge *>> &fe);
 
 void intersectFET (void *ptr);
 
 class FEData {
  public:
   unsigned int i, is, ie;
-  const vector<pair<Face *, Face *> > *ff1;
-  vector<pair<Edge *, PTR<Point> > > ep;
-  vector<pair<pair<Face *, Edge *>, PTR<Point> > > fep;
-  vector<pair<Face *, Edge *> > fe;
-  vector<pair<Face *, PTR<Point> > > fp;
-  vector<pair<Face *, Face *> > ff;
+  const vector<pair<Face *, Face *>> *ff1;
+  vector<pair<Edge *, PTR<Point>>> ep;
+  vector<pair<pair<Face *, Edge *>, PTR<Point>>> fep;
+  vector<pair<Face *, PTR<Point>>> fp;
+  vector<pair<Face *, Face *>> ff;
+  vector<pair<Face *, Edge *>> fe;
 };
 
 void intersectFE (Face *f, Face *g,
-		  vector<pair<Edge *, PTR<Point> > > &ep,
-		  vector<pair<pair<Face *, Edge *>, PTR<Point> > > &fep,
-		  vector<pair<Face *, Edge *> > &fe,
-		  vector<pair<Face *, PTR<Point> > > &fp,
-		  vector<pair<Face *, Face *> > &ff);
+		  vector<pair<Edge *, PTR<Point>>> &ep,
+		  vector<pair<pair<Face *, Edge *>, PTR<Point>>> &fep,
+		  vector<pair<Face *, PTR<Point>>> &fp,
+		  vector<pair<Face *, Face *>> &ff,
+		  vector<pair<Face *, Edge *>> &fe);
+		  
 
 void intersectFEP (Face *f, Face *g,
-		   vector<pair<Edge *, PTR<Point> > > &ep,
-		   vector<pair<Face *, Edge *> > &fe);
+		   vector<pair<Edge *, PTR<Point>>> &ep,
+		   vector<pair<Face *, Edge *>> &fe);
 
 void intersectFEP (Face *f, HEdge *h,
-		   vector<pair<Edge *, PTR<Point> > > &ep,
-		   vector<pair<Face *, Edge *> > &fe);
+		   vector<pair<Edge *, PTR<Point>>> &ep,
+		   vector<pair<Face *, Edge *>> &fe);
 
 void intersectEE (Edge *e, Edge *f, int c,
-		  vector<pair<Edge *, PTR<Point> > > &ep);
+		  vector<pair<Edge *, PTR<Point>>> &ep);
 
 void intersectEE (Point *et, Point *eh, Point *ft, Point *fh,
 		  int c, Points &pe, Points &pf);
 
 void intersectFE (Face *f, Face *g, int *sg,
-		  vector<pair<Edge *, PTR<Point> > > &ep,
-		  vector<pair<pair<Face *, Edge *>, PTR<Point> > > &fep,
-		  vector<pair<Face *, Edge *> > &fe,
-		  vector<pair<Face *, PTR<Point> > > &fp);
+		  vector<pair<Edge *, PTR<Point>>> &ep,
+		  vector<pair<pair<Face *, Edge *>, PTR<Point>>> &fep,
+		  vector<pair<Face *, Edge *>> &fe,
+		  vector<pair<Face *, PTR<Point>>> &fp);
 
 void intersectFV (Face *f, HEdge *h,
-		  vector<pair<Edge *, PTR<Point> > > &ep,
-		  vector<pair<Face *, PTR<Point> > > &fp);
+		  vector<pair<Edge *, PTR<Point>>> &ep,
+		  vector<pair<Face *, PTR<Point>>> &fp);
 
 void intersectFEG (Face *f, HEdge *h,
-		   vector<pair<Edge *, PTR<Point> > > &ep,
-		   vector<pair<pair<Face *, Edge *>, PTR<Point> > > &fep);
+		   vector<pair<Edge *, PTR<Point>>> &ep,
+		   vector<pair<pair<Face *, Edge *>, PTR<Point>>> &fep);
 
 bool first (HEdge *h);
 
@@ -910,24 +943,35 @@ bool signChange (int *s);
 
 void update (Edge *e, PTR<Point> p, map<Edge *, Points *> &epsmap);
 
-void update (Face *f, Edge *e, map<Face *, Edges> &fesmap);
-
 void update (Face *f, PTR<Point> p, map<Face *, Points *> &fpsmap);
 
-void intersectFF (const vector<pair<Face *, Face *> > &ff, bool perturbed,
-		  const map<pair<Face *, Edge *>, PTR<Point> > &fepmap,
+void intersectFF (const vector<pair<Face *, Face *>> &ff, bool perturbed,
+		  const map<pair<Face *, Edge *>, PTR<Point>> &fepmap,
 		  const map<Edge *, Points *> &epsmap,
 		  const map<Face *, Points *> &fpsmap,
 		  map<pair<Face *, Face *>, FFE> &ffemap);
 
+class FFData {
+ public:
+  unsigned int i, is, ie;
+  const vector<pair<Face *, Face *>> *ff;
+  bool perturbed;
+  const map<pair<Face *, Edge *>, PTR<Point>> *fepmap;
+  const map<Edge *, Points *> *epsmap;
+  const map<Face *, Points *> *fpsmap;
+  vector<pair< pair<Face *, Face *>, pair<PTR<Point>, PTR<Point>>>> ffpp;
+};
+
+void intersectFFT (void *ptr);
+
 void intersectFF (Face *f, Face *g, bool perturbed,
-		  const map<pair<Face *, Edge *>, PTR<Point> > &fepmap,
+		  const map<pair<Face *, Edge *>, PTR<Point>> &fepmap,
 		  const map<Edge *, Points *> &epsmap,
 		  const map<Face *, Points *> &fpsmap,
-		  vector<pair< pair<Face *, Face *>, pair<PTR<Point>, PTR<Point> > > > &ffpp);
+		  vector<pair< pair<Face *, Face *>, pair<PTR<Point>, PTR<Point>>>> &ffpp);
 
 void findFE (Face *f, Face *g,
-	     const map<pair<Face *, Edge *>, PTR<Point> > &fepmap,
+	     const map<pair<Face *, Edge *>, PTR<Point>> &fepmap,
 	     Points &pts);
 
 void sharedVertices (Face *f, Face *g,
@@ -958,12 +1002,13 @@ class FFOrder : public Primitive {
 void update (Face *f, Face *g, PTR<Point> a, PTR<Point> b,
 	     map<pair<Face *, Face *>, FFE> &ffemap);
 
-map<Face *, vector<FFE> > feMap (map<Edge *, Points *> &epsmap,
-				const map<pair<Face *, Face *>, FFE> &ffemap,
-				map<Face *, Edges> &fesmap);
+map<Face *, vector<FFE>> feMap (map<Edge *, Points *> &epsmap,
+				map<pair<Face *, Face *>, FFE> &ffemap,
+				const vector<pair<Face *, Edge *>> &fe);
 
-void feMapFE (const map<Edge *, Points *> &epsmap,
-	      Face *f, Edge *e, map<Face *, vector<FFE> > &femap);
+void feMapFE (map<Edge *, Points *> &epsmap,
+	      map<pair<Face *, Face *>, FFE> &ffemap,
+	      Face *f, Edge *e, map<Face *, vector<FFE>> &femap);
 
 class PointOrderRP {
  public:
@@ -972,28 +1017,28 @@ class PointOrderRP {
   }
 };
 
-void update (Face *f, const FFE &ffe, map<Face *, vector<FFE> > &femap);
+void update (Face *f, const FFE &ffe, map<Face *, vector<FFE>> &femap);
 
 void intersectFFF (const map<pair<Face *, Face *>, FFE> &ffemap,
-		   const map<Face *, vector<FFE> > &femap);
+		   const map<Face *, vector<FFE>> &femap);
 
 void intersectFFFAux (const map<pair<Face *, Face *>, FFE> &ffemap,
-		      const map<Face *, vector<FFE> > &femap,
-		      vector<pair<Points *, PTR<Point> > > &psps);
-
-void intersectFFFT (void *ptr);
+		      const map<Face *, vector<FFE>> &femap,
+		      vector<pair<Points *, PTR<Point>>> &psps);
 
 class FFFData {
  public:
   unsigned int i, is, ie;
   const map<pair<Face *, Face *>, FFE> *ffemap;
-  const map<Face *, vector<FFE> > *femap;
-  vector<pair<Points *, PTR<Point> > > psps;
+  const map<Face *, vector<FFE>> *femap;
+  vector<pair<Points *, PTR<Point>>> psps;
 };
 
+void intersectFFFT (void *ptr);
+
 void intersectFFF (Face *f, const vector<FFE> &ed,
-		   const map<pair<Face *, Face *>, FFE> &ffemap,
-		   vector<pair<Points *, PTR<Point> > > &psps);
+		   const map<pair<Face *, Face *>, FFE> &ffemap, 
+		   vector<pair<Points *, PTR<Point>>> &psps);
 
 class PointOrderPPP {
  public:
@@ -1006,26 +1051,73 @@ class PointOrderPPP {
   }
 };
 
-void sortPoints (Edge *e, Points *pts);
+void subedgesE (map<Edge *, Points *> &epsmap, bool oneway, set<Point *> &bpts);
 
-void sortPoints (Points *pts);
-
-class PTriangle {
+class SEEData {
  public:
-  PTR<Point> a, b, c;
-  PTriangle (Point *a, Point *b, Point *c) : a(a), b(b), c(c) {}
+  unsigned int i, is, ie;
+  const map<Edge *, Points *> *epsmap;
+  bool oneway;
+  set<Point *> bpts;
 };
 
-typedef vector<PTriangle> PTriangles;
+void subedgesET (void *ptr);
+
+void subedgesE (Edge *e, Points &pts, bool oneway, set<Point *> &bpts);
+
+void subedgesE (Points &pts, bool oneway, set<Point *> &bpts);
+
+void subedgesE1 (Points &pts, set<Point *> &bpts);
+
+void subedgesP (Points &pts);
+
+void subedgesFF (map<pair<Face *, Face *>, FFE> &ffemap, bool oneway,
+		 const set<Point *> &bpts);
+
+class SEFData {
+ public:
+  unsigned int i, is, ie;
+  map<pair<Face *, Face *>, FFE> *ffemap;
+  bool oneway;
+  const set<Point *> *bpts;
+};
+
+void subedgesFFT (void *ptr);
+
+void subedgesFF (FFE &ffe, bool oneway, const set<Point *> &bpts);
+
+void subedgesFF (FFE &ffe, const set<Point *> &bpts);
+
+Face * otherFace (Face *f, Face *g, const Faces &fa);
+
+class SEdge {
+ public:
+  PTR<Point> tail;
+  bool forward, flag;
+  SEdge *twin, *cw;
+
+  SEdge (Point *tail, bool forward, SEdge *twin = 0)
+    : tail(tail), forward(forward), flag(false), twin(twin), cw(0) {}
+  PTR<Point> head () const { return twin->tail; }
+  SEdge * next () const { return twin->cw; }
+  Points loop () const;
+};  
+
+typedef vector<SEdge *> SEdges;
+
+class SFace {
+ public:
+  Face *f;
+  vector<Points> b;
+
+  SFace (Face *f, const Points &pts) : f(f) { b.push_back(pts); }
+};
+
+typedef vector<SFace> SFaces;
 
 Polyhedron * subfaces (Polyhedron *a, bool oneway,
 		       const map<Edge *, Points *> &epsmap,
-		       const map<Face *, vector<FFE> > &femap);
-
-void subfacesAux (Polyhedron *a, bool oneway,
-		  const map<Edge *, Points *> &epsmap,
-		  const map<Face *, vector<FFE> > &femap,
-		  PTriangles &tr);
+		       const map<Face *, vector<FFE>> &femap);
 
 void subfacesT (void *ptr);
 
@@ -1035,82 +1127,114 @@ class SUData {
   Polyhedron *a;
   bool oneway;
   const map<Edge *, Points *> *epsmap;
-  const map<Face *, vector<FFE> > *femap;
-  PTriangles tr;
+  const map<Face *, vector<FFE>> *femap;
+  SFaces sf;
 };
 
 void subfaces (Face *f, bool oneway,
 	       const map<Edge *, Points *> &epsmap,
-	       const map<Face *, vector<FFE> > &femap,
-	       bool perturbed, PTriangles &tr);
+	       const map<Face *, vector<FFE>> &femap, bool perturbed,
+	       SFaces &sf);
 
-HEdges subedges (Face *f, bool oneway,
+SEdges subedges (Face *f, bool oneway,
 		 const map<Edge *, Points *> &epsmap,
-		 const map<Face *, vector<FFE> > &femap,
-		 Polyhedron *a, PVMap &pvmap);
+		 const map<Face *, vector<FFE>> &femap, bool perturbed);
 
-void subedges (HEdge *h, const map<Edge *, Points *> &epsmap,
-	       Polyhedron *a, PVMap &pvmap, set<pair<Vertex *, Vertex *> > &vv);
+void subedgesH (HEdge *h, const map<Edge *, Points *> &epsmap,
+		vector<pair<PTR<Point>, PTR<Point>>> &pp);
 
-void subedges (const Points &pts, bool fflag, bool bflag, Polyhedron *a,
-	       PVMap &pvmap, set<pair<Vertex *, Vertex *> > &vv);
+void subedges (const Points &pts, bool fflag, bool bflag,  
+	       vector<pair<PTR<Point>, PTR<Point>>> &pp);
 
-void setNext (const HEdges &he, int c);
+void subedgesFFE (Face *f, const FFE &ffe, bool oneway,
+		  vector<pair<PTR<Point>, PTR<Point>>> &pp);
 
-class HHEdge {
- public:
-  HEdge *e;
-  bool f;
-  HHEdge (HEdge *e, bool f) : e(e), f(f) {}
-  Vertex * tail () const { return f ? e->tail() : e->head(); }
-  Vertex * head () const { return f ? e->head() : e->tail(); }
-};
-
-typedef vector<HHEdge> HHEdges;
-
-class VertexHHEdgeOrder : public Primitive {
-  Vertex *v;
-  HEdge *e, *f;
+class CCWOrder : public Primitive {
+  Point *o, *a, *b;
   int c;
 
-  int sign () {
-    PV3 eu = v == e->tail() ? e->getU() : - e->getU(),
-    fu = v == f->tail() ? f->getU() : - f->getU(),
-    r = Rdir->get();
-    int es = eu.dot(r).sign(), fs = fu.dot(r).sign();
-    return es == fs ? cross(fu, eu, c).sign() : es;
+  Parameter calculate () {
+    PV3 u = a->get() - o->get(), v = b->get() - o->get(), r = Rdir->get();
+    Parameter ur = u.dot(r), vr = v.dot(r);
+    return ur.sign() != vr.sign() ? ur : cross(u, v, c);
   }
  public:
-  VertexHHEdgeOrder (Vertex *v, HEdge *e, HEdge *f, int c) 
-    : v(v), e(e), f(f), c(c) {}
+  CCWOrder (Point *o, Point *a, Point *b, int c) : o(o), a(a), b(b), c(c) {}
 };
 
-class HHEdgeOrder {
+class SEdgeCWOrder {
  public:
-  HHEdgeOrder (int c) : c(c) {}
-  bool operator() (const HHEdge &e, const HHEdge &f) const {
-    Vertex *u = e.tail(), *v = f.tail();
-    if (u != v)
-      return u < v;
-    if (e.head() == f.head())
-      return f.f < e.f;
-    return VertexHHEdgeOrder(u, e.e, f.e, c) == 1;
+  SEdgeCWOrder (int c) : c(c) {}
+  bool operator() (SEdge *e, SEdge *f) const {
+    Point *et = e->tail, *ft = f->tail;
+    if (et != ft)
+      return et < ft;
+    Point *eh = e->head(), *fh = f->head();
+    return eh == fh ? f->forward < e->forward : CCWOrder(et, eh, fh, c) == -1;
   }
-
+  
   int c;
 };
 
-HEdge * findLoop (HEdge *h);
+class SEdgeHeadOrder {
+ public:
+  bool operator() (SEdge *e, SEdge *f) const {
+    Point *p = e->head(), *q = f->head();
+    return p != q && PointOrderR(p, q) == 1;
+  }
+};
 
-void addInner (HEdge *e, bool oneway, int c, vector<HEdges> &fa);
+SEdges subedgesPP (const vector<pair<PTR<Point>, PTR<Point>>> &pp, int c,
+		   bool perturbed);
 
-bool contains (HEdge *e, int c, Point *p);
+PTR<Point> getPoint (PTR<Point> p, set<PTR<Point>, PointOrderRP> &ps,
+		     map<PTR<Point>, PTR<Point>> &ppmap);
 
-void triangulate (const VVertices &reg, int coord, Triangles &tr);
+void sedges (PTR<Point> t, PTR<Point> h, SEdges &ed);
 
-void triangulate (const HEdges &fa, int c, PTriangles &ptr);
+SEdge * findLoop (SEdge *h);
 
-void deleteFEmap (map<Face *, vector<FFE> > &femap);
+void addInner (SEdge *e, bool oneway, int c, SFaces &sf);
+
+bool contains (SEdge *e, int c, Point *p);
+
+class MFace : public Face {
+  HEdges inner;
+  
+ public:
+  MFace (HEdge *h, TrianglePlane *p, int pc) : Face(h, p, pc) {
+    addLoop(h, true);
+  }
+  void addInner (HEdge *h) { inner.push_back(h); addLoop(h, false); }
+  virtual HEdges boundaryHEdges () const;
+  virtual void triangulate (Triangles &tr);
+};
+
+void triangulate (const vector<Points *> &reg, int coord, Triangles &tr);
+
+void addFace (const SFace &f, Polyhedron *a, PVMap &pvmap);
+
+Vertices loop (const Points &pts, Polyhedron *a, PVMap &pvmap);
+
+bool currentFace (const Vertices &ve, Polyhedron *a);
+
+HEdge * addLoop (const Vertices &ve, Polyhedron *a);
+
+void deleteMaps (map<Edge *, Points *> &epsmap,
+		 map<pair<Face *, Face *>, FFE> &ffemap);
+
+Polyhedron * triangulate (Polyhedron *a);
+
+Triangles triangulate (const Faces &fa);
+
+void triangulateT (void *ptr);
+
+class TRData {
+ public:
+  unsigned int i, is, ie;
+  const Faces *fa;
+  Triangles tr;
+};
 
 bool inSet (bool ina, bool inb, SetOp op);
 
@@ -1122,7 +1246,7 @@ Polyhedron * coalesce (Polyhedron *a);
 
 Polyhedron * coalesceFaces (Polyhedron *a);
 
-vector<set<Face *> > groupFaces (Polyhedron *a);
+vector<set<Face *>> groupFaces (Polyhedron *a);
 
 void coalesceFace (Polyhedron *a, PVMap &pvmap, const set<Face *> &fs);
 
