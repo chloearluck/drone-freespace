@@ -194,23 +194,3 @@ void expandHull (Polyhedron *a, Vertex *v, ConflictGraph &cg, HEdge *h)
 }
 
 #include "io.h"
-
-int main (int argc, char *argv[])
-{
-  if (argc < 2)
-    return 0;
-  ifstream astr(argv[1]);
-  if (!astr.good())
-    return 0;
-  bool perturbed = argc == 2 ? true : *argv[2] != 't';
-  Parameter::enable();
-  Polyhedron *a = readPolyhedronVTK(astr, perturbed),
-    *b = convexHull(a);
-  b->formCells();
-  b->describe();
-  writePolyhedronVTK(b->faces, cout);
-  delete b;
-  delete a;
-  Parameter::disable();
-}
-

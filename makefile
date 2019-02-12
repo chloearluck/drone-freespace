@@ -1,4 +1,4 @@
-CFLAGS = -O3 -std=c++11
+CFLAGS = -g -O3 -std=c++11
 
 COMPILE = g++ $(CFLAGS) -c
 
@@ -72,6 +72,9 @@ delaunay: delaunay.o simplify.o expander2.o poly.o polyhedron.o triangulate.o \
 	triangulate.o io.o object.o acp.o \
 	$(LFLAGS) -odelaunay
 
+path3d.o: path3d.cc path3d.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h 
+	$(COMPILE) path3d.cc
+
 poly_test: poly_test.o acp.o object.o poly.o
 	$(LINK) poly_test.o acp.o object.o poly.o -lmpfr -lpthread -o poly_test
 
@@ -90,6 +93,26 @@ freespace_test: freespace_test.cc freespace.o polyhedron.o \
 	$(LINK) freespace_test.cc freespace.o polyhedron.o \
 	triangulate.o io.o object.o acp.o mink.o simplify.o expander2.o poly.o \
 	$(LFLAGS) -o freespace_test
+
+freespace-graph.o: freespace-graph.cc freespace-graph.h path3d.h hull.h polyhedron.h octree.h rbtree.h object.h \
+	pv.h acp.h geometry3d.h simplify.h
+	$(COMPILE) freespace-graph.cc
+
+freespace-graph_test: freespace-graph_test.cc freespace-graph.o path3d.o hull.o polyhedron.o \
+	triangulate.o io.o object.o acp.o mink.o simplify.o expander2.o poly.o
+	$(LINK) freespace-graph_test.cc freespace-graph.o hull.o path3d.o polyhedron.o \
+	triangulate.o io.o object.o acp.o mink.o simplify.o expander2.o poly.o \
+	$(LFLAGS) -o freespace-graph_test
+
+create_test_example.o: create_test_example.cc hull.h polyhedron.h octree.h rbtree.h object.h \
+  pv.h acp.h geometry3d.h simplify.h
+	$(COMPILE) create_test_example.cc
+
+create_test_example: create_test_example.o hull.o polyhedron.o \
+  triangulate.o io.o object.o acp.o mink.o simplify.o expander2.o poly.o
+	$(LINK) create_test_example.o hull.o polyhedron.o \
+  triangulate.o io.o object.o acp.o mink.o simplify.o expander2.o poly.o \
+	$(LFLAGS) -o create_test_example
 
 clean: 
 	rm -f *.o *~ mink hull delaunay pack cspace poly_test freespace_test *.lp
