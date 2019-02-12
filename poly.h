@@ -33,7 +33,7 @@ pages 37-52, 2012
 namespace acp {
 
 class SubKnot : public Object<Parameter> {
-  PTR<Object<Parameter> > l, r;
+  PTR<Object<Parameter>> l, r;
   unsigned int i, n;
   
   Parameter calculate () {
@@ -46,7 +46,7 @@ public:
 
 class DInt {
  public:
-  PTR<Object<Parameter> > l, u;
+  PTR<Object<Parameter>> l, u;
   unsigned int n;
    
   DInt (Object<Parameter>* l, Object<Parameter>* u, unsigned int n) : l(l), u(u), n(n) {}
@@ -54,13 +54,13 @@ class DInt {
 
 class Root : public Object<Parameter> {
 protected:
-  PTR<Object<PPoly> > p;
+  PTR<Object<PPoly>> p;
 public:
   Root (Object<PPoly> *p) : p(p) {}
-  PTR<Object<PPoly> > getPoly () { return p; }
+  PTR<Object<PPoly>> getPoly () { return p; }
 };
 
-typedef vector<PTR<Root> > Roots;
+typedef vector<PTR<Root>> Roots;
 
 class PolySolver {
   Roots linearRoots (Object<Parameter>* l, Object<Parameter>* u);
@@ -70,7 +70,7 @@ class PolySolver {
   bool descartes1 (vector<DInt> &st, const DInt &i, int v, bool lflag);
   bool descartes2 (vector<DInt> &st, const DInt &i, int v);
   int descartes2int (const DInt &i, int v);
-  PTR<Object<PPoly> > poly;
+  PTR<Object<PPoly>> poly;
   PPoly get () { return poly->get(); }
   PPoly getApprox (double e) { return poly->getApprox(e); }
   Primitive1(Degree, Object<PPoly>*, poly);
@@ -80,8 +80,8 @@ class PolySolver {
   Roots getRoots ();
   Roots getRoots (Object<Parameter>* l, Object<Parameter>* u);
   Roots getRoots (double l, double u) {
-    PTR<Object<Parameter> > pl = new Object<Parameter>(Parameter::constant(l));
-    PTR<Object<Parameter> > pr = new Object<Parameter>(Parameter::constant(u));
+    PTR<Object<Parameter>> pl = new Object<Parameter>(Parameter::constant(l));
+    PTR<Object<Parameter>> pr = new Object<Parameter>(Parameter::constant(u));
     return getRoots(pl, pr);              
   }
 };
@@ -116,7 +116,7 @@ Primitive3(Descartes, Object<PPoly> *, p, Object<Parameter> *, l, Object<Paramet
 Primitive3(Sturm, Object<PPoly> *, p, Object<Parameter> *, l, Object<Parameter> *, u);  
 
 class PolyRoot : public Root {
-  PTR<Object<Parameter> > l, u;
+  PTR<Object<Parameter>> l, u;
   Parameter calculate () {
     const PPoly &q = p->get();
     int slb = q.value(l->get()).sign(); 
@@ -157,7 +157,7 @@ public:
 };   
 
 class CauchyBound : public Object<Parameter> {
-  PTR<Object<PPoly> > p;
+  PTR<Object<PPoly>> p;
   
   Parameter calculate () {
     PPoly q = p->get();
@@ -190,7 +190,7 @@ class Root2PTR : public PTR<Root2> {
 public:
   Root2PTR () {}
   Root2PTR (Root2 *r) : PTR<Root2>(r) {}
-  operator PTR<Object<PV2> > () const;
+  operator PTR<Object<PV2>> () const;
 };
 
 typedef Object<PPoly2> Poly2;
@@ -215,7 +215,7 @@ private:
   class RootBoundary {
   public:
     PV2 I;
-    vector<vector<RootPTR> > v;
+    vector<vector<RootPTR>> v;
   };
 
   /*
@@ -231,7 +231,7 @@ private:
   PV2 polish (PV2 p);
   void newton(RootBoundary &I);
   bool subdivide(RootBoundary &I);
-  std::vector<int> intersections(vector<vector<RootPTR> > &rbv);
+  std::vector<int> intersections(vector<vector<RootPTR>> &rbv);
   int parity(const std::vector<int> &alt);
   void setRoots(RootBoundary &rb);
   RootBoundary splitHoriz(RootBoundary &rb, Parameter c);
@@ -239,8 +239,8 @@ private:
   bool solve(PV2, PV2, PV2, PV2 &);
 };
 
-inline Root2PTR::operator PTR<Object<PV2> > () const {
-  return PTR<Object<PV2> >(operator Root2 *());
+inline Root2PTR::operator PTR<Object<PV2>> () const {
+  return PTR<Object<PV2>>(operator Root2 *());
 }
 
 }

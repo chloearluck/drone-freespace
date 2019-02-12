@@ -28,8 +28,6 @@ class Octree {
 
   typedef vector<Ocelt> Ocelts;
   
-  typedef unsigned int ID;
-  
   bool bboxOverlap (const double *a, const double *b, double s = 0.0) const
   {
     for (int i = 0; i < 3; ++i)
@@ -58,7 +56,7 @@ class Octree {
   }
   
   static Octree * octree (const Ocelts &data, const double *bbox, int nmax,
-			  int dmax, ID d) {
+			  int dmax, unsigned int d) {
     int n = data.size();
     if (n <= nmax || dmax == 0)
       return new Octree(data);
@@ -113,7 +111,7 @@ class Octree {
       }
   }
 
-  void pairs (vector<pair<T, T> > &res, double s = 0.0) const {
+  void pairs (vector<pair<T, T>> &res, double s = 0.0) const {
     if (l) {
       l->pairs(res, s);
       r->pairs(res, s);

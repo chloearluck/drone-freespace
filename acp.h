@@ -165,9 +165,9 @@ class MValue {
   unsigned int p;
 };
 
-typedef unsigned int uint;
+//typedef unsigned int uint;
 
-typedef unsigned long ulong;
+//typedef unsigned long ulong;
 
 unsigned int inverse (unsigned int a, unsigned int n);
 
@@ -250,7 +250,7 @@ class Parameter;
 class EInt;
 
 #define NPrimes 7
-#define NMods 3
+#define NMods 2
 
 /*
 class Mods {
@@ -365,34 +365,36 @@ class Mods {
   static Modder modder[NMods];
   static unsigned long nMods;
   static unsigned long nMixed;
+  static double maxBits;
 
   static void changePrime (unsigned int p);
 
   Mod mod[NMods];
   const bool algebraic;
-  unsigned long bitsA, bitsB;
+  bool constant;
+  double bitsA, bitsB;
 
-  Mods (int start, int it, int up) : algebraic(false) {
+  void noBits () {
+    bitsA = 0;
+    bitsB = 0;
+  }
+
+  Mods (int start, int it, int up) : algebraic(false), constant(false) {
     for (int i = 0; i < NMods; i++) {
       assert(ps[i] == 0);
-      ps[i] = primes[i]; // PRIMES
-      // ps[i] = random32bitPrime();
-      //cerr << "p[" << i << "] = " << ps[i] << endl;
+      // ps[i] = primes[i]; // PRIMES
+      ps[i] = random32bitPrime();
+      // cout << "p[" << i << "] = " << ps[i] << endl;
       modder[i] = Modder(ps[i]);
     }
-    for (int i = 0; i < 45; i++)
-      random();
   }
 
-  Mods (bool algebraic, unsigned long bitsA, unsigned long bitsB) : algebraic(algebraic), bitsA(bitsA), bitsB(bitsB) {
-    static unsigned long maxBits;
-    if (bitsA > maxBits) {
-      //cerr << "maxBits " << bitsA << endl;
+  Mods (bool algebraic, bool constant, double bitsA, double bitsB) : algebraic(algebraic), constant(constant), bitsA(bitsA), bitsB(bitsB) {
+    if (bitsA > maxBits)
       maxBits = bitsA;
-    }
   }
 
-  Mods (double r) : algebraic(false), bitsA(53), bitsB(0) {
+  Mods (double r) : algebraic(false), constant(true), bitsA(53), bitsB(0) {
     for (int i = 0; i < NMods; i++)
       mod[i] = modder[i].mod(r);
   }
@@ -418,29 +420,27 @@ class Mods {
     nMods++;
     if (mixed()) {
       nMixed++;
-      //cerr << (mod[1].a==0) << " nMods " << nMods << " nMixed " << nMixed
-      //   << " bits " << bitsA << endl;
+      cout << (mod[1].a==0) << " nMods " << nMods << " nMixed " << nMixed
+	   << " bits " << bitsA << endl;
     }
-    //if (nMods % 1000000 == 0)
-    //cout << "nMods " << nMods << endl;
   }
 
   bool zero () const {
-    for (int i = 1; i < NMods; i++)
+    for (int i = 0; i < NMods; i++)
       if (mod[i].a != 0)
         return false;
     return true;
   }
 
   Mods operator- () const {
-    Mods m(algebraic, bitsA, bitsB);
+    Mods m(algebraic, constant, bitsA, bitsB);
     for (int i = 0; i < NMods; i++)
       m.mod[i] = -mod[i];
     return m;
   }
   
   Mods operator+ (const Mods &x) const {
-    Mods m(algebraic || x.algebraic,
+    Mods m(algebraic || x.algebraic, constant && x.constant,
 	   std::max(bitsA + x.bitsB, bitsB + x.bitsA), bitsB + x.bitsB);
     for (int i = 0; i < NMods; i++)
       m.mod[i] = mod[i] + x.mod[i];
@@ -459,7 +459,7 @@ class Mods {
   }
 
   Mods operator- (const Mods &x) const {
-    Mods m(algebraic || x.algebraic,
+    Mods m(algebraic || x.algebraic, constant && x.constant,
 	   std::max(bitsA + x.bitsB, bitsB + x.bitsA), bitsB + x.bitsB);
     for (int i = 0; i < NMods; i++)
       m.mod[i] = mod[i] - x.mod[i];
@@ -478,7 +478,8 @@ class Mods {
   }
 
   Mods operator* (const Mods &x) const {
-    Mods m(algebraic || x.algebraic, bitsA + x.bitsA, bitsB + x.bitsB);
+    Mods m(algebraic || x.algebraic,  constant && x.constant,
+	   bitsA + x.bitsA, bitsB + x.bitsB);
     for (int i = 0; i < NMods; i++)
       m.mod[i] = mod[i] * x.mod[i];
     // nMods++;
@@ -493,7 +494,8 @@ class Mods {
   }
 
   Mods operator/ (const Mods &x) const {
-    Mods m(algebraic || x.algebraic, bitsA + x.bitsB, bitsB + x.bitsA);
+    Mods m(algebraic || x.algebraic,  constant && x.constant,
+	   bitsA + x.bitsB, bitsB + x.bitsA);
     for (int i = 0; i < NMods; i++)
       m.mod[i] = mod[i] / x.mod[i];
     // nMods++;
@@ -522,6 +524,8 @@ class MInt {
   }
 
 public:
+  void noBits () { mods.noBits(); } 
+
   static unsigned int curPrecisions[128];
 
   static unsigned int getPrecision () {
@@ -548,7 +552,10 @@ public:
     return i ? *(unsigned int *) i : 0;
   }
 
-  const Mods mods;
+  static unsigned int algebraicId;
+
+  // const Mods mods;
+  Mods mods; // vjm debug
 
   /*
   MInt () : m1(Mod(random(), Mod::p1)), m2(Mod(random(), Mod::p2)),
@@ -615,7 +622,11 @@ class Parameter {
   static const double sentinel;
 
 public:  // DEBUG
-  static double algT, algR;
+static double algT, algR, sumBits;
+static int algI, algP;
+static unsigned long nSign;
+static unsigned int nAZ, nANZ;
+
 private:
 
   static Parameter sqrt (double);
@@ -640,6 +651,8 @@ private:
   Parameter (double x) : l(x) { u.r = x; }
 
 public:
+  void noBits () { u.m->noBits(); }
+
   Parameter (const Parameter &il, const Parameter &iu) {
 #ifdef USE_ASSERT
     assert(il.low() == iu.low());
@@ -715,8 +728,10 @@ private:
   
   static Parameter constant (double x) {
     Parameter p(x);
-    if (MInt::getPrecision() > 53u)
+    if (MInt::getPrecision() > 53u) {
       p.increasePrecision();
+      p.u.m->mods.constant = true; // debug
+    }
     return p;
   }
   
@@ -746,10 +761,7 @@ private:
   }
 
   int sign (bool fail = true) const {
-    static unsigned long nSign;
     nSign++;
-    //if (nSign % 1000000 == 0)
-    //cout << "nSign " << nSign << endl;
     if (high())
       return u.m->sign(fail);
     if (l > 0.0)
@@ -1116,20 +1128,20 @@ class PInt : public MInt {
 
   int sign (bool fail = true) const {
     if (p.l > 0.0) {
-      if (fail && Parameter::algT > 0) {
+      if (fail && Parameter::algT > 0 && MInt::threadId() == MInt::algebraicId) {
         double rat = p.l == p.u.r ? Parameter::algR : p.l/(p.u.r-p.l);
         if (rat < Parameter::algR) {
-          // cerr << "rat " << rat << endl;
+          // cerr << "rat1 " << rat << endl;
           Parameter::algR = rat;
         }
       }
       return 1;
     }
     if (p.u.r < 0.0) {
-      if (fail && Parameter::algT > 0) {
+      if (fail && Parameter::algT > 0 && MInt::threadId() == MInt::algebraicId) {
         double rat = p.l == p.u.r ? Parameter::algR : p.u.r/(p.l-p.u.r);
         if (rat < Parameter::algR) {
-          // cerr << "rat " << rat << endl;
+          // cerr << "rat2 " << rat << endl;
           Parameter::algR = rat;
         }
       }
@@ -1139,17 +1151,12 @@ class PInt : public MInt {
       return 0;
     if (mods.mixed())
       throw MixedModException();
-    static int nAZ;
     if (mods.zero()) {
-      nAZ++;
-      //if (nAZ % 10000 == 0)
-      //cout << "nAZ " << nAZ << endl;
+      Parameter::nAZ++;
+      Parameter::sumBits += mods.bitsA;
       return 0;
     }
-    static int nANZ;
-    nANZ++;
-    //if (nANZ % 100 == 0)
-    // cout << "nANZ " << nANZ << endl;
+    Parameter::nANZ++;
     throw SignException(mods.algebraic);
   }
 
@@ -1248,10 +1255,14 @@ public:
   int sign (bool fail = true) const {
     int su = um.sign();
     if (su == -1) {
-      if (fail && Parameter::algT > 0) {
+      if (mods.mixed() || mods.zero()) {
+	cerr << "nonzero sign with zero mod" << endl;
+	//eps removed this: exit(0);
+      }
+      if (fail && Parameter::algT > 0 && MInt::threadId() == MInt::algebraicId) {
         double rat = mpfr_get_d(um.divide(lm.minus(um, GMP_RNDD), GMP_RNDU).m, GMP_RNDU);
         if (rat < Parameter::algR) {
-          // cerr << "rat " << rat << endl;
+          // cerr << "rat3 " << rat << endl;
           Parameter::algR = rat;
         }
       }
@@ -1259,10 +1270,14 @@ public:
     }
     int sl = lm.sign();
     if (sl == 1) {
-      if (fail && Parameter::algT > 0) {
+      if (mods.mixed() || mods.zero()) {
+	cerr << "nonzero sign with zero mod" << endl;
+	//exit(0);
+      }
+      if (fail && Parameter::algT > 0 && MInt::threadId() == MInt::algebraicId) {
         double rat = mpfr_get_d(lm.divide(um.minus(lm, GMP_RNDU), GMP_RNDU).m, GMP_RNDU);
         if (rat < Parameter::algR) {
-          // cerr << "rat " << rat << endl;
+          // cerr << "rat4 " << rat << endl;
           Parameter::algR = rat;
         }
       }
@@ -1346,7 +1361,8 @@ inline MInt* MInt::make (unsigned int precision, const MInt *m) {
   }
 }
 
-inline Mods::Mods (const Parameter &p) : algebraic(p.lb()<p.ub()), bitsA(53), bitsB(0) {
+inline Mods::Mods (const Parameter &p)
+  : algebraic(p.lb()<p.ub()), constant(false), bitsA(53), bitsB(0) {
   //inline Mods::Mods (const Parameter &p) : algebraic(p.lb()<p.ub()) {
   double l = p.lb(), u = p.ub();
   if (l == u)
@@ -1357,7 +1373,8 @@ inline Mods::Mods (const Parameter &p) : algebraic(p.lb()<p.ub()), bitsA(53), bi
       mod[i] = Mod(random() % ps[i], ps[i]);
 }
 
-inline Mods::Mods (const MValue &l, const MValue &u) : algebraic(l != u), bitsA(53), bitsB(0) {
+inline Mods::Mods (const MValue &l, const MValue &u)
+  : algebraic(l != u), constant(false), bitsA(53), bitsB(0) {
   //inline Mods::Mods (const MValue &l, const MValue &u) : algebraic(l != u) {
   if (l != u)
     for (int i = 0; i < NMods; i++)

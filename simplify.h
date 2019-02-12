@@ -106,9 +106,7 @@ class PlanePoint : public Point {
     return  q - ((q.dot(n) + p->get().k)/n.dot(n))*n;
   }
  public:
-  PlanePoint (Plane *p, Point *a) : p(p), a(a) {
-    ps.insert(p->getid());
-  }
+  PlanePoint (Plane *p, Point *a) : p(p), a(a) {}
 };
 
 class LinePoint : public Point {
@@ -119,11 +117,7 @@ class LinePoint : public Point {
     return tp + (u.dot(ap - tp)/u.dot(u))*u;
   }
  public:
-  LinePoint (Point *a, Point *t, Point *h) : a(a), t(t), h(h) {
-    set<ID> psth = intersection(t->getps(), h->getps());
-    for (set<ID>::iterator i = psth.begin(); i != psth.end(); ++i)
-      ps.insert(*i);
-  }
+  LinePoint (Point *a, Point *t, Point *h) : a(a), t(t), h(h) {}
 };
 
 class LineLinePoint : public Point {
@@ -138,11 +132,7 @@ class LineLinePoint : public Point {
   }
  public:
   LineLinePoint (Point *a, Point *b, Point *c, Point *d)
-    : a(a), b(b), c(c), d(d) {
-    set<ID> psab = intersection(a->getps(), b->getps());
-    for (set<ID>::iterator i = psab.begin(); i != psab.end(); ++i)
-      ps.insert(*i);
-  }
+    : a(a), b(b), c(c), d(d) {}
 };
 
 void simplify2 (Polyhedron *a, double d, bool opt2);
@@ -228,7 +218,7 @@ void smallFeaturesT (void *ptr);
 class SFData {
  public:
   unsigned int i, is, ie;
-  vector<pair<Face *, Face *> > *ff;
+  vector<pair<Face *, Face *>> *ff;
   double d;
   VPMap *vpmap;
   FeatureSet fs;

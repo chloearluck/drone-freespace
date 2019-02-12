@@ -252,7 +252,7 @@ Triangle triangle (Vertex2 *a, Vertex2 *b, Vertex2 *c, bool flag)
 
 void deleteVertices (Vertices2 &vertices)
 {
-  for (ID i = 0; i < vertices.size(); ++i) {
+  for (unsigned int i = 0; i < vertices.size(); ++i) {
     vector<Edge2 *> edges;
     Edge2 *e = vertices[i]->edge, *e0 = e;
     do {
@@ -260,7 +260,7 @@ void deleteVertices (Vertices2 &vertices)
       e = e->next;
     }
     while (e != e0);
-    for (ID j = 0; j < edges.size(); ++j)
+    for (unsigned int j = 0; j < edges.size(); ++j)
       delete edges[j];
     delete vertices[i];
   }

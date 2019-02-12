@@ -39,10 +39,16 @@ bool Parameter::penabled = false;
 unsigned int MInt::curPrecisions[128] = { 53u };
 unsigned int MInt::threadIds[128];
 vector<MInt*> MInt::mints[128];
+unsigned int MInt::algebraicId = 0u;
 
-double Parameter::algT;
+double Parameter::algT = 1e-13;
 double Parameter::algR;
-
+double Parameter::sumBits = 0.0;
+int Parameter::algI = -1;
+int Parameter::algP;
+unsigned long Parameter::nSign = 0;
+unsigned int Parameter::nAZ = 0;
+unsigned int Parameter::nANZ = 0;
 Parameter Parameter::sqrt () const
 {
   if (high())
@@ -122,6 +128,7 @@ unsigned int Mods::ps[NMods];
 Modder Mods::modder[NMods];
 unsigned long Mods::nMods;
 unsigned long Mods::nMixed;
+double Mods::maxBits = 0;
 
   Mods initializeMods(0, 0, 0);
 
@@ -129,8 +136,8 @@ void Mods::changePrime (unsigned int p) {
   cout << "changePrime" << endl;
   for (int i = 0; i < NMods; i++)
     if (p == ps[i]) {
-      ps[i] = primes[primeIndex]; // PRIMES
-      // ps[i] = random32bitPrime();
+      // ps[i] = primes[primeIndex]; // PRIMES
+      ps[i] = random32bitPrime();
       cout << "changeprime " << ps[i] << endl;
       modder[i] = Modder(ps[i]);
       primeIndex = (primeIndex + 1) % NPrimes;
@@ -272,10 +279,8 @@ bool isPrime (unsigned int p) {
 }
 
 unsigned int random32bitPrime () {
-  static unsigned int nRandom;
   while (true) {
     unsigned int p = random();
-    cout << "random" << ++nRandom << endl;
     p |= (1 << 31);
     if (!isPrime(p))
       continue;

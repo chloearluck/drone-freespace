@@ -28,6 +28,10 @@
 #include "pv.h"
 #include <map>
 #include <limits.h>
+#include<typeinfo>
+#include <sys/time.h>
+
+double getTime (); 
 
 namespace acp {
   
@@ -81,7 +85,6 @@ class BaseObject : public RefCnt {
 protected:
   static unsigned int deltaPrecision;
   static unsigned int maxPrecision;
-  static unsigned int algebraicId;
   static bool throwSignExceptions[128];
 
   static unsigned int getPrecision () { return MInt::getPrecision(); }
@@ -89,6 +92,9 @@ protected:
 
 public:
   static bool usePrecisionException;
+
+  static unsigned int nAlg, nAmb, nAmbNZ, nHomo;
+  static double minHomo, maxWidth, tHom;
 
   static bool & throwSignException () {
     void *v = pthread_getspecific(hsekey);
@@ -146,9 +152,15 @@ public:
 
   class PP {
   public:
-    P p;
+    P p[2];
     double t;
     PP () : t(0) {}
+    ~PP () {
+      for (int i = 0; i < 2; i++)
+	for (int j = 0; j < p[i].size(); j++)
+	  if (p[i][j].high())
+	    delete p[i][j].u.m;
+    }
   };
 
 private:
@@ -176,22 +188,24 @@ public:
         assert(0);
       }
     }
-
+    
     if (constant)
       pp = (PP*)1;
   }
-
+  
   ~Object () { 
     for (int i = 0; i < p.size(); i++)
       if (p[i].high())
         delete p[i].u.m;
     if (pp != 0 && pp != (PP*)1)
-      delete pp;
+      delete[] pp;
   }
   
   int precision () const { return p.size() == 0 ? 0 : p[0].precision(); }
-  bool uninitialized () const { return p.size() == 0 ? 0 : p[0].uninitialized(); }
-
+  bool uninitialized () const {
+    return p.size() == 0 ? 0 : p[0].uninitialized();
+  }
+  
   bool input () {
     if (p.size() == 0)
       return false;
@@ -200,7 +214,7 @@ public:
         return false;
     return true;
   }
-
+  
   P getCurrentP () const {
     P q = p;
     if (MInt::getPrecision() > 53u) {
@@ -213,10 +227,10 @@ public:
           q[i].u.m = MInt::make(precObject, q[i].u.m);
       }
     }
-
+    
     return q;
   }
-
+  
   P get () {
     try {
       pthread_mutex_lock(&mutex);
@@ -233,56 +247,79 @@ public:
       throw p;
     }
   }
-
+  
 private:
   P get1 () {
-    if (Parameter::algT > 0 && MInt::threadId() == algebraicId && pp != (PP*)1) {
+    if (Parameter::algI >= 0 && MInt::threadId() == MInt::algebraicId && pp != (PP*)1) {
+      double algT = Parameter::algT;
+      int algI = Parameter::algI;
+      int algP = Parameter::algP;
       if (input()) {
-        if (pp == 0 || 
-            (pp->t == -1 && Parameter::algR != -1) ||
-            pp->p[0].precision() < MInt::getPrecision()) {
-          if (pp == 0)
-            pp = new PP;
-          pp->p = p;
-          for (int i = 0; i < pp->p.size(); i++)
-            pp->p[i] = Parameter::constant(randomNumber(-1, 1));
-	  if (pp->p[0].high())
-	    for (int i = 0; i < pp->p.size(); ++i)
-	      pp->p[i].u.m = pp->p[i].u.m->clone();
-          pp->t = 0;
+        if (pp == 0 || pp[0].p[0][0].precision() < MInt::getPrecision()) {
+	  if (pp != 0)
+	    delete[] pp;
+	  pp = new PP[2];
+	  for (int ipp = 0; ipp < 2; ipp++) {
+	    pp[ipp].p[0] = p;
+	    for (int i = 0; i < pp[ipp].p[0].size(); i++)
+	      pp[ipp].p[0][i] = Parameter::constant(randomNumber(-1, 1));
+	    if (pp[ipp].p[0][0].high())
+	      for (int i = 0; i < pp[ipp].p[0].size(); ++i)
+		pp[ipp].p[0][i].u.m = pp[ipp].p[0][i].u.m->clone();
+	    pp[ipp].t = 0;
+	  }
         }
 
-        double algT = Parameter::algT;
-        Parameter::algT = 0;
+        Parameter::algI = -1;
         P q = get1();
-        Parameter::algT = algT;
-        if (Parameter::algR != -1) {
+        Parameter::algI = algI;
+        if (Parameter::algP == 0) {
           for (int i = 0; i < p.size(); i++)
-            if (pp->p[i].sign() > 0)
-              q[i] = q[i].interval(q[i] + pp->p[i] * Parameter::algT);
+            if (pp[algI].p[0][i].sign() > 0)
+              q[i] = q[i].interval(q[i] + pp[algI].p[0][i] * algT);
             else
-              q[i] = (q[i] + pp->p[i] * Parameter::algT).interval(q[i]);
-          pp->t = Parameter::algT;
+              q[i] = (q[i] + pp[algI].p[0][i] * algT).interval(q[i]);
         }
         else {
           for (int i = 0; i < p.size(); i++)
-            q[i] = q[i] + pp->p[i] * Parameter::algT;
-          pp->t = -1;
+            q[i] = q[i] + pp[algI].p[0][i] * algT;
         }
         return q;
       }
       else { // not input
-        if (pp != 0 && 
-            (Parameter::algR != -1 ? pp->t == Parameter::algT : pp->t == -1))
-          return pp->p;
+        if (pp != 0 &&
+	    ((algP == 0 && (pp[algI].t == -algT || pp[algI].t == algT)) ||
+	     (algP == 1 && pp[algI].t == algT)))
+          return pp[algI].p[algP];
         if (pp == 0)
-          pp = new PP;
-        pp->p = calculate();
-	if (pp->p[0].high())
-	  for (int i = 0; i < pp->p.size(); ++i)
-	    pp->p[i].u.m = pp->p[i].u.m->clone();
-        pp->t = Parameter::algR != -1 ? Parameter::algT : -1;
-        return pp->p;
+          pp = new PP[2];
+        pp[algI].p[algP] = calculate();
+	if (pp[algI].p[algP][0].high())
+	  for (int i = 0; i < pp[algI].p[algP].size(); ++i) {
+	    pp[algI].p[algP][i].u.m = pp[algI].p[algP][i].u.m->clone();
+	    if (algI == 1 && algP == 1) {
+	      Parameter d0 = pp[0].p[algP][i] - p[i];
+	      Parameter d1 = pp[1].p[algP][i] - p[i];
+	      int s0 = d0.sign();
+	      int s1 = d1.sign();
+	      assert((s0 == 0) == (s1 == 0));
+	      if (s0 != 0) {
+		++nHomo;
+		double h = s0 > 0 ? d0.lb() : -d0.ub();
+		if (h < minHomo)
+		  minHomo = h;
+		h = s1 > 0 ? d1.lb() : -d1.ub();
+		if (h < minHomo)
+		  minHomo = h;
+	      }
+	      else
+		assert(p[i].sign(false) == 0 || p[i].u.m->mods.constant);
+	    }
+	  }
+
+        pp[algI].t = algP == 0 ? -algT : algT;
+
+        return pp[algI].p[algP];
       }
     }
 
@@ -308,6 +345,9 @@ private:
       P q = p;
       for (int i = 0; i < p.size(); i++)
         q[i].increasePrecision();
+      if (pp == (PP*)1)
+	for (int i = 0; i < p.size(); i++)
+	  q[i].u.m->mods.constant = true;
       return q;
     }
 
@@ -402,6 +442,8 @@ class Primitive : public BaseObject {
 
   virtual int sign () { return calculate().sign(); }
 public:
+  static double tMod;
+
   operator int () {
     if (MInt::getPrecision() > 53u || throwSignException())
       return sign();
@@ -411,21 +453,31 @@ public:
     catch (SignException se) {}
     setPrecision(106u);
     while (MInt::getPrecision() <= maxPrecision) {
+      double t0;
       try {
+	t0 = getTime();
         int s = sign();
+	if (MInt::getPrecision() == 106u)
+	  tMod += getTime() - t0;
         MInt::setPrecision(53u);
         return s;
       }
       catch (unsigned int p) {
+	if (MInt::getPrecision() == 106u)
+	  tMod += getTime() - t0;
         Mods::changePrime(p);
       }
       catch (SignException se) {
+	if (MInt::getPrecision() == 106u)
+	  tMod += getTime() - t0;
         if (MInt::getPrecision() == 106u && se.algebraic) {
           pthread_mutex_lock(&algM);
-	  algebraicId = MInt::threadId();
-          bool a1 = algebraicIdentity();
-          bool a2 = algebraicIdentity();
-	  algebraicId = 0u;
+	  MInt::algebraicId = MInt::threadId();
+	  double t0 = getTime();
+          bool a1 = algebraicIdentity(0);
+          bool a2 = algebraicIdentity(1);
+	  tHom += getTime() - t0;
+	  MInt::algebraicId = 0u;
           pthread_mutex_unlock(&algM);
           if (a1 != a2)
             throw MixedHomotopyException();
@@ -446,7 +498,10 @@ public:
     return 0;
   }
 
-  bool algebraicIdentity () {
+  bool algebraicIdentity (int algI) {
+    ++nAlg;
+    //return false;
+
     bool fail106 = true;
 
     if (!fail106) {
@@ -502,8 +557,13 @@ public:
       MInt::setPrecision(106u);
       return false;
     }
+    ++nAmb;
+
+#ifdef SET_ALGT
     Parameter::algT = 1e-62;
+    // Parameter::algT = 1e-48; // vjm debug
     Parameter::algR = 1e56;
+    // Parameter::algR = 1; // vjm debug
     throwSignException() = true;
     try {
       calculate();
@@ -515,29 +575,57 @@ public:
     //cerr << "algR " << Parameter::algR << endl;
     Parameter::algT *= Parameter::algR / 10;  // larger but conservative perturbation
     //cerr << "algT " << Parameter::algT << endl;
+    
+    static double algTmin = 1e100;
+    if (Parameter::algT < algTmin) {
+      cout << "algTmin " << Parameter::algT << endl;
+      algTmin = Parameter::algT;
+    }
+#endif
+
+    // eps debug
+    // Parameter::algT = 1.001 * 1e-62;
+    Parameter::algI = algI;
     while (true) // hopefully only once
       try {
-        Parameter::algR = 1;
         calculate();
         break;
       } catch (SignException se) {
-      cerr << "algT shrunk to " << Parameter::algT << endl;
+      //cerr << "algT shrunk to " << Parameter::algT << endl;
       Parameter::algT /= 10;
     }
-    Parameter::algR = -1; // signal final get
+
+    // eps debug 
+    /*
+    sf = p.sign(false);
+    Parameter::algT = 0;
+    Parameter::algR = 0;
+    throwSignException() = false;
+    MInt::setPrecision(106u);
+    return sf == 0;
+    */
+
+    Parameter::algP = 1; // signal final get
     try {
       p = calculate();
     } catch (SignException se) {
       cerr << "signAlgebraic:  impossible" << endl;
       assert(0);
     }
-    Parameter::algT = 0;
-    Parameter::algR = 0;
+    Parameter::algI = -1;
+    Parameter::algP = 0;
     //cout << "interval " << p[0].intervalWidth() << " "
     //   << p[0].lb() << " " << p[0].ub() << endl;
     throwSignException() = false;
     sf = p.sign(false);
+    if (sf == 0) {
+      double w = p.intervalWidth();
+      if (w > maxWidth)
+	maxWidth = w;
+    }
     MInt::setPrecision(106u);
+    if (sf != 0)
+      ++nAmbNZ;
     return sf == 0;
   }
 };
@@ -555,6 +643,8 @@ template<class P>
 int Object<P>::sign (int i) {
   return IthCoordinate<P>(this, i);
 }
+
+void report ();
 
 }
 

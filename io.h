@@ -5,7 +5,7 @@
 #include <fstream>
 #include <sstream>
 
-Polyhedron * readPolyhedron (istream &istr, bool perturbed = true);
+Polyhedron * readPolyhedron (istream &istr, bool perturb = true);
 
 void readCells (istream &istr, Polyhedron *a);
 
@@ -13,13 +13,13 @@ Cell * readCell (istream &istr, Polyhedron *a);
 
 Shell * readShell (istream &istr, Polyhedron *a);
 
-typedef pair<Vertex *, ID> VIPair;
+typedef pair<Vertex *, unsigned int> VIPair;
 
-typedef map<Vertex *, ID> VIMap;
+typedef map<Vertex *, unsigned int> VIMap;
 
-typedef pair<Face *, ID> FIPair;
+typedef pair<Face *, unsigned int> FIPair;
 
-typedef map<Face *, ID> FIMap;
+typedef map<Face *, unsigned int> FIMap;
 
 void writePolyhedron (Polyhedron *a, ostream &ostr);
 
@@ -27,7 +27,7 @@ void writeCells (Polyhedron *a, ostream &ostr);
 
 void writeShell (Shell *s, FIMap &fimap, ostream &ostr);
 
-Polyhedron * readPolyhedronVTK (istream &istr, bool perturbed = true);
+Polyhedron * readPolyhedronVTK (istream &istr, bool perturb = true);
 
 void skipComments (istream &istr);
 
@@ -37,10 +37,10 @@ void writePolyhedronVTK (const Faces &fa, ostream &ostr);
 
 int getPoint (VIMap &vimap, vector<PV3> &pts, Vertex *v);
 
-void outputVTK (const vector<PV3> &pts, const vector<ID> &data,
+void outputVTK (const vector<PV3> &pts, const vector<unsigned int> &data,
 		int ptype, ostream &ostr);
 
-Polyhedron * readPolyhedronOBJ (istream &istr, bool perturbed = true);
+Polyhedron * readPolyhedronOBJ (istream &istr, bool perturb = true);
 
 bool readPointOBJ (istream &istr, double &x, double &y, double &z);
 

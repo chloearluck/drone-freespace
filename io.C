@@ -1,15 +1,15 @@
 #include "io.h"
 
-Polyhedron * readPolyhedron (istream &istr, bool perturbed)
+Polyhedron * readPolyhedron (istream &istr, bool perturb)
 {
-  Polyhedron *a = new Polyhedron(perturbed);
+  Polyhedron *a = new Polyhedron;
   int nv, nf;
   istr >> nv >> nf;
   Parameter::disable();
   for (int i = 0; i < nv; ++i) {
     double x, y, z;
     istr >> x >> y >> z;
-    a->getVertex(x, y, z);
+    a->getVertex(new Point(x, y, z, perturb));
   }
   Parameter::enable();
   for (int i = 0; i < nf; ++i) {
@@ -114,9 +114,9 @@ void writeShell (Shell *s, FIMap &fimap, ostream &ostr)
   ostr << endl;
 }
 
-Polyhedron * readPolyhedronVTK (istream &istr, bool perturbed)
+Polyhedron * readPolyhedronVTK (istream &istr, bool perturb)
 {
-  Polyhedron *a = new Polyhedron(perturbed);
+  Polyhedron *a = new Polyhedron;
   skipComments(istr);
   string dummy;
   do {
@@ -129,7 +129,7 @@ Polyhedron * readPolyhedronVTK (istream &istr, bool perturbed)
   for (int i = 0; i < nv; ++i) {
     double x, y, z;
     istr >> x >> y >> z;
-    a->getVertex(x, y, z);
+    a->getVertex(new Point(x, y, z, perturb));
   }
   Parameter::enable();
   int nf;
@@ -152,7 +152,7 @@ void skipComments (istream &istr)
     istr.getline(s, 1000);
 }
 
-void writePolyhedronVTK (const Polyhedron *a, ostream &ostr)
+void writePolyhedronVTK (Polyhedron *a, ostream &ostr)
 {
   writePolyhedronVTK(a->faces, ostr);
 }
@@ -160,7 +160,7 @@ void writePolyhedronVTK (const Polyhedron *a, ostream &ostr)
 void writePolyhedronVTK (const Faces &fa, ostream &ostr)
 {
   vector<PV3> pts;
-  vector<ID> data;
+  vector<unsigned int> data;
   VIMap vimap;
   for (Faces::const_iterator f = fa.begin(); f != fa.end(); ++f) {
     Vertices ve = (*f)->getBoundary()->loop();
@@ -182,7 +182,7 @@ int getPoint (VIMap &vimap, vector<PV3> &pts, Vertex *v)
   return k;
 }
 
-void outputVTK (const vector<PV3> &pts, const vector<ID> &data, int ptype,
+void outputVTK (const vector<PV3> &pts, const vector<unsigned int> &data, int ptype,
 		ostream &ostr)
 {
   int nv = pts.size();
@@ -215,15 +215,15 @@ void outputVTK (const vector<PV3> &pts, const vector<ID> &data, int ptype,
   }
 }
 
-Polyhedron * readPolyhedronOBJ (istream &istr, bool perturbed)
+Polyhedron * readPolyhedronOBJ (istream &istr, bool perturb)
 {
-  Polyhedron *a = new Polyhedron(perturbed);
+  Polyhedron *a = new Polyhedron;
   Vertices ve;
   Parameter::disable();
   while (istr.peek() != EOF) {
     double x, y, z;
     if (readPointOBJ(istr, x, y, z))
-      ve.push_back(a->getVertex(x, y, z));
+      ve.push_back(a->getVertex(new Point(x, y, z, perturb)));
     else
       break;
   }
@@ -297,7 +297,7 @@ void addTriangleOBJ (Polyhedron *a, Vertex *u, Vertex *v, Vertex *w)
 void writePolyhedronVTK (const HFaces &fa, ostream &ostr)
 {
   vector<PV3> pts;
-  vector<ID> data;
+  vector<unsigned int> data;
   VIMap vimap;
   for (HFaces::const_iterator f = fa.begin(); f != fa.end(); ++f) {
     Face *ff = (*f)->getF();
@@ -316,12 +316,12 @@ string outi (int i)
   return string("out") + std::to_string(i) + ".vtk";
 }
 
-void plines (const vector<vector<PV3> > &lines, int i)
+void plines (const vector<vector<PV3>> &lines, int i)
 {
   vector<PV3> pts;
-  vector<ID> data;
+  vector<unsigned int> data;
   int k = 0;
-  for (vector<vector<PV3> >::const_iterator l = lines.begin(); l != lines.end(); ++l) {
+  for (vector<vector<PV3>>::const_iterator l = lines.begin(); l != lines.end(); ++l) {
     data.push_back(l->size());
     for (vector<PV3>::const_iterator p = l->begin(); p != l->end(); ++p, ++k) {
       pts.push_back(*p);
@@ -370,15 +370,6 @@ void pfaces (const HFaces &hfaces, int i)
   writePolyhedronVTK(hfaces, ostr);
 }
 
-void pfaces (ID pid, const Faces &faces, int i)
-{
-  Faces fa;
-  for (Faces::const_iterator f = faces.begin(); f != faces.end(); ++f)
-    if ((*f)->getP()->getid() == pid)
-      fa.push_back(*f);
-  pfaces(fa, i);
-}
-
 void pcells (Polyhedron *a)
 {
   if (a->cells.empty())
@@ -411,7 +402,7 @@ void pedges (const Edges &edges, ostream &ostr)
 {
   VIMap vidmap;
   vector<PV3> pts;
-  vector<ID> data;
+  vector<unsigned int> data;
   for (Edges::const_iterator e = edges.begin(); e != edges.end(); ++e) {
     data.push_back(2);
     data.push_back(getPoint(vidmap, pts, (*e)->getT()));
@@ -451,11 +442,40 @@ void pedge (HEdge *e)
   pedge(e->getE());
 }
 
+int getPoint (map<Point *, unsigned int> &pimap, vector<PV3> &pts, Point *p)
+{
+  map<Point *, unsigned int>::iterator iter = pimap.find(p);
+  if (iter != pimap.end())
+    return iter->second;
+  int k = pts.size();
+  pts.push_back(p->getApprox());
+  pimap.insert(pair<Point *, unsigned int>(p, k));
+  return k;
+}
+
+void pedges (const SEdges &edges, ostream &ostr)
+{
+  map<Point *, unsigned int> pidmap;
+  vector<PV3> pts;
+  vector<unsigned int> data;
+  for (SEdges::const_iterator e = edges.begin(); e != edges.end(); ++e) {
+    data.push_back(2);
+    data.push_back(getPoint(pidmap, pts, (*e)->tail));
+    data.push_back(getPoint(pidmap, pts, (*e)->head()));
+  }
+  outputVTK(pts, data, 2, ostr);
+}
+
+void pedges (const SEdges &edges)
+{
+  pedges(edges, cout);
+}
+
 void pvertices (const Vertices &ve, int i)
 {
   VIMap vidmap;
   vector<PV3> pts;
-  vector<ID> data;
+  vector<unsigned int> data;
   data.push_back(ve.size());
   for (Vertices::const_iterator v = ve.begin(); v != ve.end(); ++v)
     data.push_back(getPoint(vidmap, pts, *v));

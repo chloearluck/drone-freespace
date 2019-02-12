@@ -3,7 +3,7 @@
 
 #include "polyhedron.h"
 
-Polyhedron * minkowskiSum (Polyhedron *a, Polyhedron *b);
+Polyhedron * minkowskiSum (Polyhedron *a, Polyhedron *b, bool check = false);
 
 Shells minkowskiShells (Polyhedron *a, Polyhedron *b, const Shells &sh);
 
@@ -14,12 +14,13 @@ void minkowskiShellsT (void *ptr);
 class MSData {
  public:
   unsigned int i, is, ie;
-  Polyhedron *a, *b;
+  Polyhedron *a;
+  Octree<Face *> *octree;
   const Shells *sh;
   Shells res;
 };
 
-bool minkowskiShell (Polyhedron *a, Polyhedron *b, Shell *s);
+bool minkowskiShell (Polyhedron *a, Octree<Face *> *octree, Shell *s);
 
 class UnitVector : public Point {
   Point *a;
@@ -119,7 +120,7 @@ class BSPElt {
     Face *f;
   } d;
   HEdges ed;
-  ID l;
+  unsigned int l;
   double bbox[6];
   bool convex;
 };
@@ -127,9 +128,10 @@ class BSPElt {
 typedef vector<BSPElt> BSPElts;
 
 void BSPTree (BSPElts &aelts, BSPElts &belts, BSPElts &ea, BSPElts &eb,
-	      int nmax = 40, int dmax = 20, ID c = 0u);
+	      int nmax = 40, int dmax = 20, unsigned int c = 0u);
 
-void BSPPartition (BSPElts &elts, Point *r, ID c, BSPElts &elts1, BSPElts &elts2);
+void BSPPartition (BSPElts &elts, Point *r, unsigned int c, BSPElts &elts1,
+		   BSPElts &elts2);
 
 void BSPLeaf (const BSPElts &aelts, const BSPElts &belts, BSPElts &ea, 
 	      BSPElts &eb);
@@ -149,17 +151,29 @@ class MinkHullFace {
   MinkHullFace *prev, *next;
 };
 
-class DegenerateConflict : public Primitive {
+class DegenerateConflict1 : public Primitive {
   Point *a, *b, *c, *d;
 
   Parameter calculate () {
     PV3 u = b->get() - a->get(), v = c->get() - a->get(),
       w = d->get() - a->get(), x = u.cross(v);
-    Parameter k = x.tripleProduct(v, w);
-    return k.sign() == 1 ? k : x.tripleProduct(w, u);
+    return x.tripleProduct(v, w);
   }
  public:
-  DegenerateConflict (Point *a, Point *b, Point *c, Point *d)
+  DegenerateConflict1 (Point *a, Point *b, Point *c, Point *d)
+    : a(a), b(b), c(c), d(d) {}
+};
+
+class DegenerateConflict2 : public Primitive {
+  Point *a, *b, *c, *d;
+
+  Parameter calculate () {
+    PV3 u = b->get() - a->get(), v = c->get() - a->get(),
+      w = d->get() - a->get(), x = u.cross(v);
+    return x.tripleProduct(w, u);
+  }
+ public:
+  DegenerateConflict2 (Point *a, Point *b, Point *c, Point *d)
     : a(a), b(b), c(c), d(d) {}
 };
 
@@ -177,18 +191,26 @@ void deleteHull (MinkHullFace *hull);
 
 bool convexOrder (const HEdges &hedges);
 
-typedef map<pair<Vertex *, Vertex *>, Vertex *> VVVMap;
+Polyhedron * convolution (Polyhedron *a, Polyhedron *b, bool check);
 
-Polyhedron * convolution (Polyhedron *a, Polyhedron *b);
+typedef map<pair<Point *, Point *>, Point *> PPPMap;
 
-void sumVF (Polyhedron *a, Polyhedron *b, bool avflag, VVVMap &vmap,
-	    Polyhedron *con);
+class SF {
+ public:
+  PTR<Point> a, b, c, d;
+
+  SF (Point *a, Point *b, Point *c, Point *d = 0) : a(a), b(b), c(c), d(d) {}
+};
+
+typedef vector<SF> SFs;
+
+void sumVF (Polyhedron *a, Polyhedron *b, bool avflag, PPPMap &pmap, SFs &sfs);
 
 void convexVertices (Polyhedron *a, BSPElts &elts);
 
 bool compatibleVF (HEdges &ed, Face *f);
 
-void sumVF (Vertex *v, Face *f, bool avflag, VVVMap &vmap, Polyhedron *con);
+void sumVF (Vertex *v, Face *f, bool avflag, PPPMap &pmap, SFs &sfs);
 
 class InnerProductEF : public Primitive {
   HEdge *e;
@@ -201,9 +223,9 @@ class InnerProductEF : public Primitive {
   InnerProductEF (HEdge *e, Face *f) : e(e), f(f) {}
 };
 
-Vertex * sumVV (Vertex *a, Vertex *b, bool aflag, VVVMap &vmap, Polyhedron *con);
+Point * sumPP (Point *a, Point *b, bool aflag, PPPMap &pmap);
 
-void sumEE (Polyhedron *a, Polyhedron *b, VVVMap &vmap, Polyhedron *con);
+void sumEE (Polyhedron *a, Polyhedron *b, PPPMap &pmap, SFs &sfs);
 
 void convexEdges (Polyhedron *a, BSPElts &elts);
 
@@ -222,6 +244,12 @@ class ConvexEdge : public Primitive {
 
 bool compatibleEE (Edge *e, Edge *f, bool &aflag);
 
-void sumEE (Edge *e, Edge *f, bool aflag, VVVMap &vmap, Polyhedron *con);
+void sumEE (Edge *e, Edge *f, bool aflag, PPPMap &pmap, SFs &sfs);
+
+Polyhedron * convolution (const SFs &sfs, bool check);
+
+PVMap pvMap (const SFs &sfs, Polyhedron *c);
+
+Vertices vertices (const SF &s, Polyhedron *a, PVMap &pvmap);
 
 #endif

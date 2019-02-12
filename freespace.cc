@@ -225,7 +225,7 @@ Polyhedron * trapezoidOuterApprox(OuterApproxFace t) {
   bool topIsTriangle = (t.top2 == NULL);
   bool bottomIsTriangle = (t.bottom2 == NULL);
 
-  Polyhedron *a = new Polyhedron(true);
+  Polyhedron *a = new Polyhedron;
 
   Vertex * tp = a->getVertex(t.top1->p);
   Vertex * tq = topIsTriangle? tp : a->getVertex(t.top2->p);
@@ -457,8 +457,10 @@ Polyhedron * rotate(Polyhedron * p) {
   PVMap pvmap;
   for (Vertices::const_iterator v = p->vertices.begin(); v != p->vertices.end(); ++v)
     pvmap.insert(PVPair((*v)->getP(), a->getVertex(new RotationPoint((*v)->getP(), sin_cos_alpha))));
-  for (Faces::const_iterator f = p->faces.begin(); f != p->faces.end(); ++f)
-    a->addTriangle(*f, pvmap);
+  for (Faces::const_iterator f = p->faces.begin(); f != p->faces.end(); ++f) {
+    Vertices ve = (*f)->getBoundary()->loop();
+    a->addTriangle(ve[0]->getP(), ve[1]->getP(), ve[2]->getP(), pvmap);
+  }
   return a;
 }
 
@@ -526,14 +528,15 @@ Polyhedron * FreeSpace::generateSweep(std::vector<OuterApproxFace> & trapezoids)
     polyList.push_back(trapezoidOuterApprox(trapezoids[i]));
 
   cout<<"found polyhedral outer approximations of "<<polyList.size()<<" trapezoids"<<endl;
-  Polyhedron * outerApproxShell = multiUnion(&polyList[0], polyList.size());
+  Polyhedron *temp = multiUnion(&polyList[0], polyList.size()),
+    *outerApproxShell = coalesce(temp);
+  delete temp;
   cout <<"done multiUnion"<<endl;
   Polyhedron * robotApprox = inner_approximation? robot->boolean(outerApproxShell, Union) : robot->boolean(outerApproxShell, Complement);
   for (int i=0; i<polyList.size(); i++)
     delete polyList[i];
   polyList.clear();
-
-  Polyhedron * reflectedRobotApprox = robotApprox->negative();
+  Polyhedron *reflectedRobotApprox = robotApprox->negative();
   delete robotApprox, outerApproxShell;
   return reflectedRobotApprox;
 }
@@ -619,7 +622,6 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, PTR<Object<Param
   savePoly(closeApprox, "closeApprox");
   Polyhedron * roughApprox = generateSweep(splitTList);
   savePoly(roughApprox, "roughApprox");
-
 
   time_t start,end;
 

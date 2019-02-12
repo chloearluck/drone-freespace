@@ -1,9 +1,9 @@
 #include "mink.h"
 
-Polyhedron * minkowskiSum (Polyhedron *a, Polyhedron *b)
+Polyhedron * minkowskiSum (Polyhedron *a, Polyhedron *b, bool check)
 {
-  Polyhedron *con = convolution(a, b);
-  Polyhedron *c = subdivide(con, true), *d = new Polyhedron(a->perturbed);
+  Polyhedron *con = convolution(a, b, check),
+    *c = subdivide(con, true), *d = new Polyhedron;
   Shells sh;
   c->formShells(sh);
   Shells msh = minkowskiShells(a, b, sh);
@@ -31,12 +31,13 @@ Shells minkowskiShells (Polyhedron *a, Polyhedron *b, const Shells &sh)
       psh.push_back(*s);
   if (psh.size() == 1)
     return psh;
-  b->computeWindingNumbers();
-  return minkowskiShellsAux(a, b, psh);
+  return a->faces.size() < b->faces.size() ? minkowskiShellsAux(a, b, psh)
+    : minkowskiShellsAux(b, a, psh);
 }
 
 Shells minkowskiShellsAux (Polyhedron *a, Polyhedron *b, const Shells &sh)
 {
+  Octree<Face *> *octree = b->faceOctree();
   static unsigned int n = 8;
   unsigned int k = sh.size(), m = k/n, is = 0;
   MSData msd[n];
@@ -46,7 +47,7 @@ Shells minkowskiShellsAux (Polyhedron *a, Polyhedron *b, const Shells &sh)
     is = i + 1 == n ? k : is + m;
     msd[i].ie = is;
     msd[i].a = a;
-    msd[i].b = b;
+    msd[i].octree = octree;
     msd[i].sh = &sh;
   }
   pthread_t threads[n];
@@ -58,6 +59,7 @@ Shells minkowskiShellsAux (Polyhedron *a, Polyhedron *b, const Shells &sh)
   Shells res;
   for (int i = 0; i < n; ++i)
     res.insert(res.end(), msd[i].res.begin(), msd[i].res.end());
+  delete octree;
   return res;
 }
 
@@ -67,18 +69,17 @@ void minkowskiShellsT (void *ptr)
   BaseObject::addThread(msd->i);
   for (int i = msd->is; i < msd->ie; ++i) {
     Shell *s = msd->sh->at(i);
-    if (minkowskiShell(msd->a, msd->b, s))
+    if (minkowskiShell(msd->a, msd->octree, s))
       msd->res.push_back(s);
   }
 }
 
-bool minkowskiShell (Polyhedron *a, Polyhedron *b, Shell *s)
+bool minkowskiShell (Polyhedron *a, Octree<Face *> *octree, Shell *s)
 {
   const HFaces &hf = s->getHFaces();
   Point *p = s->getHFaces()[0]->getF()->getBoundary()->tail()->getP();
   Polyhedron *c = a->negativeTranslate(p);
-  c->computeWindingNumbers();
-  bool res = !c->intersects(b, true);
+  bool res = !c->intersectsEdges(octree, true);
   delete c;
   return res;
 }
@@ -223,7 +224,7 @@ int BSPElt::side (Point *r) const
 }
 
 void BSPTree (BSPElts &aelts, BSPElts &belts, BSPElts &ea, BSPElts &eb, 
-	      int nmax, int dmax, ID c)
+	      int nmax, int dmax, unsigned int c)
 {
   if (dmax == 0 || aelts.size() < nmax && belts.size() < nmax)
     BSPLeaf(aelts, belts, ea, eb);
@@ -242,7 +243,7 @@ void BSPTree (BSPElts &aelts, BSPElts &belts, BSPElts &ea, BSPElts &eb,
   }
 }
 
-void BSPPartition (BSPElts &elts, Point *r, ID c, BSPElts &elts1, BSPElts &elts2)
+void BSPPartition (BSPElts &elts, Point *r, unsigned int c, BSPElts &elts1, BSPElts &elts2)
 {
   for (BSPElts::iterator e = elts.begin(); e != elts.end(); ++e) {
     int s = e->side(r);
@@ -277,7 +278,7 @@ bool MinkHullFace::conflict (HEdge *f) const
   Point *a = e->tail()->getP(), *b = e->head()->getP(),
     *c = next->e->head()->getP(), *d = f->head()->getP();
   return d->onLine(a, b) || d->onLine(a, c) ||
-    DegenerateConflict(a, b, c, d) == 1;
+    DegenerateConflict1(a, b, c, d) == 1 || DegenerateConflict2(a, b, c, d) == 1;
 }
 
 void MinkHullFace::updateCset (MinkHullFace *h, HEdge *f)
@@ -431,17 +432,17 @@ bool convexOrder (const HEdges &hedges)
   return false;
 }
 
-Polyhedron * convolution (Polyhedron *a, Polyhedron *b)
+Polyhedron * convolution (Polyhedron *a, Polyhedron *b, bool check)
 {
-  Polyhedron *c = new Polyhedron(a->perturbed && b->perturbed);
-  VVVMap vmap;
-  sumVF(a, b, true, vmap, c);
-  sumVF(b, a, false, vmap, c);
-  sumEE(a, b, vmap, c);
-  return c;
+  SFs sfs;
+  PPPMap pmap;
+  sumVF(a, b, true, pmap, sfs);
+  sumVF(b, a, false, pmap, sfs);
+  sumEE(a, b, pmap, sfs);
+  return convolution(sfs, check);
 }
 
-void sumVF (Polyhedron *a, Polyhedron *b, bool avflag, VVVMap &vmap, Polyhedron *con)
+void sumVF (Polyhedron *a, Polyhedron *b, bool avflag, PPPMap &pmap, SFs &sfs)
 {
   BSPElts aelts, belts, ea, eb;
   convexVertices(a, aelts);
@@ -450,7 +451,7 @@ void sumVF (Polyhedron *a, Polyhedron *b, bool avflag, VVVMap &vmap, Polyhedron 
   BSPTree(aelts, belts, ea, eb);
   for (int i = 0; i < ea.size(); ++i)
     if (compatibleVF(ea[i].ed, eb[i].d.f))
-      sumVF(ea[i].d.v, eb[i].d.f, avflag, vmap, con);
+      sumVF(ea[i].d.v, eb[i].d.f, avflag, pmap, sfs);
 }
 
 void convexVertices (Polyhedron *a, BSPElts &elts)
@@ -470,29 +471,27 @@ bool compatibleVF (HEdges &ed, Face *f)
   return true;
 }
 
-void sumVF (Vertex *v, Face *f, bool avflag, VVVMap &vmap, Polyhedron *con)
+void sumVF (Vertex *v, Face *f, bool avflag, PPPMap &pmap, SFs &sfs)
 {
-  Vertices ve = f->getBoundary()->loop();
-  Vertex *a = sumVV(v, ve[0], avflag, vmap, con),
-    *b = sumVV(v, ve[1], avflag, vmap, con),
-    *c = sumVV(v, ve[2], avflag, vmap, con);
-  if (con->perturbed || !faceVertices(a, b, c))
-    con->addTriangle(a, b, c);
+  Points pf = f->getBoundary()->pointLoop();
+  sfs.push_back(SF(sumPP(v->getP(), pf[0], avflag, pmap),
+		   sumPP(v->getP(), pf[1], avflag, pmap),
+		   sumPP(v->getP(), pf[2], avflag, pmap)));
 }
 
-Vertex * sumVV (Vertex *a, Vertex *b, bool aflag, VVVMap &vmap, Polyhedron *con)
+Point * sumPP (Point *a, Point *b, bool aflag, PPPMap &pmap)
 {
-  Vertex *aa = aflag ? a : b, *bb = aflag ? b : a;
-  pair<Vertex *, Vertex *> vp(aa, bb);
-  VVVMap::iterator iter = vmap.find(vp);
-  if (iter != vmap.end())
+  Point *aa = aflag ? a : b, *bb = aflag ? b : a;
+  pair<Point *, Point *> pp(aa, bb);
+  PPPMap::iterator iter = pmap.find(pp);
+  if (iter != pmap.end())
     return iter->second;
-  Vertex *v = con->getVertex(new SumPoint(aa->getP(), bb->getP()));
-  vmap.insert(pair<pair<Vertex *, Vertex*>, Vertex *>(vp, v));
-  return v;
+  Point *p = new SumPoint(aa, bb);
+  pmap.insert(pair<pair<Point *, Point *>, Point *>(pp, p));
+  return p;
 }
 
-void sumEE (Polyhedron *a, Polyhedron *b, VVVMap &vmap, Polyhedron *con)
+void sumEE (Polyhedron *a, Polyhedron *b, PPPMap &pmap, SFs &sfs)
 {
   BSPElts aelts, belts, ea, eb;
   convexEdges(a, aelts);
@@ -502,7 +501,7 @@ void sumEE (Polyhedron *a, Polyhedron *b, VVVMap &vmap, Polyhedron *con)
     Edge *eai = ea[i].d.e, *ebi = eb[i].d.e;
     bool aflag;
     if (compatibleEE(eai, ebi, aflag))
-      sumEE(eai, ebi, aflag, vmap, con);
+      sumEE(eai, ebi, aflag, pmap, sfs);
   }
 }
 
@@ -516,7 +515,7 @@ void convexEdges (Polyhedron *a, BSPElts &elts)
 int convexEdge (Edge *e)
 {
   HEdge *e1 = e->getHEdge(0), *e2 = e->getHEdge(1);
-  if (e1->getF()->getP()->getid() == e2->getF()->getP()->getid())
+  if (e1->getF()->getP() == e2->getF()->getP())
     return 0;
   return ConvexEdge(e1, e2);
 }
@@ -539,16 +538,50 @@ bool compatibleEE (Edge *e, Edge *f, bool &aflag)
   return s4 == 0 || (s1 == 0 ? s2 == - s4 : s1 == s4);
 }
 
-void sumEE (Edge *e, Edge *f, bool aflag, VVVMap &vmap, Polyhedron *con)
+void sumEE (Edge *e, Edge *f, bool aflag, PPPMap &pmap, SFs &sfs)
 {
   Edge *ee = aflag ? e : f, *ff = aflag ? f : e;
-  Vertex *a = sumVV(ee->getT(), ff->getT(), aflag, vmap, con),
-    *b = sumVV(ee->getH(), ff->getT(), aflag, vmap, con),
-    *c = sumVV(ee->getH(), ff->getH(), aflag, vmap, con),
-    *d = sumVV( ee->getT(), ff->getH(), aflag, vmap, con);
-  if (con->perturbed)
-    con->addRectangle(a, b, c, d);
-  else if (!a->getP()->onLine(b->getP(), c->getP()) &&
-	   (con->perturbed || !faceVertices(a, b, c, d)))
-    con->addRectangle(a, b, c, d);
+  sfs.push_back(SF(sumPP(ee->getT()->getP(), ff->getT()->getP(), aflag, pmap),
+		   sumPP(ee->getH()->getP(), ff->getT()->getP(), aflag, pmap),
+		   sumPP(ee->getH()->getP(), ff->getH()->getP(), aflag, pmap),
+		   sumPP(ee->getT()->getP(), ff->getH()->getP(), aflag, pmap)));
+}
+
+Polyhedron * convolution (const SFs &sfs, bool check)
+{
+  Polyhedron *c = new Polyhedron;
+  PVMap pvmap = check ? pvMap(sfs, c) : PVMap();
+  for (SFs::const_iterator s = sfs.begin(); s != sfs.end(); ++s) {
+    Vertices ve = vertices(*s, c, pvmap);
+    if (ve.size() == 3 && (!check || !faceVertices(ve[0], ve[1], ve[2])))
+      c->addTriangle(ve[0], ve[1], ve[2]);
+    else if (ve.size() == 4 && (!check || !faceVertices(ve[0], ve[1], ve[2], ve[3]) &&
+				!ve[0]->getP()->onLine(ve[1]->getP(), ve[2]->getP())))
+      c->addRectangle(ve[0], ve[1], ve[2], ve[3]);
+  }
+  return c;
+}
+
+PVMap pvMap (const SFs &sfs, Polyhedron *c)
+{
+  Points pts;
+  for (SFs::const_iterator s = sfs.begin(); s != sfs.end(); ++s) {
+    pts.push_back(s->a);
+    pts.push_back(s->b);
+    pts.push_back(s->c);
+    if (s->d)
+      pts.push_back(s->d);
+  }
+  return pvMap(pts, c);
+}
+
+Vertices vertices (const SF &s, Polyhedron *a, PVMap &pvmap)
+{
+  Vertices ve;
+  ve.push_back(a->getVertex(s.a, pvmap));
+  ve.push_back(a->getVertex(s.b, pvmap));
+  ve.push_back(a->getVertex(s.c, pvmap));
+  if (s.d)
+    ve.push_back(a->getVertex(s.d, pvmap));
+  return ve;
 }

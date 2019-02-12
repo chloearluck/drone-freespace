@@ -86,30 +86,31 @@ bool collapse (Polyhedron *a, double d, Edge *e, IFeatureQ &fq, IFeatureQ &nfq,
   HEdge *e1 = e->getHEdge(0), *e2 = e->getHEdge(1);
   Vertex *t = e1->tail(), *h = e1->head(), *v = e1->getNext()->head(),
     *w = e2->getNext()->head();
-  PTR<Point> tp = t->getP(), hp = h->getP(), m = new CentroidPoint(tp, hp);
-  PV3 p = m->getApprox();
-  PTR<Point> q = new Point(p.x.mid(), p.y.mid(), p.z.mid(), false),
-    cp = a->findPoint(q) ? m : q;
+  PTR<Point> tp = t->getP(), hp = h->getP();
+  Vertex *vc = a->getVertex(new MidPoint(tp, hp));
+  vpmap.insert(VPPair(vc, t->getP()));
   a->removeLoop(e1);
   a->removeLoop(e2);
-  vpmap.insert(VPPair(h, h->getP()));
-  a->moveVertex(h, cp);
-  Faces ft = t->incidentFaces();
+  Faces ft = t->incidentFaces(), fh = h->incidentFaces();
   for (Faces::iterator f = ft.begin(); f != ft.end(); ++f)
-    a->replaceVertex(*f, t, h);
-  if (badCollapse(h, octree)) {
+    a->replaceVertex(*f, t, vc);
+  for (Faces::iterator f = fh.begin(); f != fh.end(); ++f)
+    a->replaceVertex(*f, h, vc);
+  if (badCollapse(vc, octree)) {
     for (Faces::iterator f = ft.begin(); f != ft.end(); ++f)
-      a->replaceVertex(*f, h, t);
-    a->moveVertex(h, hp);
+      a->replaceVertex(*f, vc, t);
+    for (Faces::iterator f = fh.begin(); f != fh.end(); ++f)
+      a->replaceVertex(*f, vc, h);
     octree->insert(a->addTriangle(t, h, v));
     octree->insert(a->addTriangle(h, t, w));
+    vpmap.erase(vc);
     addStar(t, d, nfq);
     addStar(h, d, nfq);
     return false;
   }
-  addStar(h, d, fq);
-  Faces fh = h->incidentFaces();
-  for (Faces::iterator f = fh.begin(); f != fh.end(); ++f)
+  addStar(vc, d, fq);
+  Faces fc = vc->incidentFaces();
+  for (Faces::iterator f = fc.begin(); f != fc.end(); ++f)
     octree->insert(*f);
   return true;
 }
@@ -247,8 +248,7 @@ void describe1 (double t, int n1, int n2, const VPMap &vpmap)
     if (n2)
       cerr << " flip = " << n2;
     if (nv)
-      cerr << endl << "            moved = " << nv << " dav = " << dr
-	   << " dmax = " << dmax;
+      cerr << endl << "            dav = " << dr << " dmax = " << dmax;
   }
   cerr << endl;
 }
@@ -325,14 +325,11 @@ void simplify2 (Polyhedron *a, double d, bool opt2)
 
 FeatureSet smallFeatures (Polyhedron *a, double d, VPMap *vpmap)
 {
-  for (Faces::iterator f = a->faces.begin(); f != a->faces.end(); ++f)
-    if ((*f)->getBoundary())
-      (*f)->getPC();
   Octree<Face *> *octree = faceOctree(a, d);
-  vector<pair<Face *, Face *> > ff;
+  vector<pair<Face *, Face *>> ff;
   octree->pairs(ff, d);  
   delete octree;
-  const unsigned int n = 8;
+  const unsigned int n = nthreads(8);
   unsigned int k = ff.size(), m = k/n, is = 0;
   SFData sfd[n];
   for (int i = 0; i < n; ++i) {
@@ -362,7 +359,7 @@ void smallFeaturesT (void *ptr)
   BaseObject::addThread(sfd->i);
   VPMap *vpmap = sfd->vpmap;
   FeatureSet fs;
-  vector<pair<Face *, Face *> >::iterator x = sfd->ff->begin() + sfd->is;
+  vector<pair<Face *, Face *>>::iterator x = sfd->ff->begin() + sfd->is;
   for (int i = sfd->is; i < sfd->ie; ++i, ++x)
     if (x->first->getBoundary() && x->second->getBoundary() &&
 	(!vpmap || moved(x->first, *vpmap) || moved(x->second, *vpmap)))
@@ -461,7 +458,7 @@ bool closeVFT (Vertex *v, Face *f, double d)
   PV3 pts[3];
   for (int i = 0; i < 3; ++i)
     pts[i] = ve[i]->getP()->getApprox(1.0);
-  int c = f->getPC();
+  int c = f->getP()->getPC();
   for (int i = 0; i < 3; ++i)
     if (cross(pts[(i+1)%3] - pts[i], p - pts[i], c).sign(false) == -1)
       return false;
@@ -780,7 +777,7 @@ bool intersects (Expander2 *e, Expander2::Pair *p)
 
 bool intersects (const Points &pts, const Points &dsp, bool vf)
 {
-  PTR<Object<PPoly> > p = new FIPoly(pts, dsp);
+  PTR<Object<PPoly>> p = new FIPoly(pts, dsp);
   Roots rts = PolySolver(p).getRoots(0, 1);
   for (Roots::iterator r = rts.begin(); r != rts.end(); ++r) {
     Points rpts;
