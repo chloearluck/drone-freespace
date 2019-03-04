@@ -2,9 +2,14 @@
 
 void simplify (Polyhedron *a, double d, bool opt2)
 {
+  bool flag = !a->cells.empty();
   simplify1(a, d);
   simplify2(a, d, opt2);
   a->removeNullFaces();
+  if (flag) {
+    a->clearCells();
+    a->formCells();
+  }
 }
 
 void simplify1 (Polyhedron *a, double d)
