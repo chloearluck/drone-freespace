@@ -2,24 +2,24 @@
 #include "simplify.h"
 #include <map>
 
-// Polyhedron * loadPoly(const char * filename) {
-//   int n = strlen(filename);
-//   char str[n+5];
-//   strncpy(str, filename, n);
-//   strncpy(str+n, ".vtk", 5);
+Polyhedron * loadPoly2(const char * filename) {
+  int n = strlen(filename);
+  char str[n+5];
+  strncpy(str, filename, n);
+  strncpy(str+n, ".vtk", 5);
 
-//   Polyhedron * poly;
-//   ifstream infile (str);
-//   if (infile.is_open()) {
-//     poly = readPolyhedronVTK (infile);
-//     infile.close();
-//   } else {
-//     cout<<"could not read from file"<<endl;
-//     return NULL;
-//   }
+  Polyhedron * poly;
+  ifstream infile (str);
+  if (infile.is_open()) {
+    poly = readPolyhedronVTK (infile);
+    infile.close();
+  } else {
+    cout<<"could not read from file"<<endl;
+    return NULL;
+  }
 
-//   return poly;
-// }
+  return poly;
+}
 
 void savePoly2(Polyhedron * p, const char * filename) {
   int n = strlen(filename);

@@ -24,13 +24,13 @@ int main (int argc, char *argv[]) {
     srandom(seed);
   }
 
-  Polyhedron * poly = loadPoly(filename);
+  Polyhedron * poly = loadPoly2(filename);
   if (poly == NULL)
     return 1;
 
   Polyhedron * obstacle;
   if (argc == 3) 
-    obstacle = loadPoly(argv[2]); 
+    obstacle = loadPoly2(argv[2]); 
   else {
     double bounds[6] = { 5, 7, 5, 7, 5, 7};
     obstacle = box(bounds);
