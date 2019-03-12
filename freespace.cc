@@ -2,26 +2,26 @@
 #include "simplify.h"
 #include <map>
 
-Polyhedron * loadPoly(const char * filename) {
-  int n = strlen(filename);
-  char str[n+5];
-  strncpy(str, filename, n);
-  strncpy(str+n, ".vtk", 5);
+// Polyhedron * loadPoly(const char * filename) {
+//   int n = strlen(filename);
+//   char str[n+5];
+//   strncpy(str, filename, n);
+//   strncpy(str+n, ".vtk", 5);
 
-  Polyhedron * poly;
-  ifstream infile (str);
-  if (infile.is_open()) {
-    poly = readPolyhedronVTK (infile);
-    infile.close();
-  } else {
-    cout<<"could not read from file"<<endl;
-    return NULL;
-  }
+//   Polyhedron * poly;
+//   ifstream infile (str);
+//   if (infile.is_open()) {
+//     poly = readPolyhedronVTK (infile);
+//     infile.close();
+//   } else {
+//     cout<<"could not read from file"<<endl;
+//     return NULL;
+//   }
 
-  return poly;
-}
+//   return poly;
+// }
 
-void savePoly(Polyhedron * p, const char * filename) {
+void savePoly2(Polyhedron * p, const char * filename) {
   int n = strlen(filename);
   char str[n+9];
   strncpy(str, filename, n);
@@ -344,7 +344,7 @@ Polyhedron * trapezoidOuterApprox(OuterApproxFace t) {
     std::vector<OuterApproxFace> tmp;
     tmp.push_back(t);
     saveTriangulation("trap.vtk", tmp);
-    savePoly(a, "trapApprox"); 
+    savePoly2(a, "trapApprox"); 
     assert(false);
   }
   return a;
@@ -551,10 +551,10 @@ void FreeSpace::generateFreeSpaces(std::vector<Polyhedron*> & spaces, Polyhedron
   for (int i=0; i< allRotations.size(); i++) {
     cout<<"minkowskiSum "<<i<<" of "<<allRotations.size()-1<<endl;
     Polyhedron * mSum = minkowskiSum(allRotations[i], obstacle);
-    simplify(mSum, 1e-6, false);
+    // simplify(mSum, 1e-6, false);
     char s[25];
     sprintf(s, "%s%02d", basename, i); 
-    savePoly(mSum, s);
+    savePoly2(mSum, s);
     spaces.push_back(mSum);
   }
 
@@ -619,9 +619,9 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, PTR<Object<Param
   saveTriangulation("triangulation2.vtk", splitTList2);
 
   Polyhedron * closeApprox = generateSweep(splitTList2);
-  savePoly(closeApprox, "closeApprox");
-  Polyhedron * roughApprox = generateSweep(splitTList);
-  savePoly(roughApprox, "roughApprox");
+  savePoly2(closeApprox, "closeApprox");
+  // Polyhedron * roughApprox = generateSweep(splitTList);
+  // savePoly2(roughApprox, "roughApprox");
 
   time_t start,end;
 
@@ -631,7 +631,7 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, PTR<Object<Param
   double closetime = difftime (end,start);
 
   time (&start);
-  generateFreeSpaces(blockspaces_rough, roughApprox, "rough");
+  // generateFreeSpaces(blockspaces_rough, roughApprox, "rough");
   time (&end);
   double roughtime = difftime (end,start);
 

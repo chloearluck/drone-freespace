@@ -1,4 +1,37 @@
 #include "freespace-graph.h"
+#include "freespace.h"
+
+void testPathExists() {
+  Polyhedron * robot = loadPolyVTK("spiny.vtk");
+  Polyhedron * obstacle = loadPolyVTK("wirecage.vtk");
+  int numRotations = 40;
+  
+  Parameter::disable();
+  PTR<Object<Parameter> > tan_half_angle = new InputParameter(tan((1.0 + 1.0e-8) * M_PI / numRotations));
+  Parameter::enable();
+
+  FreeSpace * fs  = new FreeSpace(robot, obstacle, tan_half_angle, numRotations);
+  FreeSpaceGraph graph(fs->blockspaces_close, fs->blockspaces_rough, M_PI * (2/numRotations), 0.01, 1, "wireGraph");
+
+  //search for a path from a to b
+  PTR<Point> a = new Point(-4.5, 0.0, 0.0);
+  PTR<Point> b = new Point( 4.5, 0.0, 0.0);
+
+  Polyhedron * p = fs->blockspaces_close[0];
+  p->computeWindingNumbers();
+  assert(!p->contains(a) && !p->contains(b));
+  int a_index = p->containingCell(a);
+  int b_index = p->containingCell(b);
+  cout << "finding a path from cell "<<a_index<<" to cell "<<b_index<<" in freespace rotation 0"<<endl;
+  FreeSpaceGraph::Node * startNode = graph.graph[0][0]->get(a_index);
+  FreeSpaceGraph::Node * endNode = graph.graph[0][0]->get(b_index);
+  
+  //call bfspath and print out the nodes
+  std::vector<FreeSpaceGraph::Node*> nodes;
+  graph.bfsPath(startNode, endNode, nodes);
+  for (int i=0; i<nodes.size(); i++) 
+    cout << nodes[i]->level << " " << nodes[i]->blockspace_index << " " << nodes[i]->cell_index << endl;
+}
 
 void testCreateGraph(const char * blockspace_dir, const char * graph_dir, double theta, double clearance_unit, int num_levels) {
   int numRotations = floor(2*M_PI/theta);
@@ -56,6 +89,9 @@ int main (int argc, char *argv[]) {
     srandom(seed);
   }
 
+  testPathExists();
+  return 0;
+
   const char * graph_dir = "droneRoomGraph";
 
   //--------------------------------
@@ -71,16 +107,16 @@ int main (int argc, char *argv[]) {
   cout << "Elapsed time: "<< difftime (end_t,start_t)/60.0 << " minutes" << endl;
   //--------------------------------
 
-  //--------------------------------
-  // Test searching a freespace-graph
-  PTR<Point> start = new Point(-2.5,0.0, -1.0);
-  PTR<Point> end = new Point(6.0,0.0,0.0);
-  int startRotationIndex = 0;
-  int endRotationIndex = 0;
+  // //--------------------------------
+  // // Test searching a freespace-graph
+  // PTR<Point> start = new Point(-1.0,-1.0,-1.0);
+  // PTR<Point> end = new Point(5.0,5.0,5.0);
+  // int startRotationIndex = 0;
+  // int endRotationIndex = 0;
   
-  time(&start_t);
-  testSearchGraph(graph_dir, start, end, startRotationIndex, endRotationIndex);
-  time(&end_t);
-  cout << "Elapsed time: "<< difftime (end_t,start_t) << " seconds" << endl;
-  //--------------------------------
+  // time(&start_t);
+  // testSearchGraph(graph_dir, start, end, startRotationIndex, endRotationIndex);
+  // time(&end_t);
+  // cout << "Elapsed time: "<< difftime (end_t,start_t) << " seconds" << endl;
+  // //--------------------------------
 }

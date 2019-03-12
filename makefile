@@ -98,9 +98,9 @@ freespace-graph.o: freespace-graph.cc freespace-graph.h path3d.h hull.h polyhedr
 	pv.h acp.h geometry3d.h simplify.h
 	$(COMPILE) freespace-graph.cc
 
-freespace-graph_test: freespace-graph_test.cc freespace-graph.o path3d.o hull.o polyhedron.o \
+freespace-graph_test: freespace-graph_test.cc freespace-graph.o freespace.o path3d.o hull.o polyhedron.o \
 	triangulate.o io.o object.o acp.o mink.o simplify.o expander2.o poly.o
-	$(LINK) freespace-graph_test.cc freespace-graph.o hull.o path3d.o polyhedron.o \
+	$(LINK) freespace-graph_test.cc freespace-graph.o freespace.o hull.o path3d.o polyhedron.o \
 	triangulate.o io.o object.o acp.o mink.o simplify.o expander2.o poly.o \
 	$(LFLAGS) -o freespace-graph_test
 
