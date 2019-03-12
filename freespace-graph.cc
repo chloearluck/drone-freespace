@@ -574,7 +574,7 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & close_blockspaces, std
           ni->neighborIntersectionIndices[pos_i].push_back(k);
           nj->neighborIntersectionIndices[pos_j].push_back(k);
         }
-      simplify(block_union, 1e-6);
+      // simplify(block_union, 1e-6);
       std::string s = std::string(dir) + "/" + std::to_string(level) + "-" + std::to_string(i) + "-" + std::to_string(j) + ".tri";
       savePoly(block_union, s.c_str());
       delete block_union;  
