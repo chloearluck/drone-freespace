@@ -580,21 +580,21 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & close_blockspaces, std
       delete block_union;  
     }
 
-    cout<<"finding siblings"<<endl;
-    for (int i=0; i<blockspaces.size(); i++) {
-      int nCells = graph[level][i]->nodes.size();
-      if (nCells > 1)
-        for (int s1 = 0; s1 <nCells-1; s1++)
-          for (int s2=s1+1; s2<nCells; s2++) {
-            FreeSpaceGraph::Node * sibling1 = graph[level][i]->nodes[s1];
-            FreeSpaceGraph::Node * sibling2 = graph[level][i]->nodes[s2];
-            sibling1->siblings.push_back(sibling2);
-            sibling2->siblings.push_back(sibling1);
-            std::pair< PTR<Point>, PTR<Point> > ab = nearestPointPair(blockspaces[i], sibling1->cell_index, sibling2->cell_index);
-            sibling1->siblingPoints.push_back(ab);
-            sibling2->siblingPoints.push_back(std::make_pair(ab.second,ab.first));
-          }
-    }
+    // cout<<"finding siblings"<<endl;
+    // for (int i=0; i<blockspaces.size(); i++) {
+    //   int nCells = graph[level][i]->nodes.size();
+    //   if (nCells > 1)
+    //     for (int s1 = 0; s1 <nCells-1; s1++)
+    //       for (int s2=s1+1; s2<nCells; s2++) {
+    //         FreeSpaceGraph::Node * sibling1 = graph[level][i]->nodes[s1];
+    //         FreeSpaceGraph::Node * sibling2 = graph[level][i]->nodes[s2];
+    //         sibling1->siblings.push_back(sibling2);
+    //         sibling2->siblings.push_back(sibling1);
+    //         std::pair< PTR<Point>, PTR<Point> > ab = nearestPointPair(blockspaces[i], sibling1->cell_index, sibling2->cell_index);
+    //         sibling1->siblingPoints.push_back(ab);
+    //         sibling2->siblingPoints.push_back(std::make_pair(ab.second,ab.first));
+    //       }
+    // }
 
     for (int i=0; i<blockspaces.size(); i++) {
       std::string s = std::string(dir) + "/" + std::to_string(level) + "-" + std::to_string(i) + ".tri";
