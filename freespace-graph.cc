@@ -473,8 +473,8 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & close_blockspaces, std
   std::vector<Polyhedron*> blockspaces;
   blockspaces.insert(blockspaces.begin(), close_blockspaces.begin(), close_blockspaces.end());
 
-  for (int i = 0; i<blockspaces.size(); i++)
-    simplify(blockspaces[i], 1e-6);
+  // for (int i = 0; i<blockspaces.size(); i++)
+    // simplify(blockspaces[i], 1e-6);
 
   //create directory
   if (mkdir(dir, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) == -1 && errno != EEXIST)
