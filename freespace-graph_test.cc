@@ -10,15 +10,20 @@ void testPathExists() {
   PTR<Object<Parameter> > tan_half_angle = new InputParameter(tan((1.0 + 1.0e-8) * M_PI / numRotations));
   Parameter::enable();
 
+  cout << "create sub spaces"<<endl;
   FreeSpace * fs  = new FreeSpace(robot, obstacle, tan_half_angle, numRotations);
+  cout << "create graph"<<endl;
   FreeSpaceGraph graph(fs->blockspaces_close, fs->blockspaces_rough, M_PI * (2/numRotations), 0.01, 1, "wireGraph");
+  cout << "done create graph"<<endl;
 
   //search for a path from a to b
   PTR<Point> a = new Point(-4.5, 0.0, 0.0);
   PTR<Point> b = new Point( 4.5, 0.0, 0.0);
 
   Polyhedron * p = fs->blockspaces_close[0];
+  cout << "computeWindingNumbers"<<endl;
   p->computeWindingNumbers();
+  cout << "done computeWindingNumbers"<<endl;
   assert(!p->contains(a) && !p->contains(b));
   int a_index = p->containingCell(a);
   int b_index = p->containingCell(b);
