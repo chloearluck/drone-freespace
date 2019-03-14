@@ -548,17 +548,23 @@ void FreeSpace::generateFreeSpaces(std::vector<Polyhedron*> & spaces, Polyhedron
     allRotations.push_back(rotate(allRotations[i]));
   cout<<"found all rotations"<<endl;
 
+  double simplify_time = 0.0;
   for (int i=0; i< allRotations.size(); i++) {
     cout<<"minkowskiSum "<<i<<" of "<<allRotations.size()-1<<endl;
     Polyhedron * mSum = minkowskiSum(allRotations[i], obstacle);
+    time_t start,end;
+    time (&start);
     simplify(mSum, 1e-6, false);
+    time (&end);
+    simplify_time +=  difftime(end, start);
     char s[25];
     sprintf(s, "%s%02d", basename, i); 
     savePoly(mSum, s);
     spaces.push_back(mSum);
   }
 
-  cout<<"cspaces populated"<<endl;
+  cout <<"cspaces populated"<<endl;
+  cout <<"time spend in simplify (for this set of "<<spaces.size()<<"spaces): "<<simplify_time/60.0<<" minutes" <<endl;
 
   for (int i=0; i< numRotations; i++)
     delete allRotations[i];

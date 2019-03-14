@@ -488,10 +488,11 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & close_blockspaces, std
       graph[i].push_back(new FreeSpaceGraph::BlockSpaceNode(i, j));
 
   std::vector<Polyhedron*> prev_blockspaces;
-  time_t start,end;
+  time_t start,end, start2, end2;
   for (int level = 0; level<num_levels; level++) {
     cout<<"level "<<level<<endl;
     time(&start);
+    double simplify_time = 0;
 
     if (level > 0) {
       if (level > 2)
@@ -507,7 +508,11 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & close_blockspaces, std
       unit = unit * 2;
       for (int i=0; i<prev_blockspaces.size(); i++) {
         blockspaces.push_back(minkowskiSum(rough_blockspaces[i], unit_ball));
+        time(&start2);
         simplify(blockspaces[i], 1e-6);
+        time(&end2);
+        simplify_time += difftime(end2, start2);
+
       }
       
       delete unit_ball;
@@ -574,7 +579,10 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & close_blockspaces, std
           ni->neighborIntersectionIndices[pos_i].push_back(k);
           nj->neighborIntersectionIndices[pos_j].push_back(k);
         }
+      time(&start2);
       simplify(block_union, 1e-6);
+      time(&end2);
+      simplify_time += difftime(end2, start2);
       std::string s = std::string(dir) + "/" + std::to_string(level) + "-" + std::to_string(i) + "-" + std::to_string(j) + ".tri";
       savePoly(block_union, s.c_str());
       delete block_union;  
@@ -603,6 +611,7 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & close_blockspaces, std
     }
     time(&end);
     cout << difftime(end, start)/60.0 << " minutes elapsed on level " << level << endl;
+    cout << simplify_time/60.0 << " minutes spent simplifying on level " << level << endl;
   }
 
   for(int i=0; i<prev_blockspaces.size(); i++)
