@@ -618,8 +618,10 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & close_blockspaces, std
     delete prev_blockspaces[i];
   prev_blockspaces.clear();
 
-  for (int i=0; i<blockspaces.size(); i++)
-    delete blockspaces[i];
+  if (num_levels > 1)
+    for (int i=0; i<blockspaces.size(); i++)
+      delete blockspaces[i];
+
   blockspaces.clear();
 
 
