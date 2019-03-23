@@ -316,7 +316,7 @@ void spiny() {
   //construction spiny robot
   //question: box or frustum, is frustum better for outerApprox?  box for now
   double robot_r = 0.2;
-  double spine_length = 1.5;
+  double spine_length = 1.5 * (31.0/32.0);
   int n_spines = 3;
   double d3[6] = {-robot_r, robot_r, -robot_r, robot_r, -robot_r, robot_r};
   Polyhedron * robot = box(d3);
