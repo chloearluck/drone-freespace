@@ -114,5 +114,11 @@ create_test_example: create_test_example.o hull.o polyhedron.o \
   triangulate.o io.o object.o acp.o mink.o simplify.o expander2.o poly.o \
 	$(LFLAGS) -o create_test_example
 
+lattice: lattice.o mink.o simplify.o expander2.o io.o polyhedron.o poly.o triangulate.o object.o acp.o hull.o
+	$(LINK) lattice.o mink.o simplify.o expander2.o io.o polyhedron.o poly.o triangulate.o object.o acp.o hull.o $(LFLAGS) -o lattice
+
+lattice.o: lattice.cc mink.h simplify.h expander2.h io.h polyhedron.h triangulate.h octree.h rbtree.h object.h pv.h acp.h hull.h
+	$(COMPILE) lattice.cc
+
 clean: 
 	rm -f *.o *~ mink hull delaunay pack cspace poly_test freespace_test *.lp
