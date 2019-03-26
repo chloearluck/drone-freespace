@@ -242,17 +242,29 @@ void save(std::vector<PathVertex*> & vertPath, const char * filename) {
   // }
 }
 
-Primitive3(AreaABC, PathVertex * , pva, PathVertex * , pvb, PathVertex * , pvc);
-int AreaABC::sign() {
-  if (pva == pvb || pva == pvc || pvb == pvc)
-    return 0;
-  if (Collinear(pva->original, pvb->original, pvc->original) == 0)
-    return 0;
-  PV2 a = pva->transformed2d->get();
-  PV2 b = pvb->transformed2d->get();
-  PV2 c = pvc->transformed2d->get();
-  return (b-a).cross(c-a).sign();
-}
+class AreaABC : public Primitive {
+  PathVertex * pva, * pvb, *pvc;
+
+  Parameter calculate () {
+    PV2 a = pva->transformed2d->get();
+    PV2 b = pvb->transformed2d->get();
+    PV2 c = pvc->transformed2d->get();
+    return (b-a).cross(c-a);
+  }
+
+  int sign() {
+    if (pva == pvb || pva == pvc || pvb == pvc)
+      return 0;
+    if (Collinear(pva->original, pvb->original, pvc->original) == 0)
+      return 0;
+    PV2 a = pva->transformed2d->get();
+    PV2 b = pvb->transformed2d->get();
+    PV2 c = pvc->transformed2d->get();
+    return (b-a).cross(c-a).sign();
+  }
+ public:
+  AreaABC (PathVertex* pva, PathVertex* pvb, PathVertex* pvc) : pva(pva), pvb(pvb), pvc(pvc) {}
+};
 
 //find the 3d equivalent of the 2d intersection between triangle edge p->q and line segment c->d
 class ABintersectCDto3D : public Point {
