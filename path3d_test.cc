@@ -5,7 +5,7 @@ Polyhedron * loadPoly(const char * filename) {
   Polyhedron * poly;
   ifstream infile (filename);
   if (infile.is_open()) {
-    poly = readPolyhedronVTK (infile);
+    poly = readPolyhedron (infile);
     infile.close();
   } else {
     cout<<"could not read from file"<<endl;
@@ -62,12 +62,13 @@ void testBoundary() {
 int main (int argc, char *argv[]) {
   Parameter::enable();
 
-  if (argc < 2) {
-    cout<<"not enough arguments"<<endl;
-    return 1;
-  }
+  // if (argc < 2) {
+  //   cout<<"not enough arguments"<<endl;
+  //   return 1;
+  // }
 
-  char * filename =  argv[1];
+  // char * filename =  argv[1];
+  const char * filename =  "0-40.tri";
 
   if (argc == 3) {
     unsigned seed = atoi(argv[2]);
@@ -76,11 +77,11 @@ int main (int argc, char *argv[]) {
 
   Polyhedron * blockspace = loadPoly(filename);
 
-  PTR<Point> start = new Point(5, 5, 2);
-  PTR<Point> end = new Point(15, 15, 2);
+  PTR<Point> start = new Point(3.4173073448708937, -2.4499688754530418, 1.5427307420710334);
+  PTR<Point> end = new Point(-0.001891213242022606, 0.0018911864469895242, 0.12476489721278504);
   
   Points path;
 
-  findPath(blockspace, start, end, path);
+  findPath(blockspace, 6, start, end, path);
   savePathVTK(path, "path.vtk");
 }

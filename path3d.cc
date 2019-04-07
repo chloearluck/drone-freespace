@@ -1,7 +1,7 @@
 #include "path3d.h"
 
-const bool DEBUG = false;
-const bool VERBOSE = false;
+const bool DEBUG = true;
+const bool VERBOSE = true;
 
 void save(Points path, const char * filename) {
   // ofstream ostr;

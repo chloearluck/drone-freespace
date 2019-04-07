@@ -1,4 +1,4 @@
-CFLAGS = -g -O3 -std=c++11
+CFLAGS = -g -O0 -std=c++11
 
 COMPILE = g++ $(CFLAGS) -c
 
@@ -74,6 +74,10 @@ delaunay: delaunay.o simplify.o expander2.o poly.o polyhedron.o triangulate.o \
 
 path3d.o: path3d.cc path3d.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h 
 	$(COMPILE) path3d.cc
+
+path3d_test: path3d_test.cc path3d.o  polyhedron.o triangulate.o io.o object.o acp.o  poly.o
+	$(LINK) path3d_test.cc path3d.o  polyhedron.o triangulate.o io.o object.o acp.o  poly.o \
+	$(LFLAGS) -o path3d_test
 
 poly_test: poly_test.o acp.o object.o poly.o
 	$(LINK) poly_test.o acp.o object.o poly.o -lmpfr -lpthread -o poly_test
