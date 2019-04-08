@@ -179,13 +179,6 @@ class XYComponents : public Object<PV2> {
   XYComponents (PTR<Point> p) : p(p) {} 
 };
 
-//returns 0 if a b and c lie on the same line
-Primitive3(Collinear, PTR<Point>, a, PTR<Point>, b, PTR<Point>, c)
-int Collinear::sign() {
-  PV3 s = (b->get() - a->get()).cross(c->get() - a->get());
-  return s.dot(s).sign();
-}
-
 class PathVertex {
  public:
   PTR<Point> original;
@@ -226,16 +219,6 @@ class AreaABC : public Primitive {
     return (b-a).cross(c-a);
   }
 
-  int sign() {
-    if (pva == pvb || pva == pvc || pvb == pvc)
-      return 0;
-    if (Collinear(pva->original, pvb->original, pvc->original) == 0)
-      return 0;
-    PV2 a = pva->transformed2d->get();
-    PV2 b = pvb->transformed2d->get();
-    PV2 c = pvc->transformed2d->get();
-    return (b-a).cross(c-a).sign();
-  }
  public:
   AreaABC (PathVertex* pva, PathVertex* pvb, PathVertex* pvc) : pva(pva), pvb(pvb), pvc(pvc) {}
 };
@@ -848,7 +831,6 @@ void testBoundaryCondition(Polyhedron * poly, int mode) {
     PTR<Point> a = hface->getF()->getBoundary()->tail()->getP();
     PTR<Point> b = hface->getF()->getBoundary()->head()->getP();
     PTR<Point> newStart = new MidPoint(a,b);
-    assert(Collinear(a,b,newStart) == 0);
     localPath(newStart, (PTR<Point>) end, bfsPath, path);
   } else if (mode == END_ON_VERTEX) {
     //replace end with one of its face's vertices
@@ -861,7 +843,6 @@ void testBoundaryCondition(Polyhedron * poly, int mode) {
     PTR<Point> a = hface->getF()->getBoundary()->tail()->getP();
     PTR<Point> b = hface->getF()->getBoundary()->head()->getP();
     PTR<Point> newEnd = new MidPoint(a,b);
-    assert(Collinear(a,b,newEnd) == 0);
     localPath((PTR<Point>) start, newEnd, bfsPath, path);
   }
 }
