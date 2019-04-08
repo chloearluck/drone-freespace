@@ -1,4 +1,5 @@
 #include "geometry3d.h"
+#include "io.h"
 #include <cstring>
 #include <queue>
 #include <map>
