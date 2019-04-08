@@ -4,48 +4,22 @@ const bool DEBUG = false;
 const bool VERBOSE = false;
 
 void save(Points path, const char * filename) {
-  // ofstream ostr;
-  // ostr.open(filename);
-  // if (ostr.is_open()) { 
-  //   ostr << setprecision(20) << "# vtk DataFile Version 3.0" << endl
-  //        << "vtk output" << endl << "ASCII" << endl
-  //        << "DATASET POLYDATA" << endl 
-  //        << "POINTS " << path.size() << " double" << endl;
-  //   for (int i=0; i<path.size(); i++)
-  //     ostr << path[i]->getApprox(1e-16).getX().mid() << " " << path[i]->getApprox(1e-16).getY().mid() << " " << path[i]->getApprox(1e-16).getZ().mid() << endl;
-  //   ostr<<endl<<"LINES 1 "<<path.size()+1<<endl<<path.size()<<" ";
-  //   for (int i=0; i<path.size(); i++)
-  //     ostr<<i<<" ";
-  //   ostr.close();
-  // } else {
-  //   cout<<"could not write to file"<<endl;
-  // }
-}
-
-void savePivots(Points path1, const char * filename) {
-  // Points path;
-  // for (int i=0; i<path1.size(); i++) {
-  //   Point * p = path1[i];
-  //   if ((dynamic_cast<InputPoint *> (p)) != NULL)
-  //     path.push_back(path1[i]);
-  // }
-
-  // ofstream ostr;
-  // ostr.open(filename);
-  // if (ostr.is_open()) { 
-  //   ostr << setprecision(20) << "# vtk DataFile Version 3.0" << endl
-  //        << "vtk output" << endl << "ASCII" << endl
-  //        << "DATASET POLYDATA" << endl 
-  //        << "POINTS " << path.size() << " double" << endl;
-  //   for (int i=0; i<path.size(); i++)
-  //     ostr << path[i]->getApprox(1e-16).getX().mid() << " " << path[i]->getApprox(1e-16).getY().mid() << " " << path[i]->getApprox(1e-16).getZ().mid() << endl;
-  //   ostr<<endl<<"LINES 1 "<<path.size()+1<<endl<<path.size()<<" ";
-  //   for (int i=0; i<path.size(); i++)
-  //     ostr<<i<<" ";
-  //   ostr.close();
-  // } else {
-  //   cout<<"could not write to file"<<endl;
-  // }
+  ofstream ostr;
+  ostr.open(filename);
+  if (ostr.is_open()) { 
+    ostr << setprecision(20) << "# vtk DataFile Version 3.0" << endl
+         << "vtk output" << endl << "ASCII" << endl
+         << "DATASET POLYDATA" << endl 
+         << "POINTS " << path.size() << " double" << endl;
+    for (int i=0; i<path.size(); i++)
+      ostr << path[i]->getApprox(1e-16).getX().mid() << " " << path[i]->getApprox(1e-16).getY().mid() << " " << path[i]->getApprox(1e-16).getZ().mid() << endl;
+    ostr<<endl<<"LINES 1 "<<path.size()+1<<endl<<path.size()<<" ";
+    for (int i=0; i<path.size(); i++)
+      ostr<<i<<" ";
+    ostr.close();
+  } else {
+    cout<<"could not write to file"<<endl;
+  }
 }
 
 class TransformationData {
@@ -223,23 +197,23 @@ class PathVertex {
 };
 
 void save(std::vector<PathVertex*> & vertPath, const char * filename) {
-  // ofstream ostr;
-  // ostr.open(filename);
-  // if (ostr.is_open()) { 
-  //   ostr << setprecision(20) << "# vtk DataFile Version 3.0" << endl
-  //        << "vtk output" << endl << "ASCII" << endl
-  //        << "DATASET POLYDATA" << endl 
-  //        << "POINTS " << vertPath.size() << " double" << endl;
-  //   for (int i=0; i<vertPath.size(); i++) {
-  //     ostr << vertPath[i]->transformed2d->getApprox(1e-6).getX().mid()<<" "<<vertPath[i]->transformed2d->getApprox(1e-6).getY().mid()<<" 0"<<endl;
-  //   }
-  //   ostr<<endl<<"LINES 1 "<<vertPath.size()+1<<endl<<vertPath.size()<<" ";
-  //   for (int i=0; i<vertPath.size(); i++)
-  //     ostr<<i<<" ";
-  //   ostr.close();
-  // } else {
-  //   cout<<"could not write to file"<<endl;
-  // }
+  ofstream ostr;
+  ostr.open(filename);
+  if (ostr.is_open()) { 
+    ostr << setprecision(20) << "# vtk DataFile Version 3.0" << endl
+         << "vtk output" << endl << "ASCII" << endl
+         << "DATASET POLYDATA" << endl 
+         << "POINTS " << vertPath.size() << " double" << endl;
+    for (int i=0; i<vertPath.size(); i++) {
+      ostr << vertPath[i]->transformed2d->getApprox(1e-6).getX().mid()<<" "<<vertPath[i]->transformed2d->getApprox(1e-6).getY().mid()<<" 0"<<endl;
+    }
+    ostr<<endl<<"LINES 1 "<<vertPath.size()+1<<endl<<vertPath.size()<<" ";
+    for (int i=0; i<vertPath.size(); i++)
+      ostr<<i<<" ";
+    ostr.close();
+  } else {
+    cout<<"could not write to file"<<endl;
+  }
 }
 
 class AreaABC : public Primitive {
@@ -288,6 +262,32 @@ class ABintersectCDto3D : public Point {
   }
 };
 
+void savePivots(Points path1, const char * filename) {
+  Points path;
+  for (int i=0; i<path1.size(); i++) {
+    Point * p = path1[i];
+    if ((dynamic_cast<ABintersectCDto3D *> (p)) == NULL)
+      path.push_back(path1[i]);
+  }
+
+  ofstream ostr;
+  ostr.open(filename);
+  if (ostr.is_open()) { 
+    ostr << setprecision(20) << "# vtk DataFile Version 3.0" << endl
+         << "vtk output" << endl << "ASCII" << endl
+         << "DATASET POLYDATA" << endl 
+         << "POINTS " << path.size() << " double" << endl;
+    for (int i=0; i<path.size(); i++)
+      ostr << path[i]->getApprox(1e-16).getX().mid() << " " << path[i]->getApprox(1e-16).getY().mid() << " " << path[i]->getApprox(1e-16).getZ().mid() << endl;
+    ostr<<endl<<"LINES 1 "<<path.size()+1<<endl<<path.size()<<" ";
+    for (int i=0; i<path.size(); i++)
+      ostr<<i<<" ";
+    ostr.close();
+  } else {
+    cout<<"could not write to file"<<endl;
+  }
+}
+
 class PathTriangle {
  public:
   PathVertex * p[3];
@@ -326,25 +326,25 @@ class PathTriangle {
 };
 
 void savePathTriangles(std::vector<PathTriangle> & ts, const char * filename, bool saveTranformed) {
-  // ofstream ostr;
-  // ostr.open(filename);
-  // if (ostr.is_open()) {
-  //   ostr << setprecision(20) << "# vtk DataFile Version 3.0" << endl
-  //        << "vtk output" << endl << "ASCII" << endl
-  //        << "DATASET POLYDATA" << endl 
-  //        << "POINTS " << ts.size()*3 << " double" << endl;
-  //   for (int i=0; i<ts.size(); i++)
-  //     for (int j=0; j<3; j++)
-  //       if (saveTranformed)
-  //         ostr << ts[i].p[j]->transformed2d->getApprox().getX().mid() << " " << ts[i].p[j]->transformed2d->getApprox().getY().mid() << " 0.0" << endl;
-  //       else
-  //         ostr << ts[i].p[j]->original->getApprox().getX().mid() << " " << ts[i].p[j]->original->getApprox().getY().mid() << " " << ts[i].p[j]->original->getApprox().getZ().mid() << endl;
+  ofstream ostr;
+  ostr.open(filename);
+  if (ostr.is_open()) {
+    ostr << setprecision(20) << "# vtk DataFile Version 3.0" << endl
+         << "vtk output" << endl << "ASCII" << endl
+         << "DATASET POLYDATA" << endl 
+         << "POINTS " << ts.size()*3 << " double" << endl;
+    for (int i=0; i<ts.size(); i++)
+      for (int j=0; j<3; j++)
+        if (saveTranformed)
+          ostr << ts[i].p[j]->transformed2d->getApprox().getX().mid() << " " << ts[i].p[j]->transformed2d->getApprox().getY().mid() << " 0.0" << endl;
+        else
+          ostr << ts[i].p[j]->original->getApprox().getX().mid() << " " << ts[i].p[j]->original->getApprox().getY().mid() << " " << ts[i].p[j]->original->getApprox().getZ().mid() << endl;
 
-  //   ostr << endl << "POLYGONS " << ts.size() << " " << 4*ts.size() << endl;
-  //   for (int i=0; i<ts.size(); i++)
-  //     ostr << "3 " << 3*i << " " << 3*i+1 << " " << 3*i+2 << endl;
-  //   ostr.close();
-  // } else { cout<<"could not open file"<<endl; return; }
+    ostr << endl << "POLYGONS " << ts.size() << " " << 4*ts.size() << endl;
+    for (int i=0; i<ts.size(); i++)
+      ostr << "3 " << 3*i << " " << 3*i+1 << " " << 3*i+2 << endl;
+    ostr.close();
+  } else { cout<<"could not open file"<<endl; return; }
 }
 
 void flattenTriangles(std::vector<PathTriangle> & triangles, int n) {
@@ -424,21 +424,21 @@ class State {
     nPath = n;
   }
   void save(const char * filename) {
-    // ofstream ostr;
-    // ostr.open(filename);
-    // if (ostr.is_open()) {
-    //   ostr << setprecision(20)<< edges.size()<<" "<<nPath<<endl;
-    //   ostr << left.size()<<" "<<right.size()<<endl;
-    //   for (int i=0; i<edges.size(); i++) {
-    //     ostr<<edges[i].left->transformed2d->getApprox(1e-16).getX().mid()<<" "<<edges[i].left->transformed2d->getApprox(1e-16).getY().mid()<<endl;
-    //     ostr<<edges[i].right->transformed2d->getApprox(1e-16).getX().mid()<<" "<<edges[i].right->transformed2d->getApprox(1e-16).getY().mid()<<endl;
-    //   }
-    //   for (int i=0; i<left.size(); i++)
-    //     ostr<<left[i]->transformed2d->getApprox(1e-16).getX().mid()<<" "<<left[i]->transformed2d->getApprox(1e-16).getY().mid()<<endl;
-    //   for (int i=0; i<right.size(); i++)
-    //     ostr<<right[i]->transformed2d->getApprox(1e-16).getX().mid()<<" "<<right[i]->transformed2d->getApprox(1e-16).getY().mid()<<endl;
-    //   ostr.close();
-    // } else { cout<<"could not open file"<<endl; }
+    ofstream ostr;
+    ostr.open(filename);
+    if (ostr.is_open()) {
+      ostr << setprecision(20)<< edges.size()<<" "<<nPath<<endl;
+      ostr << left.size()<<" "<<right.size()<<endl;
+      for (int i=0; i<edges.size(); i++) {
+        ostr<<edges[i].left->transformed2d->getApprox(1e-16).getX().mid()<<" "<<edges[i].left->transformed2d->getApprox(1e-16).getY().mid()<<endl;
+        ostr<<edges[i].right->transformed2d->getApprox(1e-16).getX().mid()<<" "<<edges[i].right->transformed2d->getApprox(1e-16).getY().mid()<<endl;
+      }
+      for (int i=0; i<left.size(); i++)
+        ostr<<left[i]->transformed2d->getApprox(1e-16).getX().mid()<<" "<<left[i]->transformed2d->getApprox(1e-16).getY().mid()<<endl;
+      for (int i=0; i<right.size(); i++)
+        ostr<<right[i]->transformed2d->getApprox(1e-16).getX().mid()<<" "<<right[i]->transformed2d->getApprox(1e-16).getY().mid()<<endl;
+      ostr.close();
+    } else { cout<<"could not open file"<<endl; }
   }
 };
 

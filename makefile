@@ -72,7 +72,7 @@ delaunay: delaunay.o simplify.o expander2.o poly.o polyhedron.o triangulate.o \
 	triangulate.o io.o object.o acp.o \
 	$(LFLAGS) -odelaunay
 
-path3d.o: path3d.cc path3d.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h 
+path3d.o: path3d.cc path3d.h polyhedron.h octree.h rbtree.h object.h pv.h acp.h geometry3d.h io.h
 	$(COMPILE) path3d.cc
 
 path3d_test: path3d_test.cc path3d.o  polyhedron.o triangulate.o io.o object.o acp.o  poly.o
