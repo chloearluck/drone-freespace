@@ -437,13 +437,13 @@ void shortestPath(std::vector<PathTriangle> & triangles, PathVertex * start, Pat
     PathVertex * r = ((l != p)? p : q);
     edges.push_back(PathEdge(l, r)); 
   }
-  if (edges[0].left->original == start->original)
+  if (edges[0].left->original == start->original || edges[0].left->original->identical(start->original))
     start = edges[0].left;
-  if (edges[0].right->original == start->original)
+  if (edges[0].right->original == start->original || edges[0].right->original->identical(start->original))
     start = edges[0].right;
-  if (edges[edges.size()-1].left->original == end->original)
+  if (edges[edges.size()-1].left->original == end->original || edges[edges.size()-1].left->original->identical(end->original))
     end = edges[edges.size()-1].left;
-  if (edges[edges.size()-1].right->original == end->original)
+  if (edges[edges.size()-1].right->original == end->original || edges[edges.size()-1].right->original->identical(end->original))
     end = edges[edges.size()-1].right;
   edges.push_back(PathEdge(end, end));
 
