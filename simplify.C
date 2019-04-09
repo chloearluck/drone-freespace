@@ -3,8 +3,11 @@
 void simplify (Polyhedron *a, double d, bool opt2)
 {
   bool flag = !a->cells.empty();
+  cout << "calling simplify 1"<< endl;
   simplify1(a, d);
+  cout << "calling simplify 2"<< endl;
   simplify2(a, d, opt2);
+  cout << "done simplify 2"<< endl;
   a->removeNullFaces();
   if (flag) {
     a->clearCells();

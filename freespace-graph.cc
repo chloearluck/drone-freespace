@@ -549,7 +549,9 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & close_blockspaces, std
     //create neighbor edges
     for (int i=0; i<blockspaces.size(); i++) {
       int j = (i+1)%blockspaces.size();
+      cout << "computing block_union" << endl;
       Polyhedron * block_union = blockspaces[i]->boolean(blockspaces[j], Union);
+      cout << "computing winding numbers" << endl;
       block_union->computeWindingNumbers();
       for (int k=0; k< block_union->cells.size(); k++)
         if (block_union->cells[k]->getWN() == 0) {
@@ -579,9 +581,11 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & close_blockspaces, std
           ni->neighborIntersectionIndices[pos_i].push_back(k);
           nj->neighborIntersectionIndices[pos_j].push_back(k);
         }
+      cout <<"start simplify block_union"<<endl;
       time(&start2);
       simplify(block_union, 1e-6);
       time(&end2);
+      cout <<"end simplify block_union"<<endl;
       simplify_time += difftime(end2, start2);
       std::string s = std::string(dir) + "/" + std::to_string(level) + "-" + std::to_string(i) + "-" + std::to_string(j) + ".tri";
       savePoly(block_union, s.c_str());
