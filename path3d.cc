@@ -711,7 +711,7 @@ void localPath(PTR<Point> a, PTR<Point> b, HFaces & pathfaces, Points & path) {
         pathChanged = true;
       else 
         for (int j=0; j<vertPath.size(); j++)
-          if (vertPath[j]->original != oldPath[j]->original)
+          if (vertPath[j]->original != oldPath[j]->original && !vertPath[j]->original->identical(oldPath[j]->original))
             pathChanged = true;
       changedThisIteration = changedThisIteration || pathChanged;
 
