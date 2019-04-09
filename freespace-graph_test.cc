@@ -56,14 +56,14 @@ int main (int argc, char *argv[]) {
     srandom(seed);
   }
 
-  const char * graph_dir = "droneRoomGraph";
+  const char * graph_dir = "skinny-lattice-graph";
 
   //--------------------------------
   // Test creating a freespace-graph
-  const char * blockspace_dir = "droneRoomOutput";
+  const char * blockspace_dir = "skinny-lattice-output";
   double theta = M_PI / 20;
   double clearance_unit = 0.05;
-  int num_levels = 3;
+  int num_levels = 1;
   
   time(&start_t);
   testCreateGraph(blockspace_dir, graph_dir, theta, clearance_unit, num_levels);
@@ -73,8 +73,8 @@ int main (int argc, char *argv[]) {
 
   //--------------------------------
   // Test searching a freespace-graph
-  PTR<Point> start = new Point(-2.5,0.0, -1.0);
-  PTR<Point> end = new Point(6.0,0.0,0.0);
+  PTR<Point> start = new Point(-2.0,0.0, -0.5);
+  PTR<Point> end = new Point(5.0,0.0,0.0);
   int startRotationIndex = 0;
   int endRotationIndex = 0;
   
