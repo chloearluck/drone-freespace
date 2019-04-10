@@ -99,7 +99,9 @@ pair <PTR<Point>, PTR<Point> > nearestPointPair(Polyhedron * poly, int i, int j)
 }
 
 PTR<Point> nearestPoint(Polyhedron * poly, int cell_index, PTR<Point> p) {
-  poly->computeWindingNumbers();
+  if (poly->cells.empty())
+    poly->computeWindingNumbers();
+  
   int p_index = poly->containingCell(p);
   if (p_index == cell_index)
     return p;
@@ -153,7 +155,6 @@ void FreeSpaceGraph::deepestPath(FreeSpaceGraph::Node * n, PTR<Point> p, PTR<Poi
   Polyhedron * childspace = loadPoly(s.c_str());
   assert(childspace != NULL);
   assert(childspace->cells.size() != 0);
-  childspace->computeWindingNumbers();
   for (int i=0; i<childspace->cells.size(); i++)
     if (childspace->cells[i]->getWN() == 0) {
       PTR<Point> r = nearestPoint(childspace, i, p);
@@ -233,7 +234,6 @@ void FreeSpaceGraph::nodePointPath(std::vector<FreeSpaceGraph::Node*> & nodes, P
 
     if (to->parent == from) {
       Polyhedron * to_blockspace = loadPoly((dir + "/" + std::to_string(to->level) + "-" + std::to_string(to->blockspace_index) + ".tri").c_str());
-      to_blockspace->computeWindingNumbers();
       assert(to_blockspace != NULL);
       if (to_blockspace->containingCell(p) == to->cell_index) {
         rev.push_back(make_pair(to, p));
@@ -257,7 +257,6 @@ void FreeSpaceGraph::nodePointPath(std::vector<FreeSpaceGraph::Node*> & nodes, P
     int bj = (bi == to->blockspace_index)? from->blockspace_index : to->blockspace_index;
     std::string s = std::string(dir) + "/" + std::to_string(to->level) + "-" + std::to_string(bi) + "-" + std::to_string(bj) + ".tri";
     Polyhedron * intersection = loadPoly(s.c_str() );
-    intersection->computeWindingNumbers();
     int cell_index = intersection->containingCell(p);
     assert(intersection != NULL);
     if ( std::find(to->neighborIntersectionIndices[k].begin(), to->neighborIntersectionIndices[k].end(), cell_index) != to->neighborIntersectionIndices[k].end()) {
@@ -381,7 +380,6 @@ void FreeSpaceGraph::getPath(Node * start, Node * end, PTR<Point> a, PTR<Point> 
   //deepen start and end as much as possible
   for (int level= start->level+1; level <num_levels; level++) {
     Polyhedron * space = loadPoly((dir + "/" + std::to_string(level) + "-" + std::to_string(start->blockspace_index) + ".tri").c_str());
-    space->computeWindingNumbers();
     int cell_index = space->containingCell(a);
     bool inside = (space->cells[cell_index]->getWN() == 0);
     delete space;
@@ -392,7 +390,6 @@ void FreeSpaceGraph::getPath(Node * start, Node * end, PTR<Point> a, PTR<Point> 
   }
   for (int level= end->level+1; level <num_levels; level++) {
     Polyhedron * space = loadPoly((dir + "/" + std::to_string(level) + "-" + std::to_string(end->blockspace_index) + ".tri").c_str());
-    space->computeWindingNumbers();
     int cell_index = space->containingCell(b);
     bool inside = (space->cells[cell_index]->getWN() == 0);
     delete space;
