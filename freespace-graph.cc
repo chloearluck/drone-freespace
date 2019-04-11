@@ -100,8 +100,7 @@ pair <PTR<Point>, PTR<Point> > nearestPointPair(Polyhedron * poly, int i, int j)
 }
 
 PTR<Point> nearestPoint(Polyhedron * poly, int cell_index, PTR<Point> p) {
-  if (poly->cells.empty())
-    poly->computeWindingNumbers();
+  assert(!poly->cells.empty());
   
   int p_index = poly->containingCell(p);
   if (p_index == cell_index)
