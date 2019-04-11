@@ -1,5 +1,6 @@
 #include "freespace-graph.h"
 bool DEBUG = true;
+const double SHRINKING_RADIUS = 1e-5;
 
 Polyhedron * loadPoly(const char * filename) {
   Polyhedron * poly;
@@ -542,38 +543,44 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & close_blockspaces, std
         }
     }
 
+    Polyhedron * tmp = loadPolyVTK("sphere.vtk");
+    Polyhedron * shrinking_sphere = tmp->scale(SHRINKING_RADIUS);
+
     cout<<"creating edges"<<endl;
     //create neighbor edges
     for (int i=0; i<blockspaces.size(); i++) {
       int j = (i+1)%blockspaces.size();
       cout << "computing block_union" << endl;
       Polyhedron * block_union = blockspaces[i]->boolean(blockspaces[j], Union);
-      Polyhedron * block_union_simplified = block_union->copy();
+
+      cout << "shrinking block_union" << endl;
+      tmp = minkowskiSum(block_union, shrinking_sphere);
+      delete block_union; block_union = tmp;
+
       cout <<"start simplify block_union"<<endl;
       time(&start2);
-      simplify(block_union_simplified, 1e-6);
+      simplify(block_union, 1e-6);
       time(&end2);
+      simplify_time += difftime(end2, start2);
       cout <<"end simplify block_union"<<endl;
-      Polyhedron * block_union_strict = block_union->boolean(block_union_simplified, Union);
 
       cout << "computing winding numbers" << endl;
-      block_union_simplified->computeWindingNumbers();
-      block_union_strict->computeWindingNumbers();
-      if (block_union_simplified->cells.size() != block_union_strict->cells.size()) cout << "WARN: simplified and strict have a different number of cells" << endl;
-      for (int l=0; l< block_union_strict->cells.size(); l++)
-        if (block_union_strict->cells[l]->getWN() == 0) {
-          cout<<i<<" "<<j<<endl;
-          cout<<"block_union_strict cell "<<l<<endl;
+      block_union->computeWindingNumbers();
 
-          int ci, cj, k;
-          if (l == 0) {
-            ci = 0; cj = 0; k = 0;
+      cout << "saving block_union" <<endl;
+      std::string s = std::string(dir) + "/" + std::to_string(level) + "-" + std::to_string(i) + "-" + std::to_string(j) + ".tri";
+      savePoly(block_union, s.c_str());
+
+      for (int k=0; k< block_union->cells.size(); k++)
+        if (block_union->cells[k]->getWN() == 0) {
+          cout<<i<<" "<<j<<" "<<k<<endl;
+          int ci, cj;
+          if (k == 0) {
+            ci = 0; cj = 0;
           } else {
-            PTR<Point> p = block_union_strict->cells[l]->interiorPoint();
-            k = block_union_simplified->containingCell(p);
+            PTR<Point> p = block_union->cells[k]->interiorPoint();
             ci = blockspaces[i]->containingCell(p);
             cj = blockspaces[j]->containingCell(p); 
-            cout << "block_union_simplified cell "<<k<<endl;
           }
           Node * ni = graph[level][i]->get(ci);
           Node * nj = graph[level][j]->get(cj);
@@ -591,9 +598,6 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & close_blockspaces, std
           ni->neighborIntersectionIndices[pos_i].push_back(k);
           nj->neighborIntersectionIndices[pos_j].push_back(k);
         }
-      simplify_time += difftime(end2, start2);
-      std::string s = std::string(dir) + "/" + std::to_string(level) + "-" + std::to_string(i) + "-" + std::to_string(j) + ".tri";
-      savePoly(block_union, s.c_str());
       delete block_union;  
     }
 
