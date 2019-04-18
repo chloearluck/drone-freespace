@@ -943,18 +943,31 @@ void Polyhedron::formCellsAux (const Shells &shells)
 {
   Shells inner;
   cells.push_back(new Cell(0));
-  for (Shells::const_iterator s = shells.begin(); s != shells.end(); ++s) {
-    (*s)->setBBox();
-    (*s)->setOctree();
-    if ((*s)->outer())
-      cells.push_back(new Cell(*s));
-    else
-      inner.push_back(*s);
-  }
+  for (Shells::const_iterator s = shells.begin(); s != shells.end(); ++s)
+    if ((*s)->hfaces.size() < 3)
+      removeShell(*s);
+    else {
+      (*s)->setBBox();
+      (*s)->setOctree();
+      if ((*s)->outer())
+	cells.push_back(new Cell(*s));
+      else
+	inner.push_back(*s);
+    }
+  removeNullFaces();
   Octree<Cell *> *octreec = cellOctree();
   for (Shells::iterator s = inner.begin(); s != inner.end(); ++s)
     enclosingCell(*s, octreec)->addInner(*s);
   delete octreec;
+}
+
+void Polyhedron::removeShell (Shell *s)
+{
+  for (HFaces::iterator h = s->hfaces.begin(); h != s->hfaces.end(); ++h) {
+    HEdge *e = (*h)->f->h;
+    if (e)
+      removeLoop(e);
+  }
 }
 
 void Polyhedron::formShells (Shells &shells)

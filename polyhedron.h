@@ -771,6 +771,7 @@ class Polyhedron {
   Face * addFace (HEdge *h);
   void formCells ();
   void formCellsAux (const Shells &shells);
+  void removeShell (Shell *s);
   void formShells (Shells &shells);
   Shell * formShell (HFace *f) const;
   Cell * enclosingCell (Shell *s, Octree<Cell *> *octreec) const;
