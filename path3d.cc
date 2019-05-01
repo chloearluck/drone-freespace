@@ -850,7 +850,7 @@ void testBoundaryCondition(Polyhedron * poly, int mode) {
 void findPath(Polyhedron * blockspace, int cell_index, PTR<Point> start, PTR<Point> end, Points &path) {
   //TO DO: make shortestPath algorithm can handle when start or end is a vertex
 
-  blockspace->computeWindingNumbers();
+  assert(blockspace->cells.size() != 0);
   Cell * cell = blockspace->cells[cell_index];
   bool startOutside = blockspace->containingCell(start) != cell_index;
   bool endOutside = blockspace->containingCell(end) != cell_index;
@@ -887,15 +887,15 @@ void findPath(Polyhedron * blockspace, int cell_index, PTR<Point> start, PTR<Poi
     start = p_start;
   if (endOutside)
     end = p_end;
-  
+
   std::vector<PTR<FaceIntersectionPoint> > points;
   PTR<Point> r =  new DiffPoint(end, start);
+
   for (int i=0; i<cell->nShells(); i++) {
     Shell * shell = cell->getShell(i);
     for (int j=0; j<shell->getHFaces().size(); j++) {
       HFace * hface = shell->getHFaces()[j];
-      if (hface->getF()->contains(start, false) || hface->getF()->contains(end, false))
-        continue;
+
       if (hface == hf_start || hface == hf_end)
         continue;
       PTR<FaceIntersectionPoint> q = new FaceIntersectionPoint(start, end, hface);
@@ -942,7 +942,16 @@ void findPath(Polyhedron * blockspace, int cell_index, PTR<Point> start, PTR<Poi
       path.insert(path.end(), subPath.begin()+1, subPath.end());
     } else 
       path.push_back((PTR<Point>)points[points.size()-1]);
+  } else if (startOutside && endOutside) {
+    PTR<Point> p = new MidPoint(start, end);
+    if (blockspace->containingCell(p) != cell_index) {
+      HFaces subHfaces; Points subPath;
+      bfs(hf_start, hf_end, subHfaces);
+      localPath(start, end, subHfaces, subPath);
+      path.insert(path.end(), subPath.begin()+1, subPath.end());
+    }
   }
+
   path.push_back(end);  
 }
 
