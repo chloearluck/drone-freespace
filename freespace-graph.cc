@@ -547,7 +547,7 @@ FreeSpaceGraph::FreeSpaceGraph(std::vector<Polyhedron*> & close_blockspaces, std
 
     cout<<"creating edges"<<endl;
     //create neighbor edges
-    for (int i=0; i<blockspaces.size(); i++) {
+    for (int i=0; i<1; i++) {
       int j = (i+1)%blockspaces.size();
       cout << "computing block_union" << endl;
       Polyhedron * block_union = blockspaces[i]->boolean(blockspaces[j], Union);

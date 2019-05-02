@@ -5,14 +5,14 @@ void testCreateGraph(const char * blockspace_dir, const char * graph_dir, double
   
   std::vector<Polyhedron *> close_blockspaces;
   char s[50];
-  for (int i=0; i<=40; i++) {
+  for (int i=0; i<=2; i++) {
     sprintf(s, "%s/close%02d-out.vtk", blockspace_dir, i);
     Polyhedron * p = loadPolyVTK(s);
     close_blockspaces.push_back(p);
   }
 
   std::vector<Polyhedron *> rough_blockspaces;
-  for (int i=0; i<=40; i++) {
+  for (int i=0; i<=2; i++) {
     sprintf(s, "%s/rough%02d-out.vtk", blockspace_dir, i);
     Polyhedron * p = loadPolyVTK(s);
     rough_blockspaces.push_back(p);
@@ -73,14 +73,14 @@ int main (int argc, char *argv[]) {
 
   //--------------------------------
   // Test searching a freespace-graph
-  PTR<Point> start = new Point(-2.0,0.0, -0.5);
-  PTR<Point> end = new Point(5.0,0.0,0.0);
-  int startRotationIndex = 0;
-  int endRotationIndex = 0;
+  //PTR<Point> start = new Point(-2.0,0.0, -0.5);
+  //PTR<Point> end = new Point(5.0,0.0,0.0);
+  //int startRotationIndex = 0;
+  //int endRotationIndex = 0;
   
-  time(&start_t);
-  testSearchGraph(graph_dir, start, end, startRotationIndex, endRotationIndex);
-  time(&end_t);
-  cout << "Elapsed time: "<< difftime (end_t,start_t) << " seconds" << endl;
+  //time(&start_t);
+  //testSearchGraph(graph_dir, start, end, startRotationIndex, endRotationIndex);
+  //time(&end_t);
+  //cout << "Elapsed time: "<< difftime (end_t,start_t) << " seconds" << endl;
   //--------------------------------
 }
