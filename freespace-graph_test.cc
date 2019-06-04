@@ -3,13 +3,13 @@
 void testCreateGraph(const char * blockspace_dir, const char * graph_dir, double theta, double clearance_unit, int num_levels) {
   int numRotations = floor(2*M_PI/theta);
   
-  std::vector<Polyhedron *> close_blockspaces;
-  char s[50];
-  for (int i=0; i<=40; i++) {
-    sprintf(s, "%s/close%02d-out.vtk", blockspace_dir, i);
-    Polyhedron * p = loadPolyVTK(s);
-    close_blockspaces.push_back(p);
-  }
+  // std::vector<Polyhedron *> close_blockspaces;
+  // char s[50];
+  // for (int i=0; i<=40; i++) {
+  //   sprintf(s, "%s/close%02d-out.vtk", blockspace_dir, i);
+  //   Polyhedron * p = loadPolyVTK(s);
+  //   close_blockspaces.push_back(p);
+  // }
 
   std::vector<Polyhedron *> rough_blockspaces;
   for (int i=0; i<=40; i++) {
@@ -18,7 +18,7 @@ void testCreateGraph(const char * blockspace_dir, const char * graph_dir, double
     rough_blockspaces.push_back(p);
   }
 
-  FreeSpaceGraph graph(close_blockspaces, rough_blockspaces, theta, clearance_unit, num_levels, graph_dir);
+  FreeSpaceGraph graph(rough_blockspaces, rough_blockspaces, theta, clearance_unit, num_levels, graph_dir);
 }
 
 void testSearchGraph(const char * graph_dir, PTR<Point> start, PTR<Point> end, int startRotationIndex, int endRotationIndex) {
