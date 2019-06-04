@@ -4,7 +4,7 @@ void testCreateGraph(const char * blockspace_dir, const char * graph_dir, double
   int numRotations = floor(2*M_PI/theta);
   
   // std::vector<Polyhedron *> close_blockspaces;
-  char s[5s0];
+  char s[50];
   // for (int i=0; i<=40; i++) {
   //   sprintf(s, "%s/close%02d-out.vtk", blockspace_dir, i);
   //   Polyhedron * p = loadPolyVTK(s);
