@@ -381,9 +381,8 @@ void FreeSpaceGraph::getPath(Node * start, Node * end, PTR<Point> a, PTR<Point> 
   for (int level= start->level+1; level <num_levels; level++) {
     Polyhedron * space = loadPoly((dir + "/" + std::to_string(level) + "-" + std::to_string(start->blockspace_index) + ".tri").c_str());
     int cell_index = space->containingCell(a);
-    bool inside = (space->cells[cell_index]->getWN() == 0);
     delete space;
-    if (inside)
+    if (graph[level][start->blockspace_index]->get(cell_index) != NULL)
       start = graph[level][start->blockspace_index]->get(cell_index);
     else
       break;
@@ -391,9 +390,8 @@ void FreeSpaceGraph::getPath(Node * start, Node * end, PTR<Point> a, PTR<Point> 
   for (int level= end->level+1; level <num_levels; level++) {
     Polyhedron * space = loadPoly((dir + "/" + std::to_string(level) + "-" + std::to_string(end->blockspace_index) + ".tri").c_str());
     int cell_index = space->containingCell(b);
-    bool inside = (space->cells[cell_index]->getWN() == 0);
     delete space;
-    if (inside)
+    if (graph[level][end->blockspace_index]->get(cell_index) != NULL)
       end = graph[level][end->blockspace_index]->get(cell_index);
     else
       break;
