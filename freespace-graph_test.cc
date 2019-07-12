@@ -26,14 +26,12 @@ void testSearchGraph(const char * graph_dir, PTR<Point> start, PTR<Point> end, i
   std::vector<std::pair<PTR<Point>, double > > path;
 
   Polyhedron * p = loadPoly((std::string(graph_dir) + "/0-" + std::to_string(startRotationIndex) + ".tri").c_str());
-  p->computeWindingNumbers();
   assert(!p->contains(start));
   int cell_index = p->containingCell(start);
   FreeSpaceGraph::Node * startNode = test.graph[0][startRotationIndex]->get(cell_index);
   delete p;
 
   p = loadPoly((std::string(graph_dir) + "/0-" + std::to_string(endRotationIndex) + ".tri").c_str());
-  p->computeWindingNumbers();
   assert(!p->contains(end));
   cell_index = p->containingCell(end);
   FreeSpaceGraph::Node * endNode = test.graph[0][endRotationIndex]->get(cell_index);
@@ -56,14 +54,14 @@ int main (int argc, char *argv[]) {
     srandom(seed);
   }
 
-  const char * graph_dir = "skinny-lattice-graph";
+  const char * graph_dir = "frustum-tworooms-graph";
 
   //--------------------------------
   // Test creating a freespace-graph
-  const char * blockspace_dir = "skinny-lattice-output";
+  const char * blockspace_dir = "frustum-tworooms-output";
   double theta = M_PI / 20;
   double clearance_unit = 0.05;
-  int num_levels = 1;
+  int num_levels = 5;
   
   time(&start_t);
   testCreateGraph(blockspace_dir, graph_dir, theta, clearance_unit, num_levels);
@@ -73,8 +71,8 @@ int main (int argc, char *argv[]) {
 
   //--------------------------------
   // Test searching a freespace-graph
-  PTR<Point> start = new Point(-2.0,0.0, -0.5);
-  PTR<Point> end = new Point(5.0,0.0,0.0);
+  PTR<Point> start = new Point(2.5,-1.0, 0.0);
+  PTR<Point> end = new Point(2.5,8.0,0.0);
   int startRotationIndex = 0;
   int endRotationIndex = 0;
   

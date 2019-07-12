@@ -280,11 +280,12 @@ double displacement (const VPMap &vpmap, double &dmax)
 
 void simplify2 (Polyhedron *a, double d, bool opt2)
 {
+  double dGoal = 0.999e-12; // 0.999*d // HACK!
   double t = getTime();
   int n = 0;
   VPMap vpmap;
   FeatureSet fslp = smallFeatures(a, 3.465*d, 0), fs = smallFeatures(fslp, d);
-  while (separation(fslp) < 0.999*d) {
+  while (separation(fslp) < dGoal) {
     ++n;
     simplify2s(a, d, fslp, vpmap);
   }
@@ -299,7 +300,7 @@ void simplify2 (Polyhedron *a, double d, bool opt2)
       double dbest = displacement(vpmap, dmax);
       if (dbest + 1e-8 > dprev)
         break;
-      while (separation(fslp) < 0.999*d) {
+      while (separation(fslp) < dGoal) {
 	++n;
 	simplify2s(a, d, fslp, vpmap);
       }

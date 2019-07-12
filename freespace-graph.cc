@@ -6,7 +6,7 @@ Polyhedron * loadPoly(const char * filename) {
   Polyhedron * poly;
   ifstream infile (filename);
   if (infile.is_open()) {
-    poly = readPolyhedron (infile);
+    poly = readPolyhedron (infile, false);
     infile.close();
   } else {
     cout<<"could not read from file"<<endl;
