@@ -72,6 +72,17 @@ void addCollapseFlips (Edge *e, double d, IFeatureQ &fq);
 
 void addFlips (Edge *e, double d, IFeatureQ &fq);
 
+class Flip {
+ public:
+  Vertex *a, *b, *c, *d;
+
+  Flip (Vertex *a, Vertex *b, Vertex *c, Vertex *d) : a(a), b(b), c(c), d(d) {}
+  bool operator< (const Flip &x) const {
+    return a < x.a || a == x.a && b < x.b || a == x.a && b == x.b && c < x.c ||
+      a == x.a && b == x.b && c == x.c && d < x.d;
+  }
+};
+
 void simplify1 (Polyhedron *a, double d, IFeatureQ &fq, IFeatureQ &nfq,
 		Octree<Face *> *octree, VPMap &vpmap, int &n1, int &n2);
 
@@ -85,7 +96,7 @@ bool badCollapse (Vertex *v, Octree<Face *> *octree);
 void addStar (Vertex *v, double d, IFeatureQ &fq);
 
 bool flip (Polyhedron *a, double d, HEdge *e, IFeatureQ &fq, IFeatureQ &nfq,
-	   Octree<Face *> *octree, VPMap &vpmap);
+	   Octree<Face *> *octree, VPMap &vpmap, set<Flip> &flips);
 
 bool flippable (HEdge *e, double d);
 

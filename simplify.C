@@ -3,7 +3,7 @@
 void simplify (Polyhedron *a, double d, bool opt2)
 {
   bool flag = !a->cells.empty();
-  cout << "calling simplify 1"<< endl;
+  cout << "calling simplify 1" << endl;
   simplify1(a, d);
   cout << "calling simplify 2"<< endl;
   simplify2(a, d, opt2);
@@ -73,6 +73,7 @@ Octree<Face *> * faceOctree (Polyhedron *a, double s)
 void simplify1 (Polyhedron *a, double d, IFeatureQ &fq, IFeatureQ &nfq,
 		Octree<Face *> *octree, VPMap &vpmap, int &n1, int &n2)
 {
+  set<Flip> flips;
   while (!fq.empty()) {
     IFeature f = fq.top();
     fq.pop();
@@ -81,7 +82,7 @@ void simplify1 (Polyhedron *a, double d, IFeatureQ &fq, IFeatureQ &nfq,
 	if (collapse(a, d, f.e, fq, nfq, octree, vpmap))
 	  ++n1;
       }
-      else if (flip(a, d, f.getH(), fq, nfq, octree, vpmap))
+      else if (flip(a, d, f.getH(), fq, nfq, octree, vpmap, flips))
 	++n2;
   }
 }
@@ -179,14 +180,15 @@ void addStar (Vertex *v, double d, IFeatureQ &fq)
 }
 
 bool flip (Polyhedron *a, double d, HEdge *e, IFeatureQ &fq, IFeatureQ &nfq,
-	   Octree<Face *> *octree, VPMap &vpmap)
+	   Octree<Face *> *octree, VPMap &vpmap, set<Flip> &flips)
 {
-  Vertex *t = e->tail(), *h = e->head(), *v = e->getNext()->head();
+  Vertex *t = e->tail(), *h = e->head(), *v = e->getNext()->head(),
+    *w = e->ccw()->getNext()->head();
   if (closerPair(t->getP(), h->getP(), v->getP(), t->getP()))
     return collapse(a, d, e->getNext()->getE(), fq, nfq, octree, vpmap);
   if (closerPair(t->getP(), h->getP(), h->getP(), v->getP()))
     return collapse(a, d, e->getNext()->getNext()->getE(), fq, nfq, octree, vpmap);
-  if (!flippable(e, d))
+  if (!flippable(e, d) || flips.find(Flip(t, h, v, w)) != flips.end())
     return false;
   HEdge *vw = flip(a, e);
   octree->insert(vw->getF());
@@ -198,6 +200,7 @@ bool flip (Polyhedron *a, double d, HEdge *e, IFeatureQ &fq, IFeatureQ &nfq,
     addFlips(vw->getE(), d, nfq);
     return false;
   }
+  flips.insert(Flip(t, h, v, w));
   HEdge *wh = vw->getNext(), *hv = wh->getNext(), *vt = vw->ccw()->getNext(),
     *th = vt->getNext();
   addCollapseFlips(vw->getE(), d, fq);
