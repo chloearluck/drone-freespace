@@ -54,25 +54,47 @@ int main (int argc, char *argv[]) {
     srandom(seed);
   }
 
-  const char * graph_dir = "frustum-tworooms-graph";
+  // // --- Two Room Example ---
+  // const char * graph_dir = "frustum-tworooms-graph";
+  // const char * blockspace_dir = "frustum-tworooms-output";
+  // double theta = M_PI / 20;
+  // double clearance_unit = 0.05;
+  // int num_levels = 5;
+  
+  // time(&start_t);
+  // testCreateGraph(blockspace_dir, graph_dir, theta, clearance_unit, num_levels);
+  // time(&end_t);
+  // cout << "Elapsed time: "<< difftime (end_t,start_t)/60.0 << " minutes" << endl;
 
-  //--------------------------------
-  // Test creating a freespace-graph
-  const char * blockspace_dir = "frustum-tworooms-output";
+  // PTR<Point> start = new Point(2.5,-1.0, 0.0);
+  // PTR<Point> end = new Point(2.5,8.0,0.0);
+  // int startRotationIndex = 0;
+  // int endRotationIndex = 0;
+  
+  // time(&start_t);
+  // testSearchGraph(graph_dir, start, end, startRotationIndex, endRotationIndex);
+  // time(&end_t);
+  // cout << "Elapsed time: "<< difftime (end_t,start_t) << " seconds" << endl;
+  // //--------------------------------
+
+
+
+
+
+  // --- Lattice Example ---
+  const char * graph_dir = "skinny-lattice-graph";
+  const char * blockspace_dir = "skinny-lattice-output";
   double theta = M_PI / 20;
   double clearance_unit = 0.05;
-  int num_levels = 5;
+  int num_levels = 1;
   
   time(&start_t);
   testCreateGraph(blockspace_dir, graph_dir, theta, clearance_unit, num_levels);
   time(&end_t);
   cout << "Elapsed time: "<< difftime (end_t,start_t)/60.0 << " minutes" << endl;
-  //--------------------------------
 
-  //--------------------------------
-  // Test searching a freespace-graph
-  PTR<Point> start = new Point(2.5,-1.0, 0.0);
-  PTR<Point> end = new Point(2.5,8.0,0.0);
+  PTR<Point> start = new Point(-2.0,0.0, -0.5);
+  PTR<Point> end = new Point(5.0,0.0,0.0);
   int startRotationIndex = 0;
   int endRotationIndex = 0;
   
