@@ -24,7 +24,7 @@ int main (int argc, char *argv[]) {
     srandom(seed);
   }
 
-  Polyhedron * poly = loadPoly(filename);
+  Polyhedron * poly = loadPoly(filename, true);
   if (poly == NULL)
     return 1;
 

@@ -24,7 +24,7 @@ public:
   SinCosAlpha (Object<Parameter> *t) : tan_theta(t) {}
 };
 
-Polyhedron * loadPoly(const char * filename);
+Polyhedron * loadPoly(const char * filename, bool perturbed=false);
 void savePoly(Polyhedron * p, const char * filename);
 
 class FreeSpace {

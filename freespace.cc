@@ -2,7 +2,7 @@
 #include "simplify.h"
 #include <map>
 
-Polyhedron * loadPoly(const char * filename) {
+Polyhedron * loadPoly(const char * filename, bool perturbed) {
   int n = strlen(filename);
   char str[n+5];
   strncpy(str, filename, n);
@@ -11,7 +11,7 @@ Polyhedron * loadPoly(const char * filename) {
   Polyhedron * poly;
   ifstream infile (str);
   if (infile.is_open()) {
-    poly = readPolyhedronVTK (infile);
+    poly = readPolyhedronVTK (infile, perturbed);
     infile.close();
   } else {
     cout<<"could not read from file"<<endl;
@@ -624,23 +624,23 @@ FreeSpace::FreeSpace(Polyhedron * robot, Polyhedron * obstacle, PTR<Object<Param
 
   saveTriangulation("triangulation2.vtk", splitTList2);
 
-  Polyhedron * closeApprox = generateSweep(splitTList2);
-  savePoly(closeApprox, "closeApprox");
+  // Polyhedron * closeApprox = generateSweep(splitTList2);
+  // savePoly(closeApprox, "closeApprox");
   Polyhedron * roughApprox = generateSweep(splitTList);
   savePoly(roughApprox, "roughApprox");
 
   time_t start,end;
 
-  time (&start);
-  generateFreeSpaces(blockspaces_close, closeApprox, "close");
-  time (&end);
-  double closetime = difftime (end,start);
+  // time (&start);
+  // generateFreeSpaces(blockspaces_close, closeApprox, "close");
+  // time (&end);
+  // double closetime = difftime (end,start);
 
   time (&start);
   generateFreeSpaces(blockspaces_rough, roughApprox, "rough");
   time (&end);
   double roughtime = difftime (end,start);
 
-  cout << "close approximate free spaces generated in " << closetime/60.0 << " minutes" << endl;
+  // cout << "close approximate free spaces generated in " << closetime/60.0 << " minutes" << endl;
   cout << "rough approximate free spaces generated in " << roughtime/60.0 << " minutes" << endl;
 }
